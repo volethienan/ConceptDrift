@@ -1,0 +1,116 @@
+model:
+  hidden_dims: [256, 128, 64]
+  dropout: 0.0
+  architecture: sequential
+data:
+  source: prepared_npz
+  path: prepared_streams_v2/nf-unsw-nb15-v3/S1/stream_seed2001.npz
+  scenario: S1
+  window_size: 4096
+  n_windows: 36
+  warmup_windows: 4
+  task: binary
+  random_seed: 2001
+  stream_seed: 2001
+training:
+  batch_size: 256
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs_per_window: 1
+  label_delay: 1
+  device: cuda
+  num_threads: 2
+  model_seed: 21
+drift:
+  mmd_samples: 192
+  calibration_windows: 4
+  kappa: 2.0
+  z_max: 32.0
+  severity_threshold: 0.15
+  emergency_severity_threshold: 0.60
+  persistence: 2
+  top_k: 2
+  cooldown_windows: 0
+dasp:
+  baseline: dasp
+  eta_floor: 0.1
+  eta_ceiling: 2.0
+  memory_size: 5000
+  memory_batch_size: 256
+  guard_ratio: 0.2
+  refresh_reference_after_commit: true
+  recurrence_departure_threshold: 0.25
+  recurrence_return_threshold: 0.05
+  recurrence_anchor_strength: 0.25
+  recurrence_inference_anchor: false
+  v11_novelty_weight: 1.0
+  v11_balance_weight: 0.5
+  v11_redundancy_weight: 0.25
+  v11_min_per_class: 64
+  v16_performance_reference_windows: 5
+  v16_performance_min_history: 4
+  v16_macro_f1_drop: 0.08
+  v16_attack_recall_drop: 0.08
+  v16_performance_cooldown: 2
+  v17_adapter_max_rank: 32
+  v17_adapter_scale: 1.0
+  v17_input_adapter_dim: 16
+  v17_fast_input_adapter_plasticity: 1.0
+  v17_strong_input_adapter_plasticity: 1.0
+  v17_fast_rank: 4
+  v17_strong_rank: 32
+  v17_fast_epochs: 2
+  v17_strong_epochs: 4
+  v17_strong_recovery_windows: 5
+  v17_strong_base_layers: 0
+  v17_fast_replay_size: 256
+  v17_strong_replay_size: 512
+  v17_refresh_size: 256
+  v17_new_sample_weight: 3.0
+  v17_strong_new_sample_weight: 6.0
+  v17_iwms_temperature: 0.10
+  v17_iwms_confidence_power: 1.0
+  v17_iwms_uniform_mix: 0.25
+  v17_iwms_query_size: 512
+  v17_macro_f1_tolerance: 0.0
+  v17_attack_recall_tolerance: 0.01
+  v17_min_per_class_recall_tolerance: 0.01
+  v17_recent_mean_tolerance: 0.02
+  v17_memory_mean_tolerance: 0.02
+  v17_soft_commit_alphas: [1.0, 0.5, 0.25, 0.125, 0.0625]
+  v18_modulation_scale: 0.5
+  v18_fast_modulation_plasticity: 0.5
+  v18_strong_modulation_plasticity: 1.0
+  v18_replay_max_uniform_mix: 0.75
+  v18_replay_js_threshold: 0.10
+  v18_guard_history_size: 512
+  v18_query_entropy_weight: 0.5
+  v18_query_novelty_weight: 0.5
+  v18_query_disagreement_weight: 0.25
+  v18_query_global_fraction: 0.5
+  v18_query_candidate_multiplier: 4
+  v18_current_guard_fraction: 0.25
+  v18_current_guard_min_per_class: 8
+  v18_class_weight_multiplier: 2.0
+  fast_revision: event-gated-fused-v1
+  fast_warning_severity: 0.075
+  fast_input_gate_samples: 64
+  fast_stable_label_budget: 64
+  fast_guard_history_size: 128
+  fast_fast_replay_size: 128
+  fast_strong_replay_size: 256
+  fast_fast_epochs: 1
+  fast_strong_epochs: 2
+  fast_commit_alphas: [1.0, 0.5]
+baselines:
+  update_label_budget: 256
+  ssf_label_budget: 256
+  ssf_new_sample_weight: 3.0
+  ssf_lwf_lambda: 0.5
+  ssf_drift_p_value: 0.05
+  ssf_mask_steps: 25
+  ssf_mask_bins: 10
+  ssf_allow_pseudo_labels: false
+output:
+  directory: outputs_dasp_main_development
+  save_checkpoints: false

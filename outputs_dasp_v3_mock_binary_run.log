@@ -1,0 +1,110 @@
+completed 1/96 scenario=S0 stream=9401 method=dasp_safe_v2 macro=0.930248 collapse=0
+completed 2/96 scenario=S0 stream=9401 method=dasp_v3_memory macro=0.931747 collapse=0
+completed 3/96 scenario=S0 stream=9401 method=dasp_v3_query macro=0.931588 collapse=0
+completed 4/96 scenario=S0 stream=9401 method=dasp_v3_backbone macro=0.929054 collapse=0
+completed 5/96 scenario=S0 stream=9401 method=dasp_v3_checkpoint macro=0.929054 collapse=0
+completed 6/96 scenario=S0 stream=9401 method=dasp_v3 macro=0.944834 collapse=0
+completed 7/96 scenario=S0 stream=9401 method=ssf_budget macro=0.966035 collapse=0
+completed 8/96 scenario=S0 stream=9401 method=experience_replay macro=0.957732 collapse=0
+completed 9/96 scenario=S0 stream=9402 method=dasp_safe_v2 macro=0.939419 collapse=0
+completed 10/96 scenario=S0 stream=9402 method=dasp_v3_memory macro=0.939406 collapse=0
+completed 11/96 scenario=S0 stream=9402 method=dasp_v3_query macro=0.938523 collapse=0
+completed 12/96 scenario=S0 stream=9402 method=dasp_v3_backbone macro=0.940324 collapse=0
+completed 13/96 scenario=S0 stream=9402 method=dasp_v3_checkpoint macro=0.940324 collapse=0
+completed 14/96 scenario=S0 stream=9402 method=dasp_v3 macro=0.940324 collapse=0
+completed 15/96 scenario=S0 stream=9402 method=ssf_budget macro=0.973684 collapse=0
+completed 16/96 scenario=S0 stream=9402 method=experience_replay macro=0.967823 collapse=0
+completed 17/96 scenario=S0 stream=9403 method=dasp_safe_v2 macro=0.924892 collapse=0
+completed 18/96 scenario=S0 stream=9403 method=dasp_v3_memory macro=0.927852 collapse=0
+completed 19/96 scenario=S0 stream=9403 method=dasp_v3_query macro=0.921045 collapse=0
+completed 20/96 scenario=S0 stream=9403 method=dasp_v3_backbone macro=0.932043 collapse=0
+completed 21/96 scenario=S0 stream=9403 method=dasp_v3_checkpoint macro=0.932043 collapse=0
+completed 22/96 scenario=S0 stream=9403 method=dasp_v3 macro=0.932043 collapse=0
+completed 23/96 scenario=S0 stream=9403 method=ssf_budget macro=0.972471 collapse=0
+completed 24/96 scenario=S0 stream=9403 method=experience_replay macro=0.964834 collapse=0
+completed 25/96 scenario=S1 stream=9401 method=dasp_safe_v2 macro=0.826016 collapse=0
+completed 26/96 scenario=S1 stream=9401 method=dasp_v3_memory macro=0.825607 collapse=0
+completed 27/96 scenario=S1 stream=9401 method=dasp_v3_query macro=0.824830 collapse=0
+completed 28/96 scenario=S1 stream=9401 method=dasp_v3_backbone macro=0.831101 collapse=0
+completed 29/96 scenario=S1 stream=9401 method=dasp_v3_checkpoint macro=0.831101 collapse=0
+completed 30/96 scenario=S1 stream=9401 method=dasp_v3 macro=0.826912 collapse=0
+completed 31/96 scenario=S1 stream=9401 method=ssf_budget macro=0.857353 collapse=0
+completed 32/96 scenario=S1 stream=9401 method=experience_replay macro=0.838407 collapse=0
+completed 33/96 scenario=S1 stream=9402 method=dasp_safe_v2 macro=0.805984 collapse=0
+completed 34/96 scenario=S1 stream=9402 method=dasp_v3_memory macro=0.815003 collapse=0
+completed 35/96 scenario=S1 stream=9402 method=dasp_v3_query macro=0.824052 collapse=0
+completed 36/96 scenario=S1 stream=9402 method=dasp_v3_backbone macro=0.822134 collapse=0
+completed 37/96 scenario=S1 stream=9402 method=dasp_v3_checkpoint macro=0.822134 collapse=0
+completed 38/96 scenario=S1 stream=9402 method=dasp_v3 macro=0.822134 collapse=0
+completed 39/96 scenario=S1 stream=9402 method=ssf_budget macro=0.863201 collapse=0
+completed 40/96 scenario=S1 stream=9402 method=experience_replay macro=0.823699 collapse=0
+completed 41/96 scenario=S1 stream=9403 method=dasp_safe_v2 macro=0.820567 collapse=0
+completed 42/96 scenario=S1 stream=9403 method=dasp_v3_memory macro=0.813456 collapse=0
+completed 43/96 scenario=S1 stream=9403 method=dasp_v3_query macro=0.801989 collapse=0
+completed 44/96 scenario=S1 stream=9403 method=dasp_v3_backbone macro=0.810299 collapse=0
+completed 45/96 scenario=S1 stream=9403 method=dasp_v3_checkpoint macro=0.810299 collapse=0
+completed 46/96 scenario=S1 stream=9403 method=dasp_v3 macro=0.810299 collapse=0
+completed 47/96 scenario=S1 stream=9403 method=ssf_budget macro=0.848555 collapse=0
+completed 48/96 scenario=S1 stream=9403 method=experience_replay macro=0.830326 collapse=0
+completed 49/96 scenario=S3 stream=9401 method=dasp_safe_v2 macro=0.864500 collapse=0
+completed 50/96 scenario=S3 stream=9401 method=dasp_v3_memory macro=0.861348 collapse=0
+completed 51/96 scenario=S3 stream=9401 method=dasp_v3_query macro=0.863639 collapse=0
+completed 52/96 scenario=S3 stream=9401 method=dasp_v3_backbone macro=0.862972 collapse=0
+completed 53/96 scenario=S3 stream=9401 method=dasp_v3_checkpoint macro=0.862972 collapse=0
+completed 54/96 scenario=S3 stream=9401 method=dasp_v3 macro=0.868280 collapse=0
+completed 55/96 scenario=S3 stream=9401 method=ssf_budget macro=0.882744 collapse=0
+completed 56/96 scenario=S3 stream=9401 method=experience_replay macro=0.882785 collapse=0
+completed 57/96 scenario=S3 stream=9402 method=dasp_safe_v2 macro=0.852755 collapse=0
+completed 58/96 scenario=S3 stream=9402 method=dasp_v3_memory macro=0.858775 collapse=0
+completed 59/96 scenario=S3 stream=9402 method=dasp_v3_query macro=0.859773 collapse=0
+completed 60/96 scenario=S3 stream=9402 method=dasp_v3_backbone macro=0.865859 collapse=0
+completed 61/96 scenario=S3 stream=9402 method=dasp_v3_checkpoint macro=0.865529 collapse=0
+completed 62/96 scenario=S3 stream=9402 method=dasp_v3 macro=0.862158 collapse=0
+completed 63/96 scenario=S3 stream=9402 method=ssf_budget macro=0.898585 collapse=0
+completed 64/96 scenario=S3 stream=9402 method=experience_replay macro=0.880576 collapse=0
+completed 65/96 scenario=S3 stream=9403 method=dasp_safe_v2 macro=0.845240 collapse=0
+completed 66/96 scenario=S3 stream=9403 method=dasp_v3_memory macro=0.849517 collapse=0
+completed 67/96 scenario=S3 stream=9403 method=dasp_v3_query macro=0.850279 collapse=0
+completed 68/96 scenario=S3 stream=9403 method=dasp_v3_backbone macro=0.850279 collapse=0
+completed 69/96 scenario=S3 stream=9403 method=dasp_v3_checkpoint macro=0.850279 collapse=0
+completed 70/96 scenario=S3 stream=9403 method=dasp_v3 macro=0.858089 collapse=0
+completed 71/96 scenario=S3 stream=9403 method=ssf_budget macro=0.883807 collapse=0
+completed 72/96 scenario=S3 stream=9403 method=experience_replay macro=0.876774 collapse=0
+completed 73/96 scenario=S5 stream=9401 method=dasp_safe_v2 macro=0.644666 collapse=0
+completed 74/96 scenario=S5 stream=9401 method=dasp_v3_memory macro=0.652660 collapse=0
+completed 75/96 scenario=S5 stream=9401 method=dasp_v3_query macro=0.661437 collapse=0
+completed 76/96 scenario=S5 stream=9401 method=dasp_v3_backbone macro=0.653380 collapse=0
+completed 77/96 scenario=S5 stream=9401 method=dasp_v3_checkpoint macro=0.653380 collapse=0
+completed 78/96 scenario=S5 stream=9401 method=dasp_v3 macro=0.642177 collapse=0
+completed 79/96 scenario=S5 stream=9401 method=ssf_budget macro=0.645308 collapse=0
+completed 80/96 scenario=S5 stream=9401 method=experience_replay macro=0.621753 collapse=0
+completed 81/96 scenario=S5 stream=9402 method=dasp_safe_v2 macro=0.635260 collapse=0
+completed 82/96 scenario=S5 stream=9402 method=dasp_v3_memory macro=0.637699 collapse=0
+completed 83/96 scenario=S5 stream=9402 method=dasp_v3_query macro=0.644080 collapse=0
+completed 84/96 scenario=S5 stream=9402 method=dasp_v3_backbone macro=0.637481 collapse=0
+completed 85/96 scenario=S5 stream=9402 method=dasp_v3_checkpoint macro=0.637481 collapse=0
+completed 86/96 scenario=S5 stream=9402 method=dasp_v3 macro=0.637481 collapse=0
+completed 87/96 scenario=S5 stream=9402 method=ssf_budget macro=0.623797 collapse=1
+completed 88/96 scenario=S5 stream=9402 method=experience_replay macro=0.622509 collapse=1
+completed 89/96 scenario=S5 stream=9403 method=dasp_safe_v2 macro=0.637409 collapse=0
+completed 90/96 scenario=S5 stream=9403 method=dasp_v3_memory macro=0.632638 collapse=0
+completed 91/96 scenario=S5 stream=9403 method=dasp_v3_query macro=0.633393 collapse=0
+completed 92/96 scenario=S5 stream=9403 method=dasp_v3_backbone macro=0.638152 collapse=0
+completed 93/96 scenario=S5 stream=9403 method=dasp_v3_checkpoint macro=0.625636 collapse=0
+completed 94/96 scenario=S5 stream=9403 method=dasp_v3 macro=0.625636 collapse=0
+completed 95/96 scenario=S5 stream=9403 method=ssf_budget macro=0.606835 collapse=0
+completed 96/96 scenario=S5 stream=9403 method=experience_replay macro=0.608430 collapse=1
+{
+  "stage": "dasp_v3_synthetic_mock",
+  "expected_runs": 96,
+  "completed_runs": 96,
+  "matrix_complete": true,
+  "integrity_violation_count": 0,
+  "violations": [],
+  "latency_ratio_v3_v2": 3.190920194677662,
+  "rss_ratio_v3_v2": 0.9950572841371863,
+  "cuda_ratio_v3_v2": 1.0,
+  "real_dataset_used": false,
+  "confirmation_seed_used": false,
+  "mock_passed": false
+}

@@ -1,0 +1,43 @@
+model:
+  hidden_dims: [16, 8]
+  dropout: 0.0
+data:
+  source: synthetic
+  scenario: S1
+  window_size: 128
+  n_windows: 6
+  warmup_windows: 2
+  n_features: 10
+  random_seed: 42
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs_per_window: 1
+  label_delay: 1
+  device: cpu
+  num_threads: 1
+drift:
+  mmd_samples: 64
+  calibration_windows: 2
+  kappa: 2.0
+  z_max: 8.0
+  severity_threshold: 0.2
+  emergency_severity_threshold: 0.45
+  persistence: 1
+  top_k: 2
+dasp:
+  baseline: reactive_dasp_v6
+  eta_floor: 0.25
+  eta_ceiling: 2.0
+  memory_size: 128
+  memory_batch_size: 32
+  guard_ratio: 0.2
+  utility_probe_samples: 32
+  recurrence_departure_threshold: 0.25
+  recurrence_return_threshold: 0.05
+  recurrence_anchor_strength: 0.75
+output:
+  directory: outputs
+  save_checkpoints: false
+  run_name: smoke

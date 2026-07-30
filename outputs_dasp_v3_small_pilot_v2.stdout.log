@@ -1,0 +1,13 @@
+completed 1/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_safe_v2 macro_f1=0.989054
+completed 2/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_v3_memory macro_f1=0.984499
+completed 3/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_v3_query macro_f1=0.986303
+completed 4/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_v3_backbone macro_f1=0.982761
+completed 5/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_v3_checkpoint macro_f1=0.982761
+completed 6/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=dasp_v3 macro_f1=0.982761
+completed 7/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=ssf_budget macro_f1=0.989907
+completed 8/120 dataset=nf-unsw-nb15-v3 scenario=S0 stream=2001 model=11 method=experience_replay macro_f1=0.991055
+completed 9/120 dataset=nf-unsw-nb15-v3 scenario=S1-Sudden stream=2001 model=11 method=dasp_safe_v2 macro_f1=0.970917
+completed 10/120 dataset=nf-unsw-nb15-v3 scenario=S1-Sudden stream=2001 model=11 method=dasp_v3_memory macro_f1=0.970398
+completed 11/120 dataset=nf-unsw-nb15-v3 scenario=S1-Sudden stream=2001 model=11 method=dasp_v3_query macro_f1=0.973978
+completed 12/120 dataset=nf-unsw-nb15-v3 scenario=S1-Sudden stream=2001 model=11 method=dasp_v3_backbone macro_f1=0.973537
+completed 13/120 dataset=nf-unsw-nb15-v3 scenario=S1-Sudden stream=2001 model=11 method=dasp_v3_checkpoint macro_f1=0.973537

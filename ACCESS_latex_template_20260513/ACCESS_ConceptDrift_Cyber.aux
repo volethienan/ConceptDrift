@@ -1,0 +1,94 @@
+\relax 
+\citation{Gama2014ConceptDrift}
+\citation{Li2024DriftType,Aguiar2024Locality}
+\citation{Grzenda2020Delayed,Csaba2024LabelDelay}
+\citation{Zhang2025SSF}
+\citation{Liu2026RepShield}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
+\newlabel{sec:introduction}{{I}{1}{}{section.1}{}}
+\citation{Gretton2012MMD}
+\citation{Bifet2007ADWIN}
+\citation{Aguiar2024Locality}
+\citation{Csaba2024LabelDelay}
+\citation{Rolnick2019Replay}
+\citation{Amalapuram2023NIDSReplay}
+\citation{Chaudhry2019AGEM}
+\citation{Zhang2025SSF}
+\citation{Liu2026RepShield}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{}\protected@file@percent }
+\newlabel{sec:related}{{II}{2}{}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Drift Detection and Delayed Supervision}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Continual Adaptation for Intrusion Detection}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}DASP}{2}{}\protected@file@percent }
+\newlabel{sec:method}{{III}{2}{}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Prediction-First Streaming State}{2}{}\protected@file@percent }
+\newlabel{eq:predict}{{1}{2}{}{equation.1}{}}
+\newlabel{eq:update}{{2}{2}{}{equation.2}{}}
+\newlabel{eq:invariant}{{3}{2}{}{equation.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Layer Adapters and Fused Inference}{2}{}\protected@file@percent }
+\newlabel{eq:adapter}{{4}{2}{}{equation.4}{}}
+\newlabel{eq:modulation}{{5}{2}{}{equation.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Feature and Delayed-Performance Triggers}{2}{}\protected@file@percent }
+\newlabel{eq:mmd}{{6}{2}{}{equation.6}{}}
+\citation{Luay2025NetFlowV3,UQNIDSDatasets2025}
+\newlabel{eq:performance_trigger}{{7}{3}{}{equation.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Current-Batch Querying and Similarity Replay}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}Fast and Strong Adaptation}{3}{}\protected@file@percent }
+\newlabel{eq:pareto}{{8}{3}{}{equation.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Experimental Design}{3}{}\protected@file@percent }
+\newlabel{sec:experimental}{{IV}{3}{}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Dataset, Task, and Controlled Streams}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Comparators and Fairness Controls}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Online Protocol and Outcomes}{3}{}\protected@file@percent }
+\newlabel{eq:early}{{9}{3}{}{equation.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Confirmation and Statistical Analysis}{3}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Prediction-first DASP execution. Current-window labels cannot affect their own predictions. Base hidden blocks are frozen after warm-up; only adapter, modulation, input-adapter, and classifier parameters can change.}}{4}{}\protected@file@percent }
+\newlabel{alg:dasp}{{1}{4}{}{figure.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Locked Comparator Matrix}}{4}{}\protected@file@percent }
+\newlabel{tab:baselines}{{1}{4}{}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}GPU Systems Benchmark}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {V}Results}{4}{}\protected@file@percent }
+\newlabel{sec:results}{{V}{4}{}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Integrity and Primary Distribution-Shift Evaluation}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Controlled Class-Conditional Shift Evaluation on NF-UNSW-NB15-v3}}{5}{}\protected@file@percent }
+\newlabel{tab:adaptation}{{2}{5}{}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Shift Type, Recurrence, and Recovery}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Detector Behavior and Stationary Activity}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}GPU Latency, Throughput, and Memory}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Discussion}{5}{}\protected@file@percent }
+\newlabel{sec:discussion}{{VI}{5}{}{section.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Paired DASP Effects, 95\% Hierarchical Bootstrap Intervals, and Stream-Cluster Tests}}{6}{}\protected@file@percent }
+\newlabel{tab:paired}{{3}{6}{}{table.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Mean early macro-F1 over the first five post-shift windows. S3 first shift and recurrence are reported separately. Values are descriptive episode means; paired stream-level intervals and cluster tests determine inferential claims.}}{6}{}\protected@file@percent }
+\newlabel{fig:drift_heatmap}{{2}{6}{}{figure.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Run-Level Drift-Event Matching}}{6}{}\protected@file@percent }
+\newlabel{tab:detector}{{4}{6}{}{table.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Clean GPU Systems Benchmark (Median Run-Level Summaries)}}{7}{}\protected@file@percent }
+\newlabel{tab:systems}{{5}{7}{}{table.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Confirmation early macro-F1 versus mean complete test-then-train latency from the separate GPU benchmark. The horizontal axis is logarithmic. Higher and farther left is preferable; accuracy and systems evidence come from separate prespecified matrices.}}{7}{}\protected@file@percent }
+\newlabel{fig:tradeoff}{{3}{7}{}{figure.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Threats to Validity and Limitations}{7}{}\protected@file@percent }
+\newlabel{sec:limitations}{{VII}{7}{}{section.7}{}}
+\citation{Luay2025NetFlowV3,UQNIDSDatasets2025}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Conclusion}{8}{}\protected@file@percent }
+\newlabel{sec:conclusion}{{VIII}{8}{}{section.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Locked Configuration and Reproducibility Record}{8}{}\protected@file@percent }
+\newlabel{app:config}{{A}{8}{}{section.Appendix.A}{}}
+\bibstyle{IEEEtran}
+\bibdata{references}
+\bibcite{Gama2014ConceptDrift}{1}
+\bibcite{Li2024DriftType}{2}
+\bibcite{Aguiar2024Locality}{3}
+\bibcite{Grzenda2020Delayed}{4}
+\bibcite{Csaba2024LabelDelay}{5}
+\bibcite{Zhang2025SSF}{6}
+\bibcite{Liu2026RepShield}{7}
+\bibcite{Gretton2012MMD}{8}
+\bibcite{Bifet2007ADWIN}{9}
+\bibcite{Rolnick2019Replay}{10}
+\bibcite{Amalapuram2023NIDSReplay}{11}
+\bibcite{Chaudhry2019AGEM}{12}
+\bibcite{Luay2025NetFlowV3}{13}
+\bibcite{UQNIDSDatasets2025}{14}
+\@writefile{toc}{\contentsline {section}{REFERENCES}{9}{}\protected@file@percent }
+\gdef \@abspage@last{9}

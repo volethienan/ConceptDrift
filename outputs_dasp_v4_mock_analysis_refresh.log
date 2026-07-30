@@ -1,0 +1,272 @@
+resumed 48/48 scenario=S0 stream=9501 method=dasp_v3_query
+resumed 48/48 scenario=S0 stream=9501 method=dasp_v4_replay
+resumed 48/48 scenario=S0 stream=9501 method=dasp_v4_prior
+resumed 48/48 scenario=S0 stream=9501 method=dasp_v4
+resumed 48/48 scenario=S0 stream=9501 method=experience_replay
+resumed 48/48 scenario=S0 stream=9501 method=ssf_budget
+resumed 48/48 scenario=S0 stream=9502 method=dasp_v3_query
+resumed 48/48 scenario=S0 stream=9502 method=dasp_v4_replay
+resumed 48/48 scenario=S0 stream=9502 method=dasp_v4_prior
+resumed 48/48 scenario=S0 stream=9502 method=dasp_v4
+resumed 48/48 scenario=S0 stream=9502 method=experience_replay
+resumed 48/48 scenario=S0 stream=9502 method=ssf_budget
+resumed 48/48 scenario=S1 stream=9501 method=dasp_v3_query
+resumed 48/48 scenario=S1 stream=9501 method=dasp_v4_replay
+resumed 48/48 scenario=S1 stream=9501 method=dasp_v4_prior
+resumed 48/48 scenario=S1 stream=9501 method=dasp_v4
+resumed 48/48 scenario=S1 stream=9501 method=experience_replay
+resumed 48/48 scenario=S1 stream=9501 method=ssf_budget
+resumed 48/48 scenario=S1 stream=9502 method=dasp_v3_query
+resumed 48/48 scenario=S1 stream=9502 method=dasp_v4_replay
+resumed 48/48 scenario=S1 stream=9502 method=dasp_v4_prior
+resumed 48/48 scenario=S1 stream=9502 method=dasp_v4
+resumed 48/48 scenario=S1 stream=9502 method=experience_replay
+resumed 48/48 scenario=S1 stream=9502 method=ssf_budget
+resumed 48/48 scenario=S3 stream=9501 method=dasp_v3_query
+resumed 48/48 scenario=S3 stream=9501 method=dasp_v4_replay
+resumed 48/48 scenario=S3 stream=9501 method=dasp_v4_prior
+resumed 48/48 scenario=S3 stream=9501 method=dasp_v4
+resumed 48/48 scenario=S3 stream=9501 method=experience_replay
+resumed 48/48 scenario=S3 stream=9501 method=ssf_budget
+resumed 48/48 scenario=S3 stream=9502 method=dasp_v3_query
+resumed 48/48 scenario=S3 stream=9502 method=dasp_v4_replay
+resumed 48/48 scenario=S3 stream=9502 method=dasp_v4_prior
+resumed 48/48 scenario=S3 stream=9502 method=dasp_v4
+resumed 48/48 scenario=S3 stream=9502 method=experience_replay
+resumed 48/48 scenario=S3 stream=9502 method=ssf_budget
+resumed 48/48 scenario=S5 stream=9501 method=dasp_v3_query
+resumed 48/48 scenario=S5 stream=9501 method=dasp_v4_replay
+resumed 48/48 scenario=S5 stream=9501 method=dasp_v4_prior
+resumed 48/48 scenario=S5 stream=9501 method=dasp_v4
+resumed 48/48 scenario=S5 stream=9501 method=experience_replay
+resumed 48/48 scenario=S5 stream=9501 method=ssf_budget
+resumed 48/48 scenario=S5 stream=9502 method=dasp_v3_query
+resumed 48/48 scenario=S5 stream=9502 method=dasp_v4_replay
+resumed 48/48 scenario=S5 stream=9502 method=dasp_v4_prior
+resumed 48/48 scenario=S5 stream=9502 method=dasp_v4
+resumed 48/48 scenario=S5 stream=9502 method=experience_replay
+resumed 48/48 scenario=S5 stream=9502 method=ssf_budget
+           method  macro_f1   pr_auc      mcc  update_seconds  gradient_evaluations  collapse_streak
+       ssf_budget  0.811069 0.825457 0.666664        2.188618                 96.00                1
+experience_replay  0.802861 0.805754 0.646107        0.201904                 36.00                0
+   dasp_v4_replay  0.786099 0.782836 0.599161        1.849847                 31.25                0
+    dasp_v4_prior  0.784055 0.780558 0.587985        2.028751                 33.00                0
+    dasp_v3_query  0.782283 0.778103 0.591975        1.968510                 64.50                0
+          dasp_v4  0.778562 0.772890 0.577315        2.021304                 32.75                0
+{
+  "stage": "dasp_v4_synthetic_mock",
+  "expected_runs": 48,
+  "completed_runs": 48,
+  "matrix_complete": true,
+  "integrity_violation_count": 0,
+  "violations": [],
+  "integrity_passed": true,
+  "replay_core_improvement_passed": true,
+  "improvement_passed": false,
+  "paired_deltas": {
+    "dasp_v4_replay": {
+      "mean_macro_f1_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": 0.003815921534225844,
+        "median_delta": 0.003590026077664288,
+        "minimum_delta": -0.008492904816087443,
+        "maximum_delta": 0.015265993783027954
+      },
+      "mean_pr_auc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": 0.0047332742330786215,
+        "median_delta": 0.003053515159936404,
+        "minimum_delta": -0.004493321125873417,
+        "maximum_delta": 0.016008081055467804
+      },
+      "mean_mcc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": 0.007185555311736931,
+        "median_delta": 0.005928757059488254,
+        "minimum_delta": -0.015903584391315007,
+        "maximum_delta": 0.03177008811140963
+      },
+      "mean_macro_f1_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.016761287624048077,
+        "median_delta": -0.01654117027318741,
+        "minimum_delta": -0.07377254169670522,
+        "maximum_delta": 0.03295083627920792
+      },
+      "mean_pr_auc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.02291802808799126,
+        "median_delta": -0.022131442821064662,
+        "minimum_delta": -0.05562572355484452,
+        "maximum_delta": -0.006187467824903314
+      },
+      "mean_mcc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.046945983408731476,
+        "median_delta": -0.03742025989956155,
+        "minimum_delta": -0.14097699766591698,
+        "maximum_delta": 0.004532240509308727
+      },
+      "mean_macro_f1_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.024969654578872347,
+        "median_delta": -0.023383404060224322,
+        "minimum_delta": -0.08084696538514113,
+        "maximum_delta": 0.022844149152842053
+      },
+      "mean_pr_auc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.042621035936109705,
+        "median_delta": -0.05050102323641936,
+        "minimum_delta": -0.0627577091844449,
+        "maximum_delta": -0.004115562938056483
+      },
+      "mean_mcc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.06750336758922322,
+        "median_delta": -0.05261591484023448,
+        "minimum_delta": -0.1551928610107023,
+        "maximum_delta": -0.018147587068540416
+      }
+    },
+    "dasp_v4_prior": {
+      "mean_macro_f1_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": 0.0017714041217890136,
+        "median_delta": 0.0023732545452003206,
+        "minimum_delta": -0.016117393167771166,
+        "maximum_delta": 0.026760875375750892
+      },
+      "mean_pr_auc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": 0.0024550959068967704,
+        "median_delta": 0.0013538263282855678,
+        "minimum_delta": -0.016967663860932847,
+        "maximum_delta": 0.02080801561399459
+      },
+      "mean_mcc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": -0.003989758095473986,
+        "median_delta": -0.005888448713295719,
+        "minimum_delta": -0.038015743667555,
+        "maximum_delta": 0.037358726465733516
+      },
+      "mean_macro_f1_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.018805805036484907,
+        "median_delta": -0.025168580042000732,
+        "minimum_delta": -0.06873909911161302,
+        "maximum_delta": 0.04444571787193086
+      },
+      "mean_pr_auc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.02519620641417311,
+        "median_delta": -0.025147408390027493,
+        "minimum_delta": -0.055731529738053176,
+        "maximum_delta": -0.0013875332663765283
+      },
+      "mean_mcc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.05812129681594239,
+        "median_delta": -0.056584651956941234,
+        "minimum_delta": -0.13237850256058814,
+        "maximum_delta": 0.01012087886363261
+      },
+      "mean_macro_f1_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.027014171991309177,
+        "median_delta": -0.033439304999877906,
+        "minimum_delta": -0.07581352280004894,
+        "maximum_delta": 0.038741977412119044
+      },
+      "mean_pr_auc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.044899214262291556,
+        "median_delta": -0.05490119700489571,
+        "minimum_delta": -0.06331879992408207,
+        "maximum_delta": -0.010061433452556723
+      },
+      "mean_mcc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.07867868099643413,
+        "median_delta": -0.07860667906576357,
+        "minimum_delta": -0.14659436590537345,
+        "maximum_delta": -0.005094724387484706
+      }
+    },
+    "dasp_v4": {
+      "mean_macro_f1_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": -0.003721871159933887,
+        "median_delta": -0.004697332169622148,
+        "minimum_delta": -0.018897591012239423,
+        "maximum_delta": 0.020768409211810113
+      },
+      "mean_pr_auc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": -0.005212709487713352,
+        "median_delta": -0.0024292486476414354,
+        "minimum_delta": -0.038920352926069324,
+        "maximum_delta": 0.011808552856041321
+      },
+      "mean_mcc_vs_dasp_v3_query": {
+        "n_pairs": 8,
+        "mean_delta": -0.014660575652220759,
+        "median_delta": -0.011116372244029893,
+        "minimum_delta": -0.056450941822466905,
+        "maximum_delta": 0.027931156053722317
+      },
+      "mean_macro_f1_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.024299080318207808,
+        "median_delta": -0.03815393412205009,
+        "minimum_delta": -0.06873909911161302,
+        "maximum_delta": 0.03845325170799008
+      },
+      "mean_pr_auc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.03286401180878323,
+        "median_delta": -0.03163833630568463,
+        "minimum_delta": -0.06255556841672949,
+        "maximum_delta": -0.010386996024329798
+      },
+      "mean_mcc_vs_experience_replay": {
+        "n_pairs": 8,
+        "mean_delta": -0.06879211437268917,
+        "median_delta": -0.08508535268484863,
+        "minimum_delta": -0.13237850256058814,
+        "maximum_delta": 0.011782484825579698
+      },
+      "mean_macro_f1_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.03250744727303208,
+        "median_delta": -0.04110047742529177,
+        "minimum_delta": -0.07581352280004894,
+        "maximum_delta": 0.03836011178320531
+      },
+      "mean_pr_auc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.05256701965690168,
+        "median_delta": -0.056190368526281176,
+        "minimum_delta": -0.09349467053307059,
+        "maximum_delta": -0.013201560222628528
+      },
+      "mean_mcc_vs_ssf_budget": {
+        "n_pairs": 8,
+        "mean_delta": -0.08934949855318092,
+        "median_delta": -0.08889523260198395,
+        "minimum_delta": -0.14659436590537345,
+        "maximum_delta": -0.0027718544323157013
+      }
+    }
+  },
+  "update_ratio_v4_v3_query": 1.0268193792198763,
+  "update_ratio_v4_er": 10.011208663086846,
+  "update_ratio_v4_replay_v3_query": 0.9397196822538368,
+  "gradient_ratio_v4_v3_query": 0.5077519379844961,
+  "duration_seconds": 0.13761069999964093,
+  "real_dataset_used": false,
+  "confirmation_seed_used": false,
+  "selected_mock_candidate": "dasp_v4_replay",
+  "pilot_unlocked": false
+}
