@@ -1,0 +1,311 @@
+{
+  "root": "outputs_confirmation_v6_10scenario",
+  "total_runs": 4000,
+  "method_rank_by_macro_f1": [
+    {
+      "method": "modular_dasp",
+      "runs": 500,
+      "mean_macro_f1": 0.9268663985504504,
+      "sem_macro_f1": 0.0029295859346868,
+      "mean_update_seconds": 1.4151832849996864,
+      "mean_gradient_evaluations": 328.74,
+      "mean_throughput_flows_per_second": 159219.11431386927
+    },
+    {
+      "method": "ssf",
+      "runs": 500,
+      "mean_macro_f1": 0.9190606911196606,
+      "sem_macro_f1": 0.0030421742971408,
+      "mean_update_seconds": 2.682909841196466,
+      "mean_gradient_evaluations": 512.0,
+      "mean_throughput_flows_per_second": 455279.1733751094
+    },
+    {
+      "method": "experience_replay",
+      "runs": 500,
+      "mean_macro_f1": 0.9036373524833184,
+      "sem_macro_f1": 0.0049989731867151,
+      "mean_update_seconds": 0.5456492581978964,
+      "mean_gradient_evaluations": 192.0,
+      "mean_throughput_flows_per_second": 461493.4933793477
+    },
+    {
+      "method": "repshield",
+      "runs": 500,
+      "mean_macro_f1": 0.8880636468645432,
+      "sem_macro_f1": 0.0054746165668163,
+      "mean_update_seconds": 0.9460844848002016,
+      "mean_gradient_evaluations": 128.0,
+      "mean_throughput_flows_per_second": 464789.4287334789
+    },
+    {
+      "method": "agem",
+      "runs": 500,
+      "mean_macro_f1": 0.8821361305594911,
+      "sem_macro_f1": 0.0054787087953044,
+      "mean_update_seconds": 0.4946990496026119,
+      "mean_gradient_evaluations": 128.0,
+      "mean_throughput_flows_per_second": 464700.370642792
+    },
+    {
+      "method": "online_mlp",
+      "runs": 500,
+      "mean_macro_f1": 0.8751378873253504,
+      "sem_macro_f1": 0.0056829593134976,
+      "mean_update_seconds": 0.2223174979986506,
+      "mean_gradient_evaluations": 64.0,
+      "mean_throughput_flows_per_second": 464100.6674103676
+    },
+    {
+      "method": "online_ewc",
+      "runs": 500,
+      "mean_macro_f1": 0.8751367228123316,
+      "sem_macro_f1": 0.0056816451405653,
+      "mean_update_seconds": 0.39630312260153,
+      "mean_gradient_evaluations": 64.0,
+      "mean_throughput_flows_per_second": 454904.80806704174
+    },
+    {
+      "method": "cdda_md",
+      "runs": 500,
+      "mean_macro_f1": 0.7973180129201488,
+      "sem_macro_f1": 0.0101482358337409,
+      "mean_update_seconds": 0.0382873685990052,
+      "mean_gradient_evaluations": 2.7,
+      "mean_throughput_flows_per_second": 458584.8280134769
+    }
+  ],
+  "paired_runs": 500,
+  "wins_vs_ssf": 383,
+  "losses_vs_ssf": 117,
+  "within_0_01_vs_ssf": 303,
+  "mean_gap_vs_ssf": 0.007805707430789552,
+  "median_gap_vs_ssf": 0.00321174823185225,
+  "std_gap_vs_ssf": 0.01822100218452145,
+  "min_gap_vs_ssf": -0.0900328430945592,
+  "max_gap_vs_ssf": 0.0684159636320662,
+  "sign_test_p_greater_than_ssf": 2.5609873602883253e-34,
+  "paired_ttest_p_two_sided": 4.5878764975995575e-20,
+  "wilcoxon_p_greater_than_ssf": 2.386298462216833e-27,
+  "mean_update_speedup_vs_ssf": 1.9033244371645845,
+  "median_update_speedup_vs_ssf": 1.908596499208867,
+  "mean_gradient_reduction_vs_ssf": 1.5606822369712257,
+  "median_gradient_reduction_vs_ssf": 1.6,
+  "worst_10": [
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S2-Gradual",
+      "stream_seed": 2102,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.830845188213504,
+      "mean_macro_f1_ssf": 0.9208780313080632,
+      "macro_f1_gap_vs_ssf": -0.0900328430945592,
+      "update_speedup_vs_ssf": 1.7080013253402242
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S2-Gradual",
+      "stream_seed": 2102,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8439383774273295,
+      "mean_macro_f1_ssf": 0.9098756771540804,
+      "macro_f1_gap_vs_ssf": -0.0659372997267508,
+      "update_speedup_vs_ssf": 1.7335213611128866
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S1-Sudden",
+      "stream_seed": 2102,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.8791835300733286,
+      "mean_macro_f1_ssf": 0.9237895250121986,
+      "macro_f1_gap_vs_ssf": -0.0446059949388699,
+      "update_speedup_vs_ssf": 1.7201956020786997
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S7-Local-High",
+      "stream_seed": 2001,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8414018903281639,
+      "mean_macro_f1_ssf": 0.8754702572876002,
+      "macro_f1_gap_vs_ssf": -0.0340683669594362,
+      "update_speedup_vs_ssf": 1.964520828189887
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S3-Incremental",
+      "stream_seed": 2001,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8363950269809431,
+      "mean_macro_f1_ssf": 0.8693380517882434,
+      "macro_f1_gap_vs_ssf": -0.0329430248073002,
+      "update_speedup_vs_ssf": 1.90858002350477
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S1-Sudden",
+      "stream_seed": 2102,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8692753653112538,
+      "mean_macro_f1_ssf": 0.9020301351791236,
+      "macro_f1_gap_vs_ssf": -0.0327547698678698,
+      "update_speedup_vs_ssf": 1.6832440227604537
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-High",
+      "stream_seed": 2102,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8145811612680448,
+      "mean_macro_f1_ssf": 0.8459601038153537,
+      "macro_f1_gap_vs_ssf": -0.0313789425473088,
+      "update_speedup_vs_ssf": 1.7013023067855442
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S7-Local-High",
+      "stream_seed": 2001,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.8479574596532884,
+      "mean_macro_f1_ssf": 0.874386998410896,
+      "macro_f1_gap_vs_ssf": -0.0264295387576075,
+      "update_speedup_vs_ssf": 1.9878453651222647
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S2-Gradual",
+      "stream_seed": 2001,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8429475101975943,
+      "mean_macro_f1_ssf": 0.8692466821885346,
+      "macro_f1_gap_vs_ssf": -0.0262991719909403,
+      "update_speedup_vs_ssf": 1.867095655396915
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-High",
+      "stream_seed": 2003,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.7858031815176871,
+      "mean_macro_f1_ssf": 0.811499241382349,
+      "macro_f1_gap_vs_ssf": -0.0256960598646618,
+      "update_speedup_vs_ssf": 1.6731330506747757
+    }
+  ],
+  "best_10": [
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S0",
+      "stream_seed": 2001,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.942684008517216,
+      "mean_macro_f1_ssf": 0.8742680448851499,
+      "macro_f1_gap_vs_ssf": 0.0684159636320662,
+      "update_speedup_vs_ssf": 1.8423132769950243
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S0",
+      "stream_seed": 2001,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.9340486812146932,
+      "mean_macro_f1_ssf": 0.8675571557738806,
+      "macro_f1_gap_vs_ssf": 0.0664915254408127,
+      "update_speedup_vs_ssf": 1.812348200749629
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-Low",
+      "stream_seed": 2003,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.8832520138517261,
+      "mean_macro_f1_ssf": 0.8175052605348165,
+      "macro_f1_gap_vs_ssf": 0.0657467533169096,
+      "update_speedup_vs_ssf": 1.6922395716741352
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-Medium",
+      "stream_seed": 2002,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8448634243547044,
+      "mean_macro_f1_ssf": 0.7802882819051957,
+      "macro_f1_gap_vs_ssf": 0.0645751424495086,
+      "update_speedup_vs_ssf": 1.6358174828646237
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S5-Blip",
+      "stream_seed": 2002,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8947805418293531,
+      "mean_macro_f1_ssf": 0.8308478881353054,
+      "macro_f1_gap_vs_ssf": 0.0639326536940476,
+      "update_speedup_vs_ssf": 1.7951724956419943
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S1-Sudden",
+      "stream_seed": 2002,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.8937945260124707,
+      "mean_macro_f1_ssf": 0.8302932744549775,
+      "macro_f1_gap_vs_ssf": 0.0635012515574932,
+      "update_speedup_vs_ssf": 1.9329925786901088
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S7-Local-Medium",
+      "stream_seed": 2102,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.9488615575976274,
+      "mean_macro_f1_ssf": 0.8861432564653156,
+      "macro_f1_gap_vs_ssf": 0.0627183011323118,
+      "update_speedup_vs_ssf": 1.912770527402907
+    },
+    {
+      "dataset": "nf-ton-iot-v3",
+      "scenario": "S7-Local-Medium",
+      "stream_seed": 2102,
+      "model_seed": 91,
+      "mean_macro_f1_modular_dasp": 0.9474658632763476,
+      "mean_macro_f1_ssf": 0.8856480026449562,
+      "macro_f1_gap_vs_ssf": 0.0618178606313912,
+      "update_speedup_vs_ssf": 1.901927974295028
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-Low",
+      "stream_seed": 2002,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8262598124161009,
+      "mean_macro_f1_ssf": 0.7653849005928297,
+      "macro_f1_gap_vs_ssf": 0.0608749118232712,
+      "update_speedup_vs_ssf": 1.781656426457093
+    },
+    {
+      "dataset": "nf-bot-iot-v3",
+      "scenario": "S7-Local-Medium",
+      "stream_seed": 2001,
+      "model_seed": 92,
+      "mean_macro_f1_modular_dasp": 0.8443752353754346,
+      "mean_macro_f1_ssf": 0.7844537786351008,
+      "macro_f1_gap_vs_ssf": 0.0599214567403337,
+      "update_speedup_vs_ssf": 1.7374255434920758
+    }
+  ],
+  "localized_invariants": {
+    "modular_dasp_runs": 500,
+    "global_update_sum": 0,
+    "window_files_missing": 0,
+    "localized_module_count_min": 1.0,
+    "localized_module_count_median": 3.0,
+    "localized_module_count_max": 3.0,
+    "localized_module_count_observations": 16000,
+    "localized_replay_size_min": 512.0,
+    "localized_replay_size_median": 512.0,
+    "localized_replay_size_max": 512.0,
+    "localized_replay_size_observations": 16000
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "modular_dasp_runs":135.0,
+  "global_update_sum":0.0,
+  "localized_module_count_min":1.0,
+  "localized_module_count_median":3.0,
+  "localized_module_count_max":3.0,
+  "localized_module_count_observations":4320.0,
+  "localized_replay_size_min":512.0,
+  "localized_replay_size_median":512.0,
+  "localized_replay_size_max":512.0,
+  "localized_replay_size_observations":4320.0
+}

@@ -1,0 +1,40 @@
+{
+  "total_runs": 4000,
+  "expected_runs": 4000,
+  "paired_modular_dasp_vs_ssf_runs": 500,
+  "modular_dasp_mean_macro_f1": 0.9268663985504503,
+  "ssf_mean_macro_f1": 0.9190606911196606,
+  "mean_gap_vs_ssf": 0.007805707430789578,
+  "wins_vs_ssf": 383,
+  "within_0_01_vs_ssf": 303,
+  "mean_update_speedup_vs_ssf": 1.9033244371645845,
+  "mean_gradient_reduction_vs_ssf": 1.5606822369712257,
+  "modular_dasp_global_update_sum": 0,
+  "worst_gap_vs_ssf": -0.09003284309455928,
+  "worst_case": {
+    "dataset": "nf-bot-iot-v3",
+    "scenario": "S2-Gradual",
+    "stream_seed": 2102,
+    "model_seed": 91
+  },
+  "median_gap_vs_ssf": 0.00321174823185225,
+  "std_gap_vs_ssf": 0.01822100218452145,
+  "sign_test_p_greater_than_ssf": 2.5609873602883253e-34,
+  "paired_ttest_p_two_sided": 4.5878764975995575e-20,
+  "wilcoxon_p_greater_than_ssf": 2.386298462216833e-27,
+  "median_update_speedup_vs_ssf": 1.908596499208867,
+  "median_gradient_reduction_vs_ssf": 1.6,
+  "localized_invariants": {
+    "modular_dasp_runs": 500,
+    "global_update_sum": 0,
+    "window_files_missing": 0,
+    "localized_module_count_min": 1.0,
+    "localized_module_count_median": 3.0,
+    "localized_module_count_max": 3.0,
+    "localized_module_count_observations": 16000,
+    "localized_replay_size_min": 512.0,
+    "localized_replay_size_median": 512.0,
+    "localized_replay_size_max": 512.0,
+    "localized_replay_size_observations": 16000
+  }
+}

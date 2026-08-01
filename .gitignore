@@ -7,6 +7,12 @@ __pycache__/
 docx_qa/
 tmp/
 outputs*/
+!outputs_full_v6_core/
+!outputs_full_v6_core/**
+!outputs_full_v6_10scenario_pilot/
+!outputs_full_v6_10scenario_pilot/**
+!outputs_confirmation_v6_10scenario/
+!outputs_confirmation_v6_10scenario/**
 *.backup_*.docx
 
 .venv-cpu/
