@@ -21,10 +21,11 @@
 \providecommand{\BIBdecl}{\relax}
 \BIBdecl
 
-\bibitem{Gama2014ConceptDrift}
-J.~Gama, I.~{Zliobait{\.e}}, A.~Bifet, M.~Pechenizkiy, and A.~Bouchachia, ``A
-  survey on concept drift adaptation,'' \emph{ACM Computing Surveys}, vol.~46,
-  no.~4, pp. 1--37, 2014.
+\bibitem{Arora2024DriftReview}
+S.~Arora, R.~Rani, and N.~Saxena, ``A systematic review on detection and
+  adaptation of concept drift in streaming data using machine learning
+  techniques,'' \emph{WIREs Data Mining and Knowledge Discovery}, vol.~14,
+  no.~4, p. e1536, 2024.
 
 \bibitem{Li2024DriftType}
 J.~Li, H.~Yu, Z.~Zhang, X.~Luo, and S.~Xie, ``Concept drift adaptation by
@@ -35,10 +36,11 @@ J.~Li, H.~Yu, Z.~Zhang, X.~Luo, and S.~Xie, ``Concept drift adaptation by
 G.~J. Aguiar and A.~Cano, ``A comprehensive analysis of concept drift locality
   in data streams,'' \emph{Knowledge-Based Systems}, vol. 289, p. 111535, 2024.
 
-\bibitem{Grzenda2020Delayed}
-M.~Grzenda, H.~M. Gomes, and A.~Bifet, ``Delayed labeling evaluation for data
-  streams,'' \emph{Data Mining and Knowledge Discovery}, vol.~34, no.~5, pp.
-  1237--1266, 2020.
+\bibitem{Lukats2025DriftBenchmark}
+D.~Lukats, O.~Zielinski, A.~Hahn, and F.~Stahl, ``A benchmark and survey of
+  fully unsupervised concept drift detectors on real-world data streams,''
+  \emph{International Journal of Data Science and Analytics}, vol.~19, no.~1,
+  pp. 1--31, 2025.
 
 \bibitem{Csaba2024LabelDelay}
 \BIBentryALTinterwordspacing
@@ -48,38 +50,23 @@ B.~Csaba, W.~Zhang, M.~M{\"u}ller, S.-N. Lim, M.~Elhoseiny, P.~H.~S. Torr, and
   \url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/d8f5f134febb4bd74d8f79e338de382c-Abstract-Conference.html}
 \BIBentrySTDinterwordspacing
 
-\bibitem{Zhang2025SSF}
-X.~Zhang, R.~Zhao, Z.~Jiang, H.~Chen, Y.~Ding, E.~C.~H. Ngai, and S.-H. Yang,
-  ``Continual learning with strategic selection and forgetting for network
-  intrusion detection,'' in \emph{IEEE INFOCOM 2025---IEEE Conference on
-  Computer Communications}, 2025.
+\bibitem{Palli2024DriftImbalance}
+A.~S. Palli, J.~Jaafar, A.~R. Gilal, A.~Alsughayyir, H.~M. Gomes,
+  A.~Alshanqiti, and M.~Omar, ``Online machine learning from non-stationary
+  data streams in the presence of concept drift and class imbalance: A
+  systematic review,'' \emph{Journal of Information and Communication
+  Technology}, vol.~23, no.~1, pp. 105--139, 2024.
 
-\bibitem{Liu2026RepShield}
-Y.~Liu, W.~Niu, H.~Li, M.~He, X.~Ding, J.~Gong, R.~Yan, Z.~Li, and X.~Zhang,
-  ``{RepShield}: Robust knowledge representation in continual learning for
-  network intrusion detection,'' \emph{Computer Networks}, vol. 283, p. 112308,
-  2026.
+\bibitem{Chen2024ImbalancedSurvey}
+W.~Chen, K.~Yang, Z.~Yu, Y.~Shi, and C.~L.~P. Chen, ``A survey on imbalanced
+  learning: Latest research, applications and future directions,''
+  \emph{Artificial Intelligence Review}, vol.~57, no.~6, p. 137, 2024.
 
-\bibitem{Gretton2012MMD}
-\BIBentryALTinterwordspacing
-A.~Gretton, K.~M. Borgwardt, M.~J. Rasch, B.~Sch{\"o}lkopf, and A.~Smola, ``A
-  kernel two-sample test,'' \emph{Journal of Machine Learning Research},
-  vol.~13, pp. 723--773, 2012. [Online]. Available:
-  \url{https://www.jmlr.org/papers/v13/gretton12a.html}
-\BIBentrySTDinterwordspacing
-
-\bibitem{Bifet2007ADWIN}
-A.~Bifet and R.~Gavald{\`a}, ``Learning from time-changing data with adaptive
-  windowing,'' in \emph{Proceedings of the 2007 SIAM International Conference
-  on Data Mining}, 2007, pp. 443--448.
-
-\bibitem{Rolnick2019Replay}
-\BIBentryALTinterwordspacing
-D.~Rolnick, A.~Ahuja, J.~Schwarz, T.~Lillicrap, and G.~Wayne, ``Experience
-  replay for continual learning,'' in \emph{Advances in Neural Information
-  Processing Systems}, vol.~32, 2019. [Online]. Available:
-  \url{https://proceedings.neurips.cc/paper_files/paper/2019/hash/fa7cdfad1a5aaf8370ebeda47a1ff1c3-Abstract.html}
-\BIBentrySTDinterwordspacing
+\bibitem{Wang2024ContinualSurvey}
+L.~Wang, X.~Zhang, H.~Su, and J.~Zhu, ``A comprehensive survey of continual
+  learning: Theory, method and application,'' \emph{IEEE Transactions on
+  Pattern Analysis and Machine Intelligence}, vol.~46, no.~8, pp. 5362--5383,
+  2024.
 
 \bibitem{Amalapuram2023NIDSReplay}
 \BIBentryALTinterwordspacing
@@ -98,6 +85,90 @@ A.~Chaudhry, M.~Ranzato, M.~Rohrbach, and M.~Elhoseiny, ``Efficient lifelong
   \url{https://openreview.net/forum?id=Hkf2_sC5FX}
 \BIBentrySTDinterwordspacing
 
+\bibitem{Kirkpatrick2017EWC}
+J.~Kirkpatrick, R.~Pascanu, N.~Rabinowitz \emph{et~al.}, ``Overcoming
+  catastrophic forgetting in neural networks,'' \emph{Proceedings of the
+  National Academy of Sciences}, vol. 114, no.~13, pp. 3521--3526, 2017.
+
+\bibitem{Zhang2025SSF}
+X.~Zhang, R.~Zhao, Z.~Jiang, H.~Chen, Y.~Ding, E.~C.~H. Ngai, and S.-H. Yang,
+  ``Continual learning with strategic selection and forgetting for network
+  intrusion detection,'' in \emph{IEEE INFOCOM 2025---IEEE Conference on
+  Computer Communications}, 2025.
+
+\bibitem{Liu2026RepShield}
+Y.~Liu, W.~Niu, H.~Li, M.~He, X.~Ding, J.~Gong, R.~Yan, Z.~Li, and X.~Zhang,
+  ``{RepShield}: Robust knowledge representation in continual learning for
+  network intrusion detection,'' \emph{Computer Networks}, vol. 283, p. 112308,
+  2026.
+
+\bibitem{Pfeiffer2020AdapterFusion}
+J.~Pfeiffer, A.~Kamath, A.~R{\"u}ckl{\'e}, K.~Cho, and I.~Gurevych,
+  ``Adapterfusion: Non-destructive task composition for transfer learning,'' in
+  \emph{Proceedings of the 16th Conference of the European Chapter of the
+  Association for Computational Linguistics}, 2021, pp. 2439--2455.
+
+\bibitem{Hu2022LoRA}
+\BIBentryALTinterwordspacing
+E.~J. Hu, Y.~Shen, P.~Wallis, Z.~Allen-Zhu, Y.~Li, S.~Wang, L.~Wang, and
+  W.~Chen, ``{LoRA}: Low-rank adaptation of large language models,'' in
+  \emph{International Conference on Learning Representations}, 2022. [Online].
+  Available: \url{https://openreview.net/forum?id=nZeVKeeFYf9}
+\BIBentrySTDinterwordspacing
+
+\bibitem{He2022DyLoRA}
+\BIBentryALTinterwordspacing
+Y.-C. Chen \emph{et~al.}, ``{DyLoRA}: Parameter efficient tuning of pre-trained
+  models using dynamic search-free low-rank adaptation,'' in
+  \emph{International Conference on Learning Representations}, 2023. [Online].
+  Available: \url{https://openreview.net/forum?id=3ZeR4f8sfX4}
+\BIBentrySTDinterwordspacing
+
+\bibitem{BaenaGarcia2006DDM}
+M.~Baena-Garc{\'i}a, J.~del Campo-{\'A}vila, R.~Fidalgo, A.~Bifet,
+  R.~Gavald{\`a}, and R.~Morales-Bueno, ``Early drift detection method,'' in
+  \emph{Proceedings of the 4th International Workshop on Knowledge Discovery
+  from Data Streams}, 2006, pp. 77--86.
+
+\bibitem{Bifet2007ADWIN}
+A.~Bifet and R.~Gavald{\`a}, ``Learning from time-changing data with adaptive
+  windowing,'' in \emph{Proceedings of the 2007 SIAM International Conference
+  on Data Mining}, 2007, pp. 443--448.
+
+\bibitem{Gretton2012MMD}
+\BIBentryALTinterwordspacing
+A.~Gretton, K.~M. Borgwardt, M.~J. Rasch, B.~Sch{\"o}lkopf, and A.~Smola, ``A
+  kernel two-sample test,'' \emph{Journal of Machine Learning Research},
+  vol.~13, pp. 723--773, 2012. [Online]. Available:
+  \url{https://www.jmlr.org/papers/v13/gretton12a.html}
+\BIBentrySTDinterwordspacing
+
+\bibitem{Ali2024NIDSSurvey}
+A.~H. Ali, M.~Charfeddine, B.~Ammar, B.~B. Hamed, F.~Albalwy, A.~Alqarafi, and
+  A.~Hussain, ``Unveiling machine learning strategies and considerations in
+  intrusion detection systems: A comprehensive survey,'' \emph{Frontiers in
+  Computer Science}, vol.~6, p. 1387354, 2024.
+
+\bibitem{Moustafa2015UNSW}
+N.~Moustafa and J.~Slay, ``{UNSW-NB15}: a comprehensive data set for network
+  intrusion detection systems,'' in \emph{Military Communications and
+  Information Systems Conference}, 2015, pp. 1--6.
+
+\bibitem{Sharafaldin2018CICIDS}
+I.~Sharafaldin, A.~H. Lashkari, and A.~A. Ghorbani, ``Toward generating a new
+  intrusion detection dataset and intrusion traffic characterization,''
+  \emph{Proceedings of the 4th International Conference on Information Systems
+  Security and Privacy}, pp. 108--116, 2018.
+
+\bibitem{Moustafa2019ToNIoT}
+N.~Moustafa, ``A new distributed architecture for evaluating ai-based security
+  systems at the edge: Network ton-iot telemetry dataset,'' \emph{Sustainable
+  Cities and Society}, vol.~61, p. 102238, 2020.
+
+\bibitem{Layeghy2022NFv2}
+S.~Layeghy and M.~Portmann, ``Nf-uq-nids-v2: A network flow dataset for network
+  intrusion detection systems,'' \emph{Data}, vol.~7, no.~8, p. 103, 2022.
+
 \bibitem{Luay2025NetFlowV3}
 \BIBentryALTinterwordspacing
 M.~Luay, S.~Layeghy, S.~Hosseininoorbin, M.~Sarhan, N.~Moustafa, and
@@ -112,5 +183,27 @@ M.~Luay, S.~Layeghy, S.~Hosseininoorbin, M.~Sarhan, N.~Moustafa, and
   detection system datasets,'' Dataset portal, 2025, accessed: 2026-07-26.
   [Online]. Available: \url{https://staff.itee.uq.edu.au/marius/NIDS_datasets/}
 \BIBentrySTDinterwordspacing
+
+\bibitem{Ribeiro2016LIME}
+M.~T. Ribeiro, S.~Singh, and C.~Guestrin, ``Why should i trust you? explaining
+  the predictions of any classifier,'' in \emph{Proceedings of the 22nd ACM
+  SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  2016, pp. 1135--1144.
+
+\bibitem{Lundberg2017SHAP}
+S.~M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model
+  predictions,'' in \emph{Advances in Neural Information Processing Systems},
+  vol.~30, 2017.
+
+\bibitem{Schwalbe2024XAITaxonomy}
+G.~Schwalbe and B.~Finzel, ``A comprehensive taxonomy for explainable
+  artificial intelligence: A systematic survey of surveys on methods and
+  concepts,'' \emph{Data Mining and Knowledge Discovery}, vol.~38, no.~5, pp.
+  3043--3101, 2024.
+
+\bibitem{Rainio2024Metrics}
+O.~Rainio, J.~Teuho, and R.~Kl{\'{e}}n, ``Evaluation metrics and statistical
+  tests for machine learning,'' \emph{Scientific Reports}, vol.~14, no.~1, p.
+  6086, 2024.
 
 \end{thebibliography}

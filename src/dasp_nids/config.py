@@ -138,6 +138,11 @@ class DASPConfig:
     v13_refresh_layers: int = 1
     v13_macro_f1_tolerance: float = 0.0
     v13_per_class_recall_tolerance: float = 0.02
+    modular_replay_size: int = 512
+    modular_new_sample_weight: float = 3.0
+    modular_background_plasticity: float = 0.25
+    modular_repair_epochs: int = 2
+    modular_emergency_epochs: int = 3
     v14_light_current_size: int = 256
     v14_light_replay_size: int = 512
     v14_light_layers: int = 1

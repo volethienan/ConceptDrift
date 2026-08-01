@@ -1,94 +1,291 @@
 \relax 
-\citation{Gama2014ConceptDrift}
-\citation{Li2024DriftType,Aguiar2024Locality}
-\citation{Grzenda2020Delayed,Csaba2024LabelDelay}
-\citation{Zhang2025SSF}
-\citation{Liu2026RepShield}
-\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
-\newlabel{sec:introduction}{{I}{1}{}{section.1}{}}
-\citation{Gretton2012MMD}
-\citation{Bifet2007ADWIN}
-\citation{Aguiar2024Locality}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{Arora2024DriftReview,Li2024DriftType,Aguiar2024Locality}
+\citation{Lukats2025DriftBenchmark}
 \citation{Csaba2024LabelDelay}
-\citation{Rolnick2019Replay}
-\citation{Amalapuram2023NIDSReplay}
+\citation{Palli2024DriftImbalance,Chen2024ImbalancedSurvey}
+\citation{Wang2024ContinualSurvey,Amalapuram2023NIDSReplay}
 \citation{Chaudhry2019AGEM}
+\citation{Kirkpatrick2017EWC,Wang2024ContinualSurvey}
+\citation{Zhang2025SSF,Liu2026RepShield}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:introduction}{{I}{1}{Introduction}{section.1}{}}
+\citation{Pfeiffer2020AdapterFusion,Hu2022LoRA,He2022DyLoRA}
+\citation{Wang2024ContinualSurvey}
+\citation{Arora2024DriftReview,Lukats2025DriftBenchmark}
+\citation{BaenaGarcia2006DDM,Bifet2007ADWIN}
+\citation{Gretton2012MMD}
+\citation{Li2024DriftType,Aguiar2024Locality}
+\citation{Wang2024ContinualSurvey,Amalapuram2023NIDSReplay}
+\citation{Chaudhry2019AGEM}
+\citation{Kirkpatrick2017EWC}
+\citation{Zhang2025SSF,Liu2026RepShield}
+\citation{Pfeiffer2020AdapterFusion,Hu2022LoRA,He2022DyLoRA}
+\citation{Ali2024NIDSSurvey,Moustafa2015UNSW,Sharafaldin2018CICIDS}
+\citation{Moustafa2019ToNIoT}
+\citation{Layeghy2022NFv2,Luay2025NetFlowV3,UQNIDSDatasets2025}
+\citation{Amalapuram2023NIDSReplay,Zhang2025SSF,Liu2026RepShield}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{II}{2}{Related Work}{section.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Concept Drift Detection and Stream Evaluation}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Continual Learning and Selective Plasticity}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Continual NIDS and Benchmark Data}{2}{subsection.2.3}\protected@file@percent }
+\citation{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}
+\citation{Rainio2024Metrics}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Interpretability and Statistical Reporting}{3}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-E}}Synthesis and Research Gap}{3}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Problem Formulation}{3}{section.3}\protected@file@percent }
+\newlabel{sec:problem}{{III}{3}{Problem Formulation}{section.3}{}}
+\newlabel{eq:objective}{{1}{3}{Problem Formulation}{equation.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Drift-Attributed Subspace Plasticity}{3}{section.4}\protected@file@percent }
+\newlabel{sec:method}{{IV}{3}{Drift-Attributed Subspace Plasticity}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Design Rationale and System State}{3}{subsection.4.1}\protected@file@percent }
+\newlabel{eq:system-state}{{2}{3}{Design Rationale and System State}{equation.2}{}}
+\newlabel{eq:state-transition}{{3}{3}{Design Rationale and System State}{equation.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Modular Feature-Subspace Backbone}{3}{subsection.4.2}\protected@file@percent }
+\newlabel{eq:module}{{4}{3}{Modular Feature-Subspace Backbone}{equation.4}{}}
+\newlabel{eq:classifier}{{5}{3}{Modular Feature-Subspace Backbone}{equation.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Warm-Up Calibration and MMD Requirement}{4}{subsection.4.3}\protected@file@percent }
+\newlabel{eq:multiscale-kernel}{{6}{4}{Warm-Up Calibration and MMD Requirement}{equation.6}{}}
+\newlabel{eq:mmd}{{7}{4}{Warm-Up Calibration and MMD Requirement}{equation.7}{}}
+\newlabel{eq:requirement}{{9}{4}{Warm-Up Calibration and MMD Requirement}{equation.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Delayed Conflict and Top-$k$ Routing}{4}{subsection.4.4}\protected@file@percent }
+\newlabel{eq:conflict}{{10}{4}{Delayed Conflict and Top-$k$ Routing}{equation.10}{}}
+\newlabel{eq:attribution}{{11}{4}{Delayed Conflict and Top-$k$ Routing}{equation.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}Replay, Memory Lifecycle, and Strict Freezing}{4}{subsection.4.5}\protected@file@percent }
+\newlabel{eq:rehearsal}{{12}{4}{Replay, Memory Lifecycle, and Strict Freezing}{equation.12}{}}
+\newlabel{eq:loss}{{13}{4}{Replay, Memory Lifecycle, and Strict Freezing}{equation.13}{}}
+\newlabel{eq:mask}{{14}{4}{Replay, Memory Lifecycle, and Strict Freezing}{equation.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-F}}End-to-End Window Algorithm}{4}{subsection.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-G}}Complexity, Worked Example, and Interpretability}{4}{subsection.4.7}\protected@file@percent }
+\citation{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Implementation-faithful repair policy for the reported primary DASP path. The classifier multiplier is 1 on the base learning rate $10^{-3}$ in every mode.}}{5}{table.1}\protected@file@percent }
+\newlabel{tab:dasp-repair-policy}{{1}{5}{Implementation-faithful repair policy for the reported primary DASP path. The classifier multiplier is 1 on the base learning rate $10^{-3}$ in every mode}{table.1}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Overview of the one-window delayed-label DASP adaptation cycle. For each current window $W_t$, predictions and MMD evidence are computed before label access and stored in a pending-update queue. At the same outer iteration, labels for $W_{\tau }$, $\tau =t-1$, restore the matching evidence; module-wise gradient conflict and the delayed-label performance holdout then determine repair intensity. The selected localized update is applied directly, unaffected modules remain frozen, and memory, reference, and audit state are updated. The reported primary path does not implement post-update candidate rollback.}}{5}{figure.1}\protected@file@percent }
+\newlabel{fig:window-algorithm}{{1}{5}{Overview of the one-window delayed-label DASP adaptation cycle. For each current window $W_t$, predictions and MMD evidence are computed before label access and stored in a pending-update queue. At the same outer iteration, labels for $W_{\tau }$, $\tau =t-1$, restore the matching evidence; module-wise gradient conflict and the delayed-label performance holdout then determine repair intensity. The selected localized update is applied directly, unaffected modules remain frozen, and memory, reference, and audit state are updated. The reported primary path does not implement post-update candidate rollback}{figure.1}{}}
+\citation{Ali2024NIDSSurvey,Sharafaldin2018CICIDS,Moustafa2015UNSW,Moustafa2019ToNIoT}
+\citation{Layeghy2022NFv2,Luay2025NetFlowV3,UQNIDSDatasets2025}
+\citation{Arora2024DriftReview,Li2024DriftType,Aguiar2024Locality}
 \citation{Zhang2025SSF}
 \citation{Liu2026RepShield}
-\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{}\protected@file@percent }
-\newlabel{sec:related}{{II}{2}{}{section.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Drift Detection and Delayed Supervision}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Continual Adaptation for Intrusion Detection}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {III}DASP}{2}{}\protected@file@percent }
-\newlabel{sec:method}{{III}{2}{}{section.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Prediction-First Streaming State}{2}{}\protected@file@percent }
-\newlabel{eq:predict}{{1}{2}{}{equation.1}{}}
-\newlabel{eq:update}{{2}{2}{}{equation.2}{}}
-\newlabel{eq:invariant}{{3}{2}{}{equation.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Layer Adapters and Fused Inference}{2}{}\protected@file@percent }
-\newlabel{eq:adapter}{{4}{2}{}{equation.4}{}}
-\newlabel{eq:modulation}{{5}{2}{}{equation.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Feature and Delayed-Performance Triggers}{2}{}\protected@file@percent }
-\newlabel{eq:mmd}{{6}{2}{}{equation.6}{}}
-\citation{Luay2025NetFlowV3,UQNIDSDatasets2025}
-\newlabel{eq:performance_trigger}{{7}{3}{}{equation.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Current-Batch Querying and Similarity Replay}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}Fast and Strong Adaptation}{3}{}\protected@file@percent }
-\newlabel{eq:pareto}{{8}{3}{}{equation.8}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {IV}Experimental Design}{3}{}\protected@file@percent }
-\newlabel{sec:experimental}{{IV}{3}{}{section.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Dataset, Task, and Controlled Streams}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Comparators and Fairness Controls}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Online Protocol and Outcomes}{3}{}\protected@file@percent }
-\newlabel{eq:early}{{9}{3}{}{equation.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Confirmation and Statistical Analysis}{3}{}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Prediction-first DASP execution. Current-window labels cannot affect their own predictions. Base hidden blocks are frozen after warm-up; only adapter, modulation, input-adapter, and classifier parameters can change.}}{4}{}\protected@file@percent }
-\newlabel{alg:dasp}{{1}{4}{}{figure.1}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Locked Comparator Matrix}}{4}{}\protected@file@percent }
-\newlabel{tab:baselines}{{1}{4}{}{table.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-E}}GPU Systems Benchmark}{4}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {V}Results}{4}{}\protected@file@percent }
-\newlabel{sec:results}{{V}{4}{}{section.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Integrity and Primary Distribution-Shift Evaluation}{4}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Controlled Class-Conditional Shift Evaluation on NF-UNSW-NB15-v3}}{5}{}\protected@file@percent }
-\newlabel{tab:adaptation}{{2}{5}{}{table.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Shift Type, Recurrence, and Recovery}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Detector Behavior and Stationary Activity}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}GPU Latency, Throughput, and Memory}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {VI}Discussion}{5}{}\protected@file@percent }
-\newlabel{sec:discussion}{{VI}{5}{}{section.6}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Paired DASP Effects, 95\% Hierarchical Bootstrap Intervals, and Stream-Cluster Tests}}{6}{}\protected@file@percent }
-\newlabel{tab:paired}{{3}{6}{}{table.3}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Mean early macro-F1 over the first five post-shift windows. S3 first shift and recurrence are reported separately. Values are descriptive episode means; paired stream-level intervals and cluster tests determine inferential claims.}}{6}{}\protected@file@percent }
-\newlabel{fig:drift_heatmap}{{2}{6}{}{figure.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Run-Level Drift-Event Matching}}{6}{}\protected@file@percent }
-\newlabel{tab:detector}{{4}{6}{}{table.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Clean GPU Systems Benchmark (Median Run-Level Summaries)}}{7}{}\protected@file@percent }
-\newlabel{tab:systems}{{5}{7}{}{table.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Confirmation early macro-F1 versus mean complete test-then-train latency from the separate GPU benchmark. The horizontal axis is logarithmic. Higher and farther left is preferable; accuracy and systems evidence come from separate prespecified matrices.}}{7}{}\protected@file@percent }
-\newlabel{fig:tradeoff}{{3}{7}{}{figure.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {VII}Threats to Validity and Limitations}{7}{}\protected@file@percent }
-\newlabel{sec:limitations}{{VII}{7}{}{section.7}{}}
-\citation{Luay2025NetFlowV3,UQNIDSDatasets2025}
-\@writefile{toc}{\contentsline {section}{\numberline {VIII}Conclusion}{8}{}\protected@file@percent }
-\newlabel{sec:conclusion}{{VIII}{8}{}{section.8}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {A}Locked Configuration and Reproducibility Record}{8}{}\protected@file@percent }
-\newlabel{app:config}{{A}{8}{}{section.Appendix.A}{}}
+\citation{Chen2024ImbalancedSurvey,Rainio2024Metrics}
+\citation{Rainio2024Metrics}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Prediction-first DASP pseudocode}}{6}{figure.2}\protected@file@percent }
+\newlabel{fig:dasp-pseudocode}{{2}{6}{Prediction-first DASP pseudocode}{figure.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Experimental Design}{6}{section.5}\protected@file@percent }
+\newlabel{sec:experiments}{{V}{6}{Experimental Design}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Datasets and Task}{6}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Ten Primary Drift Conditions}{6}{subsection.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Dataset and stream protocol.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:datasets}{{2}{6}{Dataset and stream protocol}{table.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Methods and Fairness Controls}{6}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Pilot and Confirmation Matrices}{6}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}Metrics and Statistical Analysis}{6}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-F}}Reproducibility and Performance Measurement}{7}{subsection.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Results}{7}{section.6}\protected@file@percent }
+\newlabel{sec:results}{{VI}{7}{Results}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Overall Confirmation Results}{7}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}Dataset-Level Analysis}{7}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Drift-Condition Analysis}{7}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-D}}Adaptation Cost and Systems Performance}{7}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-E}}Localization and Structural Preservation}{7}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-F}}Development Ablation and Failure Analysis}{7}{subsection.6.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Confirmation results over 4,000 runs. Values are means across five stream seeds and two model seeds for each dataset--scenario cell.}}{8}{table.3}\protected@file@percent }
+\newlabel{tab:overall}{{3}{8}{Confirmation results over 4,000 runs. Values are means across five stream seeds and two model seeds for each dataset--scenario cell}{table.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Mean Macro-F1 by dataset over the confirmation matrix. DASP is highlighted in red.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:datasetf1}{{3}{8}{Mean Macro-F1 by dataset over the confirmation matrix. DASP is highlighted in red}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces DASP minus SSF Macro-F1 gap by dataset and drift condition. Positive values are blue; negative values are red.}}{8}{figure.4}\protected@file@percent }
+\newlabel{fig:heatmap}{{4}{8}{DASP minus SSF Macro-F1 gap by dataset and drift condition. Positive values are blue; negative values are red}{figure.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Dataset-level mean Macro-F1 and update cost.}}{8}{table.4}\protected@file@percent }
+\newlabel{tab:dataset}{{4}{8}{Dataset-level mean Macro-F1 and update cost}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Window-level Macro-F1 trajectories of all eight methods on CIC-IDS2017. Each line is the mean over five stream seeds and two model seeds; the red band is a 95\% normal-approximation confidence interval for DASP. Scenario segments are independent runs, gaps prevent connections across resets, and dotted markers indicate the first nonstationary window. L/M/H denote low-, medium-, and high-intensity local drift.}}{9}{figure.5}\protected@file@percent }
+\newlabel{fig:traj-cic}{{5}{9}{Window-level Macro-F1 trajectories of all eight methods on CIC-IDS2017. Each line is the mean over five stream seeds and two model seeds; the red band is a 95\% normal-approximation confidence interval for DASP. Scenario segments are independent runs, gaps prevent connections across resets, and dotted markers indicate the first nonstationary window. L/M/H denote low-, medium-, and high-intensity local drift}{figure.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Window-level Macro-F1 trajectories of all eight methods on NF-BoT-IoT-v3. Curves and uncertainty are aggregated over five stream seeds and two model seeds. DASP is emphasized in red; independent scenario segments are separated by gaps, and dotted markers identify the first nonstationary window.}}{9}{figure.6}\protected@file@percent }
+\newlabel{fig:traj-bot}{{6}{9}{Window-level Macro-F1 trajectories of all eight methods on NF-BoT-IoT-v3. Curves and uncertainty are aggregated over five stream seeds and two model seeds. DASP is emphasized in red; independent scenario segments are separated by gaps, and dotted markers identify the first nonstationary window}{figure.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Discussion}{9}{section.7}\protected@file@percent }
+\newlabel{sec:discussion}{{VII}{9}{Discussion}{section.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Window-level Macro-F1 trajectories of all eight methods on NF-CSE-CIC-IDS2018-v3. The red DASP curve includes a 95\% normal-approximation confidence band. Segment gaps denote independent scenario resets; dotted markers indicate drift onset.}}{10}{figure.7}\protected@file@percent }
+\newlabel{fig:traj-cse}{{7}{10}{Window-level Macro-F1 trajectories of all eight methods on NF-CSE-CIC-IDS2018-v3. The red DASP curve includes a 95\% normal-approximation confidence band. Segment gaps denote independent scenario resets; dotted markers indicate drift onset}{figure.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Window-level Macro-F1 trajectories of all eight methods on NF-ToN-IoT-v3, averaged over five stream seeds and two model seeds. The frequent crossings between DASP and the strongest baselines visualize the smaller, condition-dependent effect on this dataset.}}{10}{figure.8}\protected@file@percent }
+\newlabel{fig:traj-ton}{{8}{10}{Window-level Macro-F1 trajectories of all eight methods on NF-ToN-IoT-v3, averaged over five stream seeds and two model seeds. The frequent crossings between DASP and the strongest baselines visualize the smaller, condition-dependent effect on this dataset}{figure.8}{}}
+\citation{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Window-level Macro-F1 trajectories of all eight methods on NF-UNSW-NB15-v3. The compressed vertical scale reflects near-ceiling performance; differences among the leading methods are correspondingly small. DASP is emphasized in red and its band shows the 95\% normal-approximation confidence interval.}}{11}{figure.9}\protected@file@percent }
+\newlabel{fig:traj-unsw}{{9}{11}{Window-level Macro-F1 trajectories of all eight methods on NF-UNSW-NB15-v3. The compressed vertical scale reflects near-ceiling performance; differences among the leading methods are correspondingly small. DASP is emphasized in red and its band shows the 95\% normal-approximation confidence interval}{figure.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Accuracy--adaptation frontier. Bubble size is proportional to gradient evaluations; DASP is highlighted in red.}}{11}{figure.10}\protected@file@percent }
+\newlabel{fig:frontier}{{10}{11}{Accuracy--adaptation frontier. Bubble size is proportional to gradient evaluations; DASP is highlighted in red}{figure.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Threats to Validity and Limitations}{11}{section.8}\protected@file@percent }
+\newlabel{sec:limitations}{{VIII}{11}{Threats to Validity and Limitations}{section.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {IX}Conclusion}{12}{section.9}\protected@file@percent }
+\newlabel{sec:conclusion}{{IX}{12}{Conclusion}{section.9}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {X}Detailed Method and Structural Invariants}{12}{section.10}\protected@file@percent }
+\newlabel{sec:detailed-method}{{X}{12}{Detailed Method and Structural Invariants}{section.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {X-A}}Calibration and reference lifecycle}{13}{subsection.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {X-B}}Delayed supervision and repair modes}{13}{subsection.10.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {X-C}}Proof sketches for structural properties}{13}{subsection.10.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {X-D}}Complexity accounting}{13}{subsection.10.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {X-E}}Interpretability as an intervention record}{13}{subsection.10.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XI}Dataset Construction and Stream Semantics}{13}{section.11}\protected@file@percent }
+\newlabel{sec:stream-semantics}{{XI}{13}{Dataset Construction and Stream Semantics}{section.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XI-A}}Dataset roles}{13}{subsection.11.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XI-B}}Window protocol}{14}{subsection.11.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XI-C}}Ten scenario definitions}{14}{subsection.11.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XI-D}}Seed structure and pairing}{14}{subsection.11.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Primary scenario semantics and expected adaptation pressure.}}{14}{table.5}\protected@file@percent }
+\newlabel{tab:scenario-semantics}{{5}{14}{Primary scenario semantics and expected adaptation pressure}{table.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XI-E}}Fairness controls}{14}{subsection.11.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XII}Evaluation Contract and Statistical Analysis}{14}{section.12}\protected@file@percent }
+\newlabel{sec:evaluation-contract}{{XII}{14}{Evaluation Contract and Statistical Analysis}{section.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XII-A}}Predictive metrics}{14}{subsection.12.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XII-B}}Cost and performance metrics}{14}{subsection.12.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Confirmation design and paired performance map. Rows are datasets, columns are the ten primary scenarios, and each cell aggregates five stream seeds and two model seeds.}}{15}{figure.11}\protected@file@percent }
+\newlabel{fig:experiment-matrix}{{11}{15}{Confirmation design and paired performance map. Rows are datasets, columns are the ten primary scenarios, and each cell aggregates five stream seeds and two model seeds}{figure.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XII-C}}Paired inference}{15}{subsection.12.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XII-D}}Effect size and uncertainty reporting}{15}{subsection.12.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XIII}Expanded Confirmation Results}{15}{section.13}\protected@file@percent }
+\newlabel{sec:expanded-results}{{XIII}{15}{Expanded Confirmation Results}{section.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIII-A}}Dataset-by-method pattern}{15}{subsection.13.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIII-B}}Dataset-level cost and accuracy}{15}{subsection.13.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Mean Macro-F1 by dataset and method over the confirmation matrix.}}{16}{table.6}\protected@file@percent }
+\newlabel{tab:dataset-method-f1}{{6}{16}{Mean Macro-F1 by dataset and method over the confirmation matrix}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Dataset-level DASP--SSF comparison. Speedup and gradient reduction are ratios relative to SSF.}}{16}{table.7}\protected@file@percent }
+\newlabel{tab:dataset-cost-detail}{{7}{16}{Dataset-level DASP--SSF comparison. Speedup and gradient reduction are ratios relative to SSF}{table.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Scenario-level DASP--SSF comparison across five datasets and ten replication cells per scenario.}}{16}{table.8}\protected@file@percent }
+\newlabel{tab:scenario-detail}{{8}{16}{Scenario-level DASP--SSF comparison across five datasets and ten replication cells per scenario}{table.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces DASP Macro-F1 for every dataset--scenario cell. Values average five stream seeds and two model seeds.}}{16}{table.9}\protected@file@percent }
+\newlabel{tab:dasp-cell-f1}{{9}{16}{DASP Macro-F1 for every dataset--scenario cell. Values average five stream seeds and two model seeds}{table.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIII-C}}Scenario-level response}{16}{subsection.13.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIII-D}}Cell-level matrices}{16}{subsection.13.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces SSF Macro-F1 for every dataset--scenario cell, using the same paired cells as DASP.}}{17}{table.10}\protected@file@percent }
+\newlabel{tab:ssf-cell-f1}{{10}{17}{SSF Macro-F1 for every dataset--scenario cell, using the same paired cells as DASP}{table.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces DASP minus SSF Macro-F1 gap for every dataset--scenario cell. Positive values favor DASP.}}{17}{table.11}\protected@file@percent }
+\newlabel{tab:gap-cell}{{11}{17}{DASP minus SSF Macro-F1 gap for every dataset--scenario cell. Positive values favor DASP}{table.11}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Operational and retention metrics by method. Values are means over 500 confirmation cells.}}{17}{table.12}\protected@file@percent }
+\newlabel{tab:method-operational}{{12}{17}{Operational and retention metrics by method. Values are means over 500 confirmation cells}{table.12}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Logged DASP structural invariants.}}{17}{table.13}\protected@file@percent }
+\newlabel{tab:dasp-invariants}{{13}{17}{Logged DASP structural invariants}{table.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIII-E}}Retention and operational behavior}{17}{subsection.13.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XIV}Ablation, Sensitivity, and Failure Diagnostics}{17}{section.14}\protected@file@percent }
+\newlabel{sec:ablation-expanded}{{XIV}{17}{Ablation, Sensitivity, and Failure Diagnostics}{section.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIV-A}}Development ablation as mechanism diagnosis}{17}{subsection.14.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Development ablation sequence on the 15 paired pilot cells.}}{18}{table.14}\protected@file@percent }
+\newlabel{tab:development-ablation}{{14}{18}{Development ablation sequence on the 15 paired pilot cells}{table.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIV-B}}Router sensitivity}{18}{subsection.14.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIV-C}}Failure episode analysis}{18}{subsection.14.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XIV-D}}Negative controls}{18}{subsection.14.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XV}Theoretical and Operational Analysis}{18}{section.15}\protected@file@percent }
+\newlabel{sec:theory-analysis}{{XV}{18}{Theoretical and Operational Analysis}{section.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XV-A}}Constrained repair view}{18}{subsection.15.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XV-B}}Locality versus expressivity}{18}{subsection.15.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XV-C}}Attribution stability under drift types}{19}{subsection.15.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XV-D}}Why the performance holdout is not an oracle}{19}{subsection.15.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XV-E}}Computational decomposition}{19}{subsection.15.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XVI}Deployment Threat Model and Governance}{19}{section.16}\protected@file@percent }
+\newlabel{sec:deployment-threat}{{XVI}{19}{Deployment Threat Model and Governance}{section.16}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVI-A}}Operational deployment blueprint}{19}{subsection.16.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVI-B}}Threats against adaptation}{19}{subsection.16.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVI-C}}Governance and change control}{19}{subsection.16.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Mechanism-to-evidence mapping used in the evaluation.}}{20}{table.15}\protected@file@percent }
+\newlabel{tab:claim-evidence-map}{{15}{20}{Mechanism-to-evidence mapping used in the evaluation}{table.15}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {16}{\ignorespaces Threats to the adaptive repair path and corresponding controls.}}{20}{table.16}\protected@file@percent }
+\newlabel{tab:threat-controls}{{16}{20}{Threats to the adaptive repair path and corresponding controls}{table.16}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVI-D}}Evidence integration and scope}{20}{subsection.16.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XVII}Experimental Integrity and Reproducibility Checks}{20}{section.17}\protected@file@percent }
+\newlabel{sec:quality-assurance}{{XVII}{20}{Experimental Integrity and Reproducibility Checks}{section.17}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-A}}Leakage audit}{20}{subsection.17.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-B}}Baseline equivalence audit}{20}{subsection.17.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-C}}Result integrity audit}{20}{subsection.17.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-D}}Interpretation of statistical significance}{20}{subsection.17.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {17}{\ignorespaces Experimental integrity checks and the artifact supporting each check.}}{21}{table.17}\protected@file@percent }
+\newlabel{tab:qa-checks}{{17}{21}{Experimental integrity checks and the artifact supporting each check}{table.17}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-E}}Failure transparency}{21}{subsection.17.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-F}}Test coverage and reproducibility gate}{21}{subsection.17.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {XVII-G}}Evidence and reproducibility boundary}{21}{subsection.17.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {XVIII}Operational Reproducibility and Auditability}{21}{section.18}\protected@file@percent }
+\newlabel{sec:reproducibility-expanded}{{XVIII}{21}{Operational Reproducibility and Auditability}{section.18}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {18}{\ignorespaces Layered software and experiment validation gate.}}{22}{table.18}\protected@file@percent }
+\newlabel{tab:test-coverage}{{18}{22}{Layered software and experiment validation gate}{table.18}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {19}{\ignorespaces Reproducibility checklist for a confirmation cell.}}{22}{table.19}\protected@file@percent }
+\newlabel{tab:repro-checklist}{{19}{22}{Reproducibility checklist for a confirmation cell}{table.19}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Locked Configuration}{22}{appendix.Appendix.A}\protected@file@percent }
+\newlabel{app:config}{{A}{22}{Locked Configuration}{appendix.Appendix.A}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Experimental Protocol Summary}{22}{appendix.Appendix.B}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C}Complete Method Configuration Matrix}{22}{appendix.Appendix.C}\protected@file@percent }
+\newlabel{app:method-matrix}{{C}{22}{Complete Method Configuration Matrix}{appendix.Appendix.C}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {C-A}}Locked DASP values}{22}{subsection.Appendix.C.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {20}{\ignorespaces External evaluation controls and the audited DASP supervision exception.}}{23}{table.20}\protected@file@percent }
+\newlabel{tab:shared-contract}{{20}{23}{External evaluation controls and the audited DASP supervision exception}{table.20}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {21}{\ignorespaces Method-specific controls used in the confirmation matrix.}}{23}{table.21}\protected@file@percent }
+\newlabel{tab:method-config-detail}{{21}{23}{Method-specific controls used in the confirmation matrix}{table.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {D}Dataset and Scenario Design}{23}{appendix.Appendix.D}\protected@file@percent }
+\newlabel{app:scenario-manifest}{{D}{23}{Dataset and Scenario Design}{appendix.Appendix.D}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {D-A}}Protocol validation}{23}{subsection.Appendix.D.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {D-B}}Class balance and label accounting}{23}{subsection.Appendix.D.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {22}{\ignorespaces Dataset characteristics and intended stress properties.}}{24}{table.22}\protected@file@percent }
+\newlabel{tab:dataset-manifest}{{22}{24}{Dataset characteristics and intended stress properties}{table.22}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {23}{\ignorespaces Scenario design with temporal behavior, expected failure mode, and DASP diagnostic.}}{24}{table.23}\protected@file@percent }
+\newlabel{tab:scenario-manifest-detail}{{23}{24}{Scenario design with temporal behavior, expected failure mode, and DASP diagnostic}{table.23}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {E}Prediction-First State Machine}{24}{appendix.Appendix.E}\protected@file@percent }
+\newlabel{app:state-machine}{{E}{24}{Prediction-First State Machine}{appendix.Appendix.E}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {E-A}}State transition conditions}{24}{subsection.Appendix.E.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {E-B}}Expanded pseudocode}{24}{subsection.Appendix.E.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {F}Statistical Audit of Paired Results}{25}{appendix.Appendix.F}\protected@file@percent }
+\newlabel{app:statistical-audit}{{F}{25}{Statistical Audit of Paired Results}{appendix.Appendix.F}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {F-A}}Multiple-comparison discipline}{25}{subsection.Appendix.F.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {F-B}}What is not treated as independent}{25}{subsection.Appendix.F.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {G}Performance and Memory Audit}{25}{appendix.Appendix.G}\protected@file@percent }
+\newlabel{app:performance-audit}{{G}{25}{Performance and Memory Audit}{appendix.Appendix.G}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {G-A}}Update-time interpretation}{25}{subsection.Appendix.G.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {G-B}}Memory interpretation}{25}{subsection.Appendix.G.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {H}Reproduction and Archival Guide}{25}{appendix.Appendix.H}\protected@file@percent }
+\newlabel{app:archival-guide}{{H}{25}{Reproduction and Archival Guide}{appendix.Appendix.H}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {H-A}}Recommended execution order}{25}{subsection.Appendix.H.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {H-B}}Failure handling}{25}{subsection.Appendix.H.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {24}{\ignorespaces Distribution audit for the 500 paired DASP--SSF Macro-F1 gaps.}}{26}{table.24}\protected@file@percent }
+\newlabel{tab:gap-quantiles}{{24}{26}{Distribution audit for the 500 paired DASP--SSF Macro-F1 gaps}{table.24}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {25}{\ignorespaces Paired adaptation-cost distribution across the same 500 cells.}}{26}{table.25}\protected@file@percent }
+\newlabel{tab:cost-quantiles}{{25}{26}{Paired adaptation-cost distribution across the same 500 cells}{table.25}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {26}{\ignorespaces Confirmation-level performance summary by method.}}{26}{table.26}\protected@file@percent }
+\newlabel{tab:performance-audit}{{26}{26}{Confirmation-level performance summary by method}{table.26}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {27}{\ignorespaces Archival artifact map.}}{26}{table.27}\protected@file@percent }
+\newlabel{tab:artifact-map}{{27}{26}{Archival artifact map}{table.27}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {H-C}}Reporting checklist}{26}{subsection.Appendix.H.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {I}Extended Limitations and Future Experiments}{26}{appendix.Appendix.I}\protected@file@percent }
+\newlabel{app:future-work}{{I}{26}{Extended Limitations and Future Experiments}{appendix.Appendix.I}{}}
 \bibstyle{IEEEtran}
 \bibdata{references}
-\bibcite{Gama2014ConceptDrift}{1}
+\bibcite{Arora2024DriftReview}{1}
 \bibcite{Li2024DriftType}{2}
 \bibcite{Aguiar2024Locality}{3}
-\bibcite{Grzenda2020Delayed}{4}
+\bibcite{Lukats2025DriftBenchmark}{4}
 \bibcite{Csaba2024LabelDelay}{5}
-\bibcite{Zhang2025SSF}{6}
-\bibcite{Liu2026RepShield}{7}
-\bibcite{Gretton2012MMD}{8}
-\bibcite{Bifet2007ADWIN}{9}
-\bibcite{Rolnick2019Replay}{10}
-\bibcite{Amalapuram2023NIDSReplay}{11}
-\bibcite{Chaudhry2019AGEM}{12}
-\bibcite{Luay2025NetFlowV3}{13}
-\bibcite{UQNIDSDatasets2025}{14}
-\@writefile{toc}{\contentsline {section}{REFERENCES}{9}{}\protected@file@percent }
-\gdef \@abspage@last{9}
+\bibcite{Palli2024DriftImbalance}{6}
+\bibcite{Chen2024ImbalancedSurvey}{7}
+\bibcite{Wang2024ContinualSurvey}{8}
+\bibcite{Amalapuram2023NIDSReplay}{9}
+\bibcite{Chaudhry2019AGEM}{10}
+\bibcite{Kirkpatrick2017EWC}{11}
+\bibcite{Zhang2025SSF}{12}
+\bibcite{Liu2026RepShield}{13}
+\bibcite{Pfeiffer2020AdapterFusion}{14}
+\bibcite{Hu2022LoRA}{15}
+\bibcite{He2022DyLoRA}{16}
+\bibcite{BaenaGarcia2006DDM}{17}
+\bibcite{Bifet2007ADWIN}{18}
+\bibcite{Gretton2012MMD}{19}
+\bibcite{Ali2024NIDSSurvey}{20}
+\bibcite{Moustafa2015UNSW}{21}
+\bibcite{Sharafaldin2018CICIDS}{22}
+\bibcite{Moustafa2019ToNIoT}{23}
+\bibcite{Layeghy2022NFv2}{24}
+\bibcite{Luay2025NetFlowV3}{25}
+\bibcite{UQNIDSDatasets2025}{26}
+\bibcite{Ribeiro2016LIME}{27}
+\@writefile{lot}{\contentsline {table}{\numberline {28}{\ignorespaces Prioritized future experiment matrix.}}{27}{table.28}\protected@file@percent }
+\newlabel{tab:future-experiments}{{28}{27}{Prioritized future experiment matrix}{table.28}{}}
+\@writefile{toc}{\contentsline {section}{REFERENCES}{27}{section*.7}\protected@file@percent }
+\bibcite{Lundberg2017SHAP}{28}
+\bibcite{Schwalbe2024XAITaxonomy}{29}
+\bibcite{Rainio2024Metrics}{30}
+\gdef \@abspage@last{28}

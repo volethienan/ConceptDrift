@@ -1,0 +1,62 @@
+model:
+  architecture: modular
+  hidden_dims: [128, 64]
+  dropout: 0.0
+  n_modules: 4
+  module_dim: 64
+data:
+  source: synthetic
+  scenario: S4
+  window_size: 1024
+  n_windows: 18
+  warmup_windows: 4
+  n_features: 32
+  random_seed: 9501
+  stream_seed: 9501
+  task: binary
+training:
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs_per_window: 2
+  label_delay: 1
+  device: cpu
+  num_threads: 1
+  model_seed: 91
+drift:
+  mmd_samples: 128
+  calibration_windows: 4
+  kappa: 2.0
+  z_max: 12.0
+  severity_threshold: 0.15
+  emergency_severity_threshold: 0.60
+  persistence: 1
+  top_k: 3
+  kernel_scales: [0.5, 1.0, 2.0]
+  cooldown_windows: 0
+dasp:
+  baseline: modular_dasp
+  eta_floor: 0.0
+  eta_ceiling: 2.0
+  conflict_weight: 1.0
+  memory_size: 1024
+  memory_batch_size: 128
+  guard_ratio: 0.25
+  modular_replay_size: 512
+  modular_new_sample_weight: 3.0
+  modular_background_plasticity: 0.25
+  modular_repair_epochs: 2
+  modular_emergency_epochs: 3
+baselines:
+  update_label_budget: 128
+  ssf_label_budget: 128
+  ssf_new_sample_weight: 3.0
+  ssf_lwf_lambda: 0.5
+  ssf_drift_p_value: 0.05
+  ssf_mask_steps: 25
+  ssf_mask_bins: 10
+  ssf_allow_pseudo_labels: false
+output:
+  directory: outputs
+  run_name: modular_dasp_main
+  save_checkpoints: false

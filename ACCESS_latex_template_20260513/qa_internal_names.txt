@@ -1,0 +1,1965 @@
+Received XX XX, 2026; revised XX XX, 2026.
+Digital Object Identifier To be assigned after acceptance
+
+
+
+
+DASP: Drift-Attributed Subspace Plasticity for
+Localized Continual Adaptation in Streaming
+Network Intrusion Detection
+AUTHOR NAME1
+1
+    Affiliation to be completed before submission (e-mail: corresponding author e-mail to be completed).
+Corresponding author: Author Name (e-mail: to be completed).
+The author list, affiliations, funding statement, and acknowledgments must be verified before submission.
+
+
+
+
+      ABSTRACT Continual network intrusion detection must adapt to evolving traffic while preserving benign
+      and previously learned attack behavior. Existing approaches commonly respond to drift by replaying a large
+      buffer or updating the whole predictor, which couples unrelated feature groups, increases adaptation cost,
+      and provides limited evidence about what changed. This paper presents Drift-Attributed Subspace Plasticity
+      (DASP), a modular continual-learning framework that localizes distribution shift to feature-group subspaces,
+      updates only the routed representation modules, and retains a shared trainable classifier. DASP combines layer-
+      and module-wise discrepancy monitoring, a top-k attribution router, strict structural freezing, class-balanced
+      bounded rehearsal, new-sample weighting, and a performance-gated emergency repair path. The method is
+      evaluated under a prediction-first, one-window delayed-label protocol on five network-flow datasets, ten
+      drift conditions, five stream seeds, two model seeds, and eight methods. The confirmation matrix contains
+      4,000 runs and compares DASP with seven locked alternatives. Across all eight methods, DASP obtains the
+      highest observed mean Macro-F1 (0.9269), followed by SSF (0.9191) and Experience Replay (0.9036). SSF
+      is the prespecified primary comparator: DASP wins 383 of 500 paired cells with a mean gap of +0.0078,
+      and the locked-matrix sign test gives p = 2.56 × 10−34 . DASP reduces adaptation time by a factor of 1.90
+      and gradient evaluations by a factor of 1.56 relative to SSF. The method performs no logged full-model or
+      all-representation-module update; the shared classifier remains trainable, and all 16,000 observed repair
+      records activate at most three of four representation modules. The main systems trade-off is lower forward
+      throughput caused by the parallel modular backbone. These results support the integrated localized-repair
+      system as an effective and auditable alternative to indiscriminate online retraining under the implemented
+      supervision paths; they do not isolate the predictive contribution of the attribution router or establish a strict
+      shared total-label-exposure comparison.
+
+
+      INDEX TERMS Concept drift, continual learning, delayed labels, intrusion detection, modular neural
+      networks, parameter-efficient adaptation, replay, streaming evaluation.
+
+
+I. INTRODUCTION                                                                                       The experimental protocol is part of the scientific problem.
+                                                                                                    Randomly shuffling a stream removes the temporal structure
+N     ETWORK intrusion detection systems (NIDSs) operate
+      under non-stationary traffic, changing services, shifting
+attack prevalence, and evolving attacker behavior. A detector
+                                                                                                    that defines drift [4]. Training on the current window before
+                                                                                                    producing its predictions leaks future information, while treat-
+that is accurate on a static split may therefore become un-                                         ing windows as independent replications exaggerates statistical
+reliable when the joint distribution Pt (X , Y ) changes over                                       evidence. Delayed labels make the setting more realistic but
+time. Concept drift research distinguishes abrupt, gradual,                                         create a gap between prediction, querying, memory update,
+recurring, and local changes because they create different                                          and supervised repair [5]. Severe class imbalance further
+adaptation requirements [1]–[3]. In network-flow data, local                                        makes accuracy an inadequate primary outcome [6], [7];
+class-conditional changes are particularly important: an attack                                     Macro-F1, attack recall, false-negative rate, and class-wise
+family can change while benign traffic and other attack                                             diagnostics are required.
+families remain comparatively stable.                                                                 Most continual NIDS methods use one of two strategies.
+
+VOLUME XX, 2026                                                                                                                                                   1
+                                                                                      Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+Replay methods mix current data with historical examples              causal. The confirmation evaluates DASP as an integrated
+[8], [9]; protected-gradient methods constrain updates using          adaptation system; because random, fixed, and single-signal
+a reference memory [10]; regularization methods preserve              routing policies are not included in the locked matrix, the
+important parameters [8], [11]; and recent NIDS systems               isolated contribution of attribution-guided routing to predictive
+use strategic selection or representation protection [12], [13].      performance is not identified.
+These mechanisms are valuable, but they generally answer
+the question ‘‘how much data should be used for adaptation?’’         II. RELATED WORK
+rather than ‘‘which representation subspace is responsible for        A. CONCEPT DRIFT DETECTION AND STREAM EVALUATION
+the drift?’’ Updating the full predictor can therefore alter stable   Recent reviews organize drift detectors into error-rate,
+features unnecessarily.                                               adaptive-window, and distributional families [1], [4]. Rep-
+   This paper introduces DASP, which changes the adaptation           resentative foundations include DDM and ADWIN [17], [18],
+unit from the whole network to an attributed feature-group            while the maximum mean discrepancy (MMD) compares sam-
+subspace. Its modular backbone partitions input features into         ples in a reproducing-kernel Hilbert space without assuming
+parallel modules. A drift router computes discrepancy and             a parametric form [19]. DASP uses MMD-like discrepancy
+supervised conflict signals for each module, selects at most k        signals as attribution evidence rather than as a standalone
+modules, and freezes every unselected module at the parameter         decision to retrain the entire network. The router is not a
+level. A bounded class-balanced replay batch prevents the             separately trained predictor: it is a deterministic scoring-and-
+routed repair from becoming a short-memory classifier, while          selection component whose thresholds and top-k budget are
+a delayed-label performance holdout selects emergency or              locked before confirmation.
+background repair intensity. The resulting design is related to          The distinction between detection and adaptation is impor-
+recent parameter-efficient adaptation [14]–[16] and modular           tant. A detector can identify a distribution shift without proving
+continual learning [8], but is developed for delayed-label            that the decision boundary changed. Conversely, performance
+streaming NIDS evaluation.                                            degradation can appear before a distributional statistic crosses
+   The contributions are:                                             a threshold. DASP therefore combines representation dis-
+   • a drift-attributed modular architecture that performs strict
+                                                                      crepancy with delayed supervised conflict and a delayed-
+      top-k subspace repair instead of global fine-tuning;            label performance holdout. This design follows the broader
+   • a bounded localized rehearsal mechanism that combines
+                                                                      recommendation that drift type and drift locality should guide
+      delayed current labels, class-balanced memory, and new-         adaptation [2], [3].
+      sample weighting without changing the structural locality
+      constraint;                                                     B. CONTINUAL LEARNING AND SELECTIVE PLASTICITY
+   • a reproducible ten-scenario evaluation with 1,200-run full
+                                                                      Experience replay remains a simple and effective continual-
+      pilot and 4,000-run confirmation matrices, eight locked         learning mechanism [8], [9]. A-GEM protects a new gra-
+      methods, five datasets, five stream seeds, and two model        dient using reference memory [10], while EWC constrains
+      seeds;                                                          parameter changes using importance estimates [11]. Recent
+   • a joint accuracy–adaptation–systems analysis that reports
+                                                                      NIDS methods extend these ideas through strategic selection
+      Macro-F1, attack recall, update time, gradient evalua-          and representation protection [12], [13]. These approaches
+      tions, throughput, memory, and localization invariants;         motivate DASP’s rehearsal and structural protection, but DASP
+      and                                                             differs in making the protected unit an attributed feature
+   • an explicit failure analysis that distinguishes mean su-
+                                                                      module inside one predictor.
+      periority from worst-case cells and avoids claiming that           Parameter-efficient adaptation provides a complementary
+      every drift episode is won by DASP.                             route. Adapter fusion and low-rank adaptation reduce the
+                                                                      number of trainable parameters while retaining a fixed base
+   Accordingly, this study evaluates DASP through three
+                                                                      model [14]–[16]. DASP applies the same efficiency principle
+research questions:
+                                                                      to tabular network flows, but adds a data-driven routing signal
+   RQ1 How does DASP’s stream-level predictive perfor-                and a strict inactive-module invariant. The router similarly
+           mance compare with seven locked online and                 asks where representations differ, then uses that difference to
+           continual-learning baselines across five datasets and      select plasticity. The routing rule is data-driven rather than
+           ten controlled drift conditions?                           learned end-to-end; its scores are computed from calibrated
+   RQ2 What structural-locality and adaptation-side effi-             discrepancy and delayed-label conflict signals. This distinction
+           ciency properties does DASP exhibit relative to            matters because the confirmation experiment evaluates a fixed
+           SSF under the same prediction-first delayed-label          routing procedure, not a jointly optimized router.
+           contract?
+   RQ3 Under which dataset, controlled-drift, and systems             C. CONTINUAL NIDS AND BENCHMARK DATA
+           conditions do DASP’s predictive or adaptation-cost         Recent NIDS surveys identify UNSW-NB15 and CIC-
+           advantages weaken or reverse?                              IDS2017 as widely used benchmark families [20]–[22]. The
+These questions are comparative and evaluative rather than            ToN-IoT dataset extends the setting to telemetry-rich IoT
+2                                                                                                                               VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+environments [23]. NetFlow-oriented datasets improve scala-         modules. The goal is not only to maximize predictive quality,
+bility and reduce dependence on payload inspection [24]–[26].       but to minimize unnecessary parameter motion. Let Θ denote
+Recent continual NIDS methods such as augmented replay,             all parameters and At ⊆ {1, . . . , M } denote the attributed
+SSF, and RepShield establish relevant comparison points [9],        active module set. DASP seeks
+[12], [13]. DASP uses these families as locked comparators
+rather than selectively reporting only favorable methods.            max E[MacroF1] − λu UpdateCost −λm Motion(Θ¬At ),
+                                                                                                                                  (1)
+D. INTERPRETABILITY AND STATISTICAL REPORTING                       subject to |At | ≤ k, where k = 3 in the locked confirmation
+Interpretability methods such as LIME and SHAP explain pre-         configuration. The last term encodes the structural preservation
+dictions after the model has acted [27]–[29]. DASP exposes a        requirement: inactive modules must not change during a repair.
+structural explanation during adaptation: the router reports the
+selected modules, their plasticity values, and the replay budget.   IV. DRIFT-ATTRIBUTED SUBSPACE PLASTICITY
+This is a different, intervention-oriented form of explanation.     A. DESIGN RATIONALE AND SYSTEM STATE
+The paper reports paired stream-level comparisons, avoids           A conventional depth-wise MLP exposes globally shared
+window-level pseudo-replication, and uses exact paired tests        hidden layers, so an update motivated by one feature group
+together with effect sizes, consistent with recent guidance on      can move parameters used by every group. DASP instead
+machine-learning metrics and statistical tests [30].                creates four parallel representation modules and a shared
+                                                                    fusion classifier. The modules are not assumed to be causally
+E. SYNTHESIS AND RESEARCH GAP                                       independent or intrinsically human-interpretable. They are
+Within the cited concept-drift, continual-learning, and             a controlled intervention surface: each parameter group can
+continual-NIDS literature, three linked gaps remain. First,         be excluded from the optimizer and verified independently,
+drift detectors usually answer whether a stream has changed,        while the classifier remains trainable because concept drift
+whereas a repair policy must also decide where parameter            may move the decision boundary even when representation
+updates are admissible. Second, continual-learning methods          discrepancy is modest. Replay supplies historical supervision,
+protect prior knowledge mainly through replay, regulariza-          whereas the routing mask determines where that supervision
+tion, distillation, or gradient constraints applied to a globally   may alter parameters.
+shared predictor; these mechanisms do not by themselves                The persistent state at iteration t is
+provide a falsifiable module-level locality invariant. Third,
+                                                                                       St = Θt , Mt , Htref , Qt ,
+                                                                                                                
+continual NIDS studies often report predictive quality without                                                                 (2)
+jointly auditing delayed-label semantics, update cost, inference    where Θt is the model state, Mt is bounded replay memory,
+throughput, and the exact unit of statistical replication. DASP     Htref is the reference-representation bank, and Qt is the
+addresses this intersection by treating attribution as a routing    pending-update queue. Before labels for Wt are available,
+decision, locality as a hard optimizer constraint, and stream       the online procedure computes representation evidence Et =
+evaluation as a paired deployment contract. This framing is         (rt , st , Dt ), emits Ŷt , and enqueues (Wt , Ŷt , Et ). Let τ = t − 1.
+narrower than a claim of universally better continual learn-        When Yτ arrives, the procedure retrieves the stored item for
+ing: the contribution is a testable combination of attribution,     Wτ , restores Eτ , computes cτ , pτ , and Aτ , and updates the
+constrained repair, and auditability for streaming NIDS.            model for subsequent windows. Thus,
+III. PROBLEM FORMULATION                                                   St+1 = T (St , Wt , Et , Yτ , Qt [τ ]) ,        τ = t − 1,     (3)
+Let a stream be a sequence of windows W = {Wt }Tt=1 , where
+Wt = {(xi , yi )}ni=1
+                   t
+                      , xi ∈ Rd , and yi ∈ {0, 1}. At prediction    and no routing quantity indexed by t is combined with labels
+time, labels in the current window are unavailable. After a         from Wt−1 .
+fixed delay δ = 1, delayed labels become available under
+the implemented method-specific supervision path. Primary           B. MODULAR FEATURE-SUBSPACE BACKBONE
+DASP splits the labeled window into repair and holdout              The backbone partitions the standardized input into M = 4
+partitions and selects at most Btrain = 128 repair examples.        contiguous groups. Module j maps its feature slice x (j) into a
+Hence, Btrain bounds the optimization subset, not total label       64-dimensional representation,
+exposure. The detector must produce ŷt before using any labels
+from Wt .                                                                          hj = fj (x (j) ; θj ),     j = 1, . . . , M ,          (4)
+   The task is deliberately scoped to binary benign-versus-
+                                                                    and the shared classifier produces
+attack prediction with one-window delayed supervision and
+bounded repair training. In this paper, attribution means an               z = g([h1 ∥h2 ∥ · · · ∥hM ]; ϕ),         ŷ = arg max zc .     (5)
+                                                                                                                                   c
+operational assignment of repair responsibility from discrep-
+ancy and delayed-label conflict scores; it does not denote          The same fixed partition is used for every stream cell. Its
+causal feature attribution. The classifier is a shared adaptation   purpose is parameter-level controllability, not a claim that con-
+group, while the locality claim concerns the four representation    tiguous groups correspond to independent causal mechanisms.
+VOLUME XX, 2026                                                                                                                             3
+                                                                                            Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+C. WARM-UP CALIBRATION AND MMD REQUIREMENT                                A high cj,τ indicates greater forgetting risk. During a triggered
+Warm-up trains the initial predictor and fills Mt . The im-               attributed repair, the stored requirement for the same delayed
+plementation then freezes a reference-model snapshot and                  window is attenuated as
+constructs Href from the final warm-up window. The four                                               rj,τ
+                                                                                          pj,τ =              ,     λc = 1.            (11)
+calibration representation sets are produced by this same                                         1 + λc cj,τ
+frozen reference model on the last four warm-up windows.                  The active set contains at most the k = 3 modules with the
+For each module, calibration compares the fixed final-window              largest positive pj,τ ; if none is positive, the maximum-scoring
+bank with each calibration-window representation set; it is               module is selected. The no-trigger branches rank modules by
+neither leave-one-window-out nor based on an independently                conflict and use a deterministic first-layer fallback if the active
+sampled reference. For module j, DASP subsamples at most                  list is empty.
+q = 128 reference and current representations, computes                      The delayed-label performance holdout is evaluated before
+squared pairwise distances over the joined sample, and uses               optimization and only selects emergency versus background
+the median positive distance bj,t as the base bandwidth. The              intensity. The evaluated primary DASP procedure applies
+multi-scale kernel is                                                     the selected update directly; it has no post-update candidate
+                      1   X           
+                                          ∥u − v∥22
+                                                                         acceptance or rollback step.
+        Kj,t (u, v) =            exp −                .   (6)
+                      3                    2bj,t s2
+                         s∈{0.5,1,2}                                      E. REPLAY, MEMORY LIFECYCLE, AND STRICT FREEZING
+                                                                          The localized rehearsal batch is
+The implementation uses the non-negative biased estimate
+                                                                                                eτ = Cτnew ∪ Bmem
+                                                                                                  C                    τ    ,               (12)
+           1 X                     1  X                    2 X                         mem
+                                                                               . |Bτ | ≤ 512, current examples receive weight
+mj,t =  2        K (ua , ub ) + 2         K (va , vb ) −        K (ua , vb )where
+           n a,b                  m a,b                   nm a,b             wnew = 3, and replay examples receive unit weight. The
+                                                                                +
+                                                                  (7)        weighted loss is
+Across the four calibration windows, let µ    ej and MADj denote
+                                                                                                 P
+                                                                                                              eτ wi ℓ(g(f (xi )), yi )
+                                                                                                    (xi ,yi )∈C
+the median and median absolute deviation of mj,t . DASP                                   Lτ =                  P                      .    (13)
+                                                                                                                   i wi
+computes
+                                                                           The memory capacity is 1,024. After localized training, Cτnew
+                                      mj,t − µ
+                                             ej                              is inserted into memory. Reference refresh is enabled in
+      zj,t = max 0,                                            , (8)
+                        1.4826 max(MADj , 10−6 ) + ϵ                         the locked confirmation. After every applied primary DASP
+                                                                             repair—triggered, emergency, or background—the updated
+                                     
+                     zj,t − κ
+      rj,t = clip               , 0, 1 ,                          (9)        model is deep-copied as the new reference snapshot, reference
+                    zmax − κ
+                                                                             representations are recomputed on Wτ , and calibration is
+with κ = 2, zmax = 12. Severity is the mean of the largest                   recomputed over the recent windows ending at τ .
+min(k, M ) requirement scores. In the evaluated DASP con-                       For selected modules, the learning rate is scaled by the
+figuration, a drift episode is triggered when severity exceeds               mode-specific plasticity. The structural mask is
+θs = 0.15 for P = 1 consecutive window (equivalently, the                                   (
+current window alone). The locked experimental configuration                                  pj,τ , j ∈ Aτ ,
+                                                                                     ηj,τ =                              ηclassifier,τ = 1. (14)
+also specifies an emergency-severity value of 0.60, but this                                  0,       j∈ / Aτ ,
+parameter is not used by the evaluated primary procedure and                 Zero-plasticity modules are omitted from the AdamW op-
+is therefore inactive in the reported DASP results.                          timizer rather than merely assigned a zero gradient. Conse-
+                                                                          quently, neither gradient updates nor decoupled weight decay
+D. DELAYED CONFLICT AND TOP-K ROUTING                                     can change inactive modules. Pre- and post-update parameter-
+Let τ = t − 1 denote the delayed window being repaired                    state fingerprints, together with the active-module count, are
+at outer iteration t. The implementation partitions labeled               recorded to verify these structural invariants.
+Wτ into a 75% repair pool and a disjoint 25% performance
+holdout, then uses repair-pool labels to select at most 128 class-        F. END-TO-END WINDOW ALGORITHM
+balanced training examples. Thus, 128 is a training-subset                Figure 1 presents the complete implemented DASP transition,
+count; the matrix compares the implemented supervision paths              while Fig. 2 provides the corresponding pseudocode. These
+rather than a shared 128-total-label-query protocol.                      descriptions specify the complete transition without assuming
+   Let Cτnew be the sampled delayed repair-training batch and             a factorial contribution from any individual component.
+  mem
+Bτ     a class-balanced replay batch. DASP compares current-
+window and replay gradients for each adaptation module,                   G. COMPLEXITY, WORKED EXAMPLE, AND
+                                                     !                    INTERPRETABILITY
+                                 ⟨gnew     mem
+                                   j,τ , gj,τ ⟩                           Let Pj be the parameters of module j, Pc the classifier parame-
+         cj,τ = max 0, − new                            .    (10)
+                            ∥gj,τ ∥2 ∥gmem
+                                         j,τ ∥2 + ϵ                       ters, q the MMD subsample size, h the module representation
+4                                                                                                                                     VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 1. Implementation-faithful repair policy for the reported primary DASP path. The classifier multiplier is 1 on the base learning rate 10−3 in every
+mode.
+
+
+  Mode                                 Condition for delayed window τ         Routed representation modules                  Module plasticity                 Epochs
+  Triggered attributed repair          Stored MMD severity triggers at θs =   Up to three positive top-k values of pj,τ ;    pj,τ = rj,τ /(1 + cj,τ )             2
+                                       0.15 with P = 1                        maximum-score fallback
+  Performance-gated emergency repair   No MMD trigger and Fτhold < 0.80       Three highest-conflict modules; deter-         min{1, max(0.25, cj,τ )}             3
+                                                                              ministic fallback if needed
+  Background local consolidation       No MMD trigger and Fτhold ≥ 0.80       Three highest-conflict modules; deter-         0.25                                 2
+                                                                              ministic fallback if needed
+
+
+
+                                          Delayed-label DASP algorithm flowchart
+                current processing                                                                    delayed or persistent-state link
+      A. Pre-adaptation inference at iteration t
+                 Predict     Representations MMD evidence                                           PendingUpdate                       Reference snapshot
+      Current                                module-wise                current vs frozen     store Wt + t                                final warm-up or
+        Wt              before labels       current features                reference     for one-window delay                            latest DASP repair
+
+      B. Delayed-label localized adaptation for τ = t − 1
+
+                       Restore evidence Training + holdout                    Gradient conflict
+       Labels            matching Wτ      repair samples +                    current-window vs                  MMD severity              No       Holdout F1
+                                                                                                                                                     < 0.80?
+        Yτ                  and τ       performance gate                      replay gradients                   triggered?
+                                                                                                                    Yes                             Yes          No
+
+
+          Triggered attributed repair                                Emergency repair                                       Background consolidation
+              stronger adaptation of                                performance-gated;                                           local rehearsal
+                attributed modules                                 high-conflict modules                                          for retention
+
+
+      C. Localized optimization and state update
+         Localized rehearsal              Selective optimizer update                  Memory + audit                         Refresh reference
+          delayed current +                 routed modules + classifier;                 append labels +                     after every applied           Next
+           balanced replay                         freeze others                          routing trace                         DASP repair               window
+
+
+                                                                                     Reservoir memory
+                                                                                        balanced replay +
+                                                                                         bounded storage
+
+
+
+
+FIGURE 1. Overview of the one-window delayed-label DASP adaptation cycle. For each current window Wt , predictions and MMD evidence are computed
+before label access and stored in a pending-update queue. At the same outer iteration, labels for Wτ , τ = t − 1, restore the matching evidence; module-wise
+gradient conflict and the delayed-label performance holdout then determine repair intensity. The selected localized update is applied directly, unaffected
+modules remain frozen, and memory, reference, and audit state are updated. The reported primary path does not implement post-update candidate rollback.
+
+
+
+width, B the rehearsal batch size, and Et the selected epoch bud-                    k = 3, modules {2, 4, 3} and the classifier are updated, while
+get. The biased MMD computation costs O(Mq2 h), conflict                             module 1 remains byte-identical. This example illustrates the
+estimation requires two gradient calculations overP    the adapta-                   implemented calculation and is not presented as an empirical
+tion groups, and localized repair costs O(Et B(Pc + j∈At Pj )).                      ablation result.
+Replay and reference storage require O(Bmem d + Mqh). All                               The routing record is therefore an operational intervention
+four modules are still evaluated at inference, explaining why                        record: it stores MMD, robust scores, conflict, plasticity, se-
+update work can decrease while forward throughput remains                            lected modules, replay size, repair mode, gradient evaluations,
+lower than a flat MLP.                                                               and whether any full-model update occurred. It explains the
+   As an arithmetic illustration, let rτ                 =                           scope of parameter change rather than providing post-hoc
+(0.18, 0.82, 0.46, 0.70) and cτ = (0.10, 0.22, 0.61, 0.18).                          feature importance [27]–[29].
+Equation (11) gives pτ ≈ (0.164, 0.672, 0.286, 0.593); with
+VOLUME XX, 2026                                                                                                                                                         5
+                                                                                      Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+                                                                     TABLE 2. Dataset and stream protocol.
+              FIGURE 2. Prediction-first DASP pseudocode
+
+    1: Warm up fΘ ; initialize M, Href , and pending queue Q.           Dataset                            Role in evaluation
+    2: for each outer iteration t with current window Wt do
+                                                                        CIC-IDS2017                        Enterprise traffic with multiple
+    3:   Predict Ŷt = fΘt (Xt ) before using labels from Wt .                                             attack families
+    4:Compute and store Et = (rt , st , Dt ) from Wt and Htref .        NF-BoT-IoT-v3                      IoT botnet and denial-of-service
+                                                                                                           behavior
+    5:Enqueue (Wt , Ŷt , Et ) in Q.                                    NF-CSE-CIC-IDS2018-v3              Enterprise/IoT flow variant with
+    6:if labels are available for τ = t − 1 then                                                           evolving attack composition
+    7:   Dequeue (Wτ , Ŷτ , Eτ ) and restore rτ , sτ , Dτ .            NF-ToN-IoT-v3                      Telemetry-rich IoT and network
+                                                                                                           traffic
+    8:    From delayed labels, split repair pool/holdout and            NF-UNSW-NB15-v3                    Heterogeneous modern network-
+          form class-balanced Cτnew with at most 128 training                                              flow benchmark
+          examples; draw Bmem τ   .
+ 9:       Compute module conflicts cj,τ from Cτnew and Bmem  τ
+          gradients.                                                 C. METHODS AND FAIRNESS CONTROLS
+10:       if stored MMD decision Dτ triggers then                    The eight methods are locked before evaluation: Online MLP,
+11:          Route positive top-k pj,τ = rj,τ /(1 + cj,τ ); use      Experience Replay, Online EWC, A-GEM, SSF, RepShield,
+             maximum-score fallback.                                 CDDA-MD, and modular DASP. All methods receive the same
+12:       else if Fτhold < 0.80 then                                 prepared stream, one-window prediction-first delay, and seed
+13:          Route top-k conflicts for three-epoch performance-      assignment. Their supervision paths differ: primary DASP
+             gated emergency repair.                                 selects 128 class-balanced repair examples from a labeled
+14:       else                                                       pool and evaluates a disjoint 25% holdout; primary SSF
+15:          Route top-k conflicts for two-epoch background          also selects after label access, whereas the budget-matched
+             local consolidation with p = 0.25.                      comparators use label-blind uniform selection. The matrix
+16:       end if                                                     therefore does not establish equal total label exposure. Method-
+17:       Train on C eτ = Cτnew ∪ Bmem
+                                     τ    .                          specific controls and this exception are reported explicitly in
+18:       Update routed modules and classifier; exclude unaf-        Table 21 and Appendix C. The SSF implementation follows
+          fected modules from AdamW.                                 strategic sample selection and forgetting protection [12];
+19:       Update memory and audit; refresh the enabled refer-        RepShield follows representation-protection motivation [13];
+          ence state using Wτ .                                      the remaining baselines represent direct online training, replay,
+20:       Commit Θt+1 for subsequent windows; no candidate           regularization, and gradient projection.
+          rollback is executed.
+21:   end if                                                         D. PILOT AND CONFIRMATION MATRICES
+22: end for                                                          The full pilot contains 5 × 10 × 3 × 1 × 8 = 1,200 runs. The
+                                                                     confirmation matrix contains 5 × 10 × 5 × 2 × 8 = 4,000
+                                                                     runs, with stream seeds {2001, 2002, 2003, 2101, 2102} and
+V. EXPERIMENTAL DESIGN
+                                                                     model seeds {91, 92}. Each dataset–scenario–seed–model cell
+A. DATASETS AND TASK
+                                                                     is paired across methods. The confirmation has 500 DASP–
+We evaluate binary benign-versus-attack detection on five            SSF paired comparisons.
+network-flow collections: CIC-IDS2017, NF-BoT-IoT-v3,
+NF-CSE-CIC-IDS2018-v3, NF-ToN-IoT-v3, and NF-UNSW-                   E. METRICS AND STATISTICAL ANALYSIS
+NB15-v3. The classical source datasets are described in [20]–        The primary metric is Macro-F1 because it weights benign
+[23]; the NetFlow construction and dataset portal are docu-          and attack classes equally. We also report attack recall, false-
+mented in [24]–[26]. All methods use the same chronologically        negative rate, cumulative Macro-F1, online forgetting, update
+ordered experimental streams. No future window contributes           time, median update time, gradient evaluations, prediction
+to a prediction.                                                     throughput, memory payload, and peak resident memory.
+                                                                     Metric choice under class imbalance should combine class-
+B. TEN PRIMARY DRIFT CONDITIONS                                      balanced summaries with class-wise error analysis [7], [30].
+The protocol contains ten conditions: stationary control (S0),          The analysis unit is the paired dataset–scenario–stream-
+sudden drift (S1), gradual drift (S2), incremental drift (S3), re-   seed–model-seed cell, not the window. We report paired
+current drift (S4), transient blip (S5), combined drift (S6), and    mean gaps, medians, wins, and a sign test. Cells are paired
+local class-conditional drift at low, medium, and high intensity     exactly across methods, but cells sharing a dataset or scenario
+(S7-Local-Low/Medium/High). Local scenarios change the               generator are not claimed to be independent draws from all
+composition associated with selected classes while retaining         possible operational deployments. We additionally use a paired
+non-target traffic as an anchor. The taxonomy follows the            t-test and Wilcoxon signed-rank test as sensitivity analyses,
+distinction between drift type and locality in [1]–[3].              with Holm correction when multiple exploratory comparisons
+                                                                     are made [30]. Bootstrap intervals may be added after the
+6                                                                                                                               VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+final archival run; the present analysis emphasizes the exact      pattern suggests that attribution is most useful when the
+paired results to avoid treating highly correlated windows as      drift is localized or transient, while high-intensity local drift
+independent. The very small nominal p-values are therefore         can activate several modules and reduce the advantage of
+interpreted as sensitivity evidence for the locked matrix, while   selectivity.
+the dataset-wise, scenario-wise, and worst-cell summaries             Figs. 5–9 provide the corresponding window-level view for
+carry the generalization argument.                                 all eight methods. The trajectories reinforce the aggregate re-
+                                                                   sult but do not show uniform window-by-window dominance.
+F. REPRODUCIBILITY AND PERFORMANCE MEASUREMENT                     On CIC-IDS2017, DASP ranks first overall at 0.9420, exceeds
+All runs use single-thread CPU execution, fixed stream and         SSF by 0.0070, and has the highest scenario mean in seven
+model seeds, a locked experimental configuration, and deter-       of ten conditions. On NF-BoT-IoT-v3, it again leads seven
+ministic run identifiers. Adaptation time is the sum of update     conditions and has the largest dataset-level advantage over SSF
+intervals, excluding data preparation. Prediction throughput       (+0.0215), although S2-Gradual and S7-Local-High remain
+is measured separately from update time, so a faster predictor     boundary cases. On NF-CSE-CIC-IDS2018-v3, DASP leads
+is not conflated with a faster adaptation algorithm. The same      overall by only 0.0027 over Experience Replay and exceeds
+streaming evaluation procedure is applied consistently across      SSF in all ten scenario means, but it ranks seventh in S5-Blip.
+the full protocol.                                                 NF-ToN-IoT-v3 is more mixed: DASP leads five conditions
+                                                                   and exceeds the strongest baseline by only 0.0032. NF-UNSW-
+VI. RESULTS                                                        NB15-v3 is a ceiling case: DASP ranks sixth at 0.9961, only
+A. OVERALL CONFIRMATION RESULTS                                    0.0001 below the leading group, while still exceeding SSF in
+Table 3 is generated directly from the 4,000-run confirmation.     every scenario mean. These crossings and exceptions support a
+DASP obtains the highest observed mean Macro-F1, 0.9269,           bounded comparative-effectiveness claim rather than universal
+followed by SSF at 0.9191 and Experience Replay at 0.9036.         superiority.
+The DASP–SSF mean gap is +0.0078 and the median gap
+is +0.0032. DASP wins 383 of 500 paired cells and remains          D. ADAPTATION COST AND SYSTEMS PERFORMANCE
+within ±0.01 of SSF in 303 cells. The sign test gives p =          DASP’s mean update time is 1.415 s per stream, compared
+2.56 × 10−34 ; the paired t-test and Wilcoxon sensitivity tests    with 2.683 s for SSF. It uses 328.7 gradient evaluations versus
+give p = 4.59 × 10−20 and p = 2.39 × 10−27 , respectively.         512 for SSF, giving a 1.90-fold update speedup and a 1.56-fold
+                                                                   gradient reduction. The advantage is stable across datasets:
+B. DATASET-LEVEL ANALYSIS                                          the update speedup ranges from 1.77 on NF-BoT-IoT-v3 to
+Table 4 summarizes all methods by dataset, while Fig. 3 shows      2.03 on NF-UNSW-NB15-v3.
+the method distribution. DASP is the best method on CIC-              The main cost is prediction throughput. DASP reaches
+IDS2017 (0.9420), NF-BoT-IoT-v3 (0.8652), NF-CSE-CIC-              approximately 159,219 flows/s, whereas the other MLP-based
+IDS2018-v3 (0.9627), and NF-ToN-IoT-v3 (0.8684). On NF-            methods are near 455,000–465,000 flows/s. The modular
+UNSW-NB15-v3, several methods are effectively saturated            backbone executes four parallel feature modules and a fusion
+near 0.996; DASP reaches 0.9961, while A-GEM, Experience           classifier, so the throughput reduction is an architectural cost
+Replay, RepShield, and Online EWC reach 0.9962. Thus, the          of attribution. This is acceptable when adaptation time and
+last dataset is a ceiling case rather than a decisive separation   auditability are primary constraints, but it should not be hidden
+between methods.                                                   in a single ‘‘efficiency’’ number. Fig. 10 reports the accuracy–
+   The largest positive DASP–SSF dataset gap is on NF-BoT-         update frontier explicitly.
+IoT-v3, +0.0215. The difference is compatible with the design
+hypothesis that class-conditional botnet changes can often be      E. LOCALIZATION AND STRUCTURAL PRESERVATION
+repaired through a subset of feature modules rather than by        Across the 500 DASP confirmation runs, 16,000 window-
+updating all parameters; the confirmation matrix does not by       level repair records were available. The active-module count
+itself establish that this mechanism is causal. NF-ToN-IoT-v3      has minimum 1, median 3, and maximum 3; no record
+remains the most difficult dataset, but DASP still exceeds SSF     opens all four modules. The replay size is exactly 512 in
+by +0.0042 on average. The large negative outlier is NF-BoT-       the logged repair records. The global-update count is zero.
+IoT-v3, S2-Gradual, stream seed 2102, model seed 91, where         These invariants distinguish DASP from an implementation
+DASP trails SSF by 0.0900; this cell is retained as a failure      that merely labels a full-model update as selective.
+case rather than removed.
+                                                                   F. DEVELOPMENT ABLATION AND FAILURE ANALYSIS
+C. DRIFT-CONDITION ANALYSIS                                        The small development pilot illustrates why the final mecha-
+Fig. 4 shows that the mean DASP–SSF gap is positive in             nism was required. The original no-update path reached mean
+all ten scenarios. The largest mean gains occur for S7-Local-      Macro-F1 0.7625 against SSF 0.9211. Classifier calibration
+Low (+0.0141), S0 (+0.0131), S7-Local-Medium (+0.0110),            improved it to 0.8706, the early semi-local prototype to 0.8725,
+and S5-Blip (+0.0110). S7-Local-High is approximately tied         and bounded localized rehearsal with new-sample weighting
+(+0.0002), and S2-Gradual is also close (+0.0014). This            to approximately 0.9266 on the same 15 paired cells. The
+VOLUME XX, 2026                                                                                                                   7
+                                                                                                                          Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 3. Confirmation results over 4,000 runs. Values are means across five stream seeds and two model seeds for each dataset–scenario cell.
+
+
+                                               Method                   Macro-F1        Update (s)         Grad. eval.   Throughput (flows/s)
+                                               modular dasp                  0.9269            1.415            328.7                    159,219
+                                               ssf                           0.9191            2.683            512.0                    455,279
+                                               experience replay             0.9036            0.546            192.0                    461,493
+                                               repshield                     0.8881            0.946            128.0                    464,789
+                                               agem                          0.8821            0.495            128.0                    464,700
+                                               online mlp                    0.8751            0.222             64.0                    464,101
+                                               online ewc                    0.8751            0.396             64.0                    454,905
+                                               cdda md                       0.7973            0.038              2.7                    458,585
+
+
+
+                                                                 online mlp                   online ewc          ssf                  cdda md
+                                                                 experience replay            agem                repshield            modular dasp
+                       1.0
+       Mean Macro-F1
+
+
+
+
+                       0.8
+
+                       0.6
+
+                       0.4
+                                    S   2017                T- I oT-v3                  0 18-v3                      N-Io     T-v3           B 15-v3
+                             CIC-ID                  NF-B o
+                                                                           E-CIC
+                                                                                 -ID S 2
+                                                                                                               NF-To                    SW- N
+                                                                 N F - C S                                                        NF-UN
+
+FIGURE 3. Mean Macro-F1 by dataset over the confirmation matrix. DASP is highlighted in red.
+
+
+
+                                                         Macro-F1 gap: modular DASP minus SSF
+                  CIC          +0.016     -0.005        -0.001         +0.002        +0.012       +0.013        +0.002        +0.012      +0.008      +0.010     0.04
+
+       BoT-IoT                 +0.044     +0.015        -0.003         +0.020        +0.017       +0.036        +0.019        +0.043      +0.035      -0.011     0.02
+
+
+
+                                                                                                                                                                        Macro-F1 gap
+      CSE-CIC                  +0.006     +0.007        +0.002         +0.011        +0.006       +0.007        +0.004        +0.001      +0.001      +0.001     0.00
+       ToN-IoT                 -0.002     +0.001        +0.006         -0.002        +0.007       -0.003        +0.013        +0.014      +0.009      -0.001
+                                                                                                                                                                   0.02
+         UNSW                  +0.001     +0.002        +0.003         +0.002        +0.001       +0.001        +0.003        +0.001      +0.001      +0.002
+                                                                                                                                                                   0.04
+                                S0         S1            S2             S3            S4           S5            S6             L           M           H
+                                                              Scenario; L/M/H = local low/medium/high
+FIGURE 4. DASP minus SSF Macro-F1 gap by dataset and drift condition. Positive values are blue; negative values are red.
+
+
+
+TABLE 4. Dataset-level mean Macro-F1 and update cost.                                                  the principal failure mode was under-adaptation, not an invalid
+                                                                                                       locality hypothesis.
+                   Dataset                         Macro-F1        Update (s)
+                   cic-ids2017                       0.9179             0.808                             The worst confirmation cell is retained in the analysis
+                   nf-bot-iot-v3                     0.7669             0.845                          because aggregate means can conceal instability. In the NF-
+                   nf-cse-cic-ids2018-v3             0.9512             0.842                          BoT-IoT-v3 S2-Gradual cell with stream seed 2102 and model
+                   nf-ton-iot-v3                     0.7852             0.860
+                   nf-unsw-nb15-v3                   0.9959             0.859                          seed 91, DASP’s Macro-F1 is 0.0900 below SSF. This failure is
+                                                                                                       consistent with gradual attribution ambiguity: several modules
+                                                                                                       can receive moderate evidence before the classifier has a stable
+                                                                                                       boundary. Future work should test adaptive k, uncertainty-
+ablation is diagnostic, not a confirmation claim: it shows that                                        triggered expansion, and a boundary-focused performance
+8                                                                                                                                                                   VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+
+                                                DASP         Experience Replay      A-GEM               Online MLP
+                                                SSF          RepShield              Online EWC          CDDA-MD
+
+                                                     Window-level Macro-F1 comparison on CIC-IDS2017
+                  1.00
+                  0.95
+                  0.90
+Window Macro-F1
+
+
+
+
+                  0.85
+                  0.80
+                  0.75
+                  0.70
+                  0.65
+                                                                                                                         Dotted markers: first nonstationary window
+                  0.60
+                         S0        S1            S2          S3            S4         S5           S6                L           M                H
+                                                Independent scenario segments (32 post-warm-up windows per segment)
+
+FIGURE 5. Window-level Macro-F1 trajectories of all eight methods on CIC-IDS2017. Each line is the mean over five stream seeds and two model seeds; the
+red band is a 95% normal-approximation confidence interval for DASP. Scenario segments are independent runs, gaps prevent connections across resets,
+and dotted markers indicate the first nonstationary window. L/M/H denote low-, medium-, and high-intensity local drift.
+
+
+                                                DASP         Experience Replay      A-GEM               Online MLP
+                                                SSF          RepShield              Online EWC          CDDA-MD
+
+                                                 Window-level Macro-F1 comparison on NF-BoT-IoT-v3
+                  1.0
+
+                  0.9
+
+                  0.8
+Window Macro-F1
+
+
+
+
+                  0.7
+
+                  0.6
+
+                  0.5
+
+                  0.4
+                                                                                                                         Dotted markers: first nonstationary window
+                  0.3
+                         S0       S1            S2           S3           S4          S5          S6                 L           M                H
+                                               Independent scenario segments (32 post-warm-up windows per segment)
+
+FIGURE 6. Window-level Macro-F1 trajectories of all eight methods on NF-BoT-IoT-v3. Curves and uncertainty are aggregated over five stream seeds and two
+model seeds. DASP is emphasized in red; independent scenario segments are separated by gaps, and dotted markers identify the first nonstationary window.
+
+
+
+gate on this condition without changing the locked primary                       much of the locked matrix, but its magnitude is modest and
+result.                                                                          the cell-level distribution contains meaningful losses. The evi-
+                                                                                 dence supports comparative effectiveness under the evaluated
+ VII. DISCUSSION                                                                 delayed-label protocol, not unconditional superiority.
+
+RQ1: Comparative predictive effectiveness                                        RQ2: Structural locality and adaptation efficiency
+  The answer to RQ1 is qualified rather than universal. DASP                        For RQ2, the locked implementation exhibits clear
+has the highest observed mean Macro-F1 among the eight                           structural-locality and adaptation-efficiency properties. No
+locked methods, with 0.9269 compared with 0.9191 for SSF                         repair opens all four representation modules, the global-update
+and 0.9036 for Experience Replay. Against the prespecified                       counter remains zero, and inactive modules are excluded from
+SSF comparator, the mean paired gap is +0.0078 and DASP                          the optimizer; the shared classifier is the declared exception to
+wins 383 of 500 cells. The effect is therefore consistent across                 the representation-module invariant. Relative to SSF, DASP
+VOLUME XX, 2026                                                                                                                                                       9
+                                                                                               Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+
+                                            DASP         Experience Replay       A-GEM               Online MLP
+                                            SSF          RepShield               Online EWC          CDDA-MD
+
+                                        Window-level Macro-F1 comparison on NF-CSE-CIC-IDS2018-v3
+                  1.00
+                  0.95
+                  0.90
+Window Macro-F1
+
+
+
+
+                  0.85
+                  0.80
+                  0.75
+                  0.70
+                  0.65
+                                                                                                                      Dotted markers: first nonstationary window
+                  0.60
+                         S0     S1           S2           S3           S4          S5           S6                L           M                H
+                                            Independent scenario segments (32 post-warm-up windows per segment)
+
+FIGURE 7. Window-level Macro-F1 trajectories of all eight methods on NF-CSE-CIC-IDS2018-v3. The red DASP curve includes a 95% normal-approximation
+confidence band. Segment gaps denote independent scenario resets; dotted markers indicate drift onset.
+
+
+                                            DASP         Experience Replay       A-GEM               Online MLP
+                                            SSF          RepShield               Online EWC          CDDA-MD
+
+                                             Window-level Macro-F1 comparison on NF-ToN-IoT-v3
+                  1.0
+
+                  0.9
+
+                  0.8
+Window Macro-F1
+
+
+
+
+                  0.7
+
+                  0.6
+
+                  0.5
+
+                  0.4
+                                                                                                                      Dotted markers: first nonstationary window
+                  0.3
+                         S0    S1           S2           S3           S4           S5          S6                 L           M                H
+                                            Independent scenario segments (32 post-warm-up windows per segment)
+
+FIGURE 8. Window-level Macro-F1 trajectories of all eight methods on NF-ToN-IoT-v3, averaged over five stream seeds and two model seeds. The frequent
+crossings between DASP and the strongest baselines visualize the smaller, condition-dependent effect on this dataset.
+
+
+
+reduces mean update time by approximately 1.90× and gradi-                   throughput than the flat MLP-based alternatives because
+ent evaluations by approximately 1.56×. These observations                   all four representation branches are evaluated before fusion.
+establish implemented locality and lower adaptation work,                    Localized repair is therefore most defensible when adaptation
+but they do not isolate the causal contribution of each router,              cost, bounded parameter motion, and auditability are priori-
+replay, or performance-gate component.                                       tized; a prediction-throughput-constrained deployment may
+                                                                             prefer a simpler or optimized architecture.
+RQ3: Boundary conditions and systems trade-offs
+  The observed advantage weakens under gradual drift and                     Mechanistic interpretation
+high-intensity local drift, where attribution evidence is less                  The development sequence indicates that the earlier selec-
+sharply separated across modules. The strongest counterexam-                 tive path was too conservative: classifier calibration alone did
+ple is the NF-BoT-IoT-v3/S2-Gradual cell with stream seed                    not provide enough historical context to stabilize benign and
+2102 and model seed 91, where DASP trails SSF by 0.0900                      attack boundaries. Bounded rehearsal supplies that context,
+Macro-F1. DASP also has substantially lower prediction                       while the top-k mask prevents replay from becoming global
+10                                                                                                                                             VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+
+                                                            DASP              Experience Replay         A-GEM              Online MLP
+                                                            SSF               RepShield                 Online EWC         CDDA-MD
+
+                                                           Window-level Macro-F1 comparison on NF-UNSW-NB15-v3
+
+                  1.00
+
+                  0.98
+Window Macro-F1
+
+
+
+
+                  0.96
+
+                  0.94
+
+                  0.92
+
+                                                                                                                                            Dotted markers: first nonstationary window
+                  0.90
+                                 S0             S1              S2            S3            S4             S5         S6                L           M                H
+                                                            Independent scenario segments (32 post-warm-up windows per segment)
+
+FIGURE 9. Window-level Macro-F1 trajectories of all eight methods on NF-UNSW-NB15-v3. The compressed vertical scale reflects near-ceiling performance;
+differences among the leading methods are correspondingly small. DASP is emphasized in red and its band shows the 95% normal-approximation
+confidence interval.
+
+
+                                                                                                           modular dasp
+                                                                                                                                                           ssf
+                                         0.92
+                                                                           experience replay
+                                         0.90
+                                                                                         repshield
+                                                                     agem
+                         Mean Macro-F1
+
+
+
+
+                                         0.88                     mlp ewc
+                                                           onlineonline
+
+                                         0.86
+                                         0.84
+                                         0.82
+                                         0.80         cdda md
+
+                                                0.0                  0.5          1.0        1.5         2.0                                  2.5
+                                                                             Mean update time per stream (s)
+FIGURE 10. Accuracy–adaptation frontier. Bubble size is proportional to gradient evaluations; DASP is highlighted in red.
+
+
+
+retraining. Because the ablation was sequential rather than                                          historical examples were replayed.’’ This explanation is opera-
+factorial, this is a mechanism-consistent interpretation of                                          tionally useful for incident response and model governance. It
+the observed pattern rather than an isolated causal estimate                                         complements, rather than replaces, feature-level explanation
+for each component. The confirmation therefore validates                                             methods such as LIME and SHAP [27]–[29].
+the combined DASP system, not the independent predictive
+contribution of its attribution router.                                                              VIII. THREATS TO VALIDITY AND LIMITATIONS
+                                                                                                       •   The datasets are prepared chronological artifacts, not a
+Relation to interpretability                                                                               live deployment. Their scenario transformations create
+ The router output is an intervention trace: ‘‘module 2 and                                                controlled distributional changes but do not establish that
+module 4 were opened, modules 1 and 3 were frozen, and 512                                                 every episode changes the real-world binary decision
+VOLUME XX, 2026                                                                                                                                                                      11
+                                                                                       Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+       function P(Y | X ). The term concept drift is therefore         reduced update time by approximately 1.90-fold, and reduced
+       used for the experimental stress protocol, not as a claim       gradient evaluations by approximately 1.56-fold. It performed
+       that every transformed stream reproduces natural opera-         no logged full-model or all-representation-module update, kept
+       tional drift.                                                   the shared classifier trainable, and never activated more than
+     • The five stream seeds and two model seeds provide               three of four representation modules in the repair records.
+       substantial replication but do not cover every possible            The integrated localized-repair system is a credible alterna-
+       preprocessing or architecture choice.                           tive under the implemented supervision paths, but the confir-
+     • The comparison is binary. Multi-class attack-family re-         mation neither isolates the attribution router nor enforces equal
+       tention, open-set attacks, and severe label noise remain        total label exposure. The principal qualification is equally
+       future work.                                                    important: modular execution lowers prediction throughput
+     • The modular partition is feature-group based. Learned or        and a small number of difficult drift cells remain. Future work
+       attention-head routing may be preferable when features          should evaluate learned feature grouping, adaptive module
+       are not naturally ordered.                                      budgets, natural chronological streams, multi-class attack-
+     • The locked matrix does not include random top-k, fixed-         family retention, and controlled routing ablations comparing
+       module, MMD-only, or conflict-only routing controls.            random top-k, fixed-module, MMD-only, conflict-only, and
+       Consequently, the study does not identify how much of           combined attribution policies under the same repair budget.
+       the observed performance is contributed by attribution-
+       guided routing separately from replay, weighting, the           DATA AVAILABILITY
+       modular backbone, and performance-gate logic.
+                                                                       The archival repository contains the chronologically pre-
+     • Primary DASP uses delayed repair-pool labels to select
+                                                                       pared streams, locked experimental configuration, executable
+       128 class-balanced training examples and separately eval-
+                                                                       method implementations, run-level confirmation records, and
+       uates a 25% holdout; other paths use different selection
+                                                                       derived analysis outputs needed to reproduce the reported
+       semantics. The recorded 128 field is therefore not total
+                                                                       results. Public dataset provenance follows the sources cited in
+       label exposure. The matrix supports a protocol-specific
+                                                                       Section V.
+       comparison, while a strict shared-label contract requires
+       rerunning all methods under one access rule.
+     • DASP’s lower prediction throughput is a genuine sys-
+                                                                       ETHICS STATEMENT
+       tems limitation. The measured speed is hardware- and            This study uses public, de-identified network-flow benchmark
+       implementation-specific, so it should not be generalized        data and performs no intervention on a live network. It involves
+       as a universal throughput advantage. A production im-           no human participants, private records, or personal-contact
+       plementation should consider fused kernels, vectorized          data. Dataset use and redistribution must follow the source
+       modules, or a sparse execution path.                            licenses.
+     • The confirmation tests are paired across cells; the
+       window-level logs are used for diagnosis and not treated        AUTHOR CONTRIBUTIONS
+       as independent statistical replications. The reported p-        The authors must replace this placeholder with a verified
+       values therefore support the paired confirmation contrast       CRediT statement covering conceptualization, methodology,
+       under this protocol, not an unrestricted population-level       software, validation, formal analysis, data curation, visualiza-
+       claim.                                                          tion, writing, supervision, and project administration.
+     • The primary comparator and implementations are fixed
+       to the study’s available code and configuration. Unless an      FUNDING
+       official implementation is explicitly identified, the results   Funding information must be completed and verified by the
+       apply to these locked protocol-level implementations            authors. No funding source is asserted by this draft.
+       rather than every possible realization of the named
+       method. Independent reimplementation, external chrono-
+                                                                       CONFLICT OF INTEREST
+       logical data, and hardware replication remain necessary
+       before broader claims about generality or production            Conflict-of-interest information must be verified by every
+       readiness.                                                      author. No competing-interest declaration is inferred by this
+                                                                       manuscript preparation workflow.
+IX. CONCLUSION
+This paper presented DASP, a drift-attributed subspace-                DECLARATION OF GENERATIVE AI AND AI-ASSISTED
+plasticity framework for streaming NIDS. DASP combines                 TECHNOLOGIES
+module-wise drift requirements, conflict-aware top-k routing,          Generative AI tools assisted manuscript organization, language
+strict freezing, class-balanced bounded rehearsal, performance-        editing, code inspection, figure generation, and reproducibility
+gated local repair modes, and transparent localization logs. On        checks. The authors remain responsible for verifying every
+the 4,000-run confirmation matrix, DASP achieved Macro-F1              numerical result, citation, methodological statement, and final
+0.9269 versus 0.9191 for SSF, won 383 of 500 paired cells,             claim.
+12                                                                                                                               VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+X. DETAILED METHOD AND STRUCTURAL INVARIANTS                           The third property is bounded memory exposure. Each re-
+Section IV is the canonical method definition. This section         pair samples at most 512 replay records and at most 128 repair-
+retains only operational lifecycle details and structural prop-     training labels. The optimization set is therefore bounded
+erties needed to audit that definition; it does not introduce a     by 640 examples before internal batching; the separate 25%
+second algorithm.                                                   delayed-label performance holdout is evaluated outside this
+                                                                    training set. This prevents a long stream from silently increas-
+A. CALIBRATION AND REFERENCE LIFECYCLE                              ing the per-window training set. The memory itself is capped
+After warm-up, the evaluation procedure creates a frozen copy       at 1,024 records and maintained with class balancing.
+of the fitted model as the reference snapshot. The reference rep-
+resentation bank is extracted from the final warm-up window.        D. COMPLEXITY ACCOUNTING
+The four calibration representation sets are then produced by       Let Pj be the parameter count of module j, Pc the classifier
+that same frozen model on the last four warm-up windows, and        parameter count, Br the replay size, Bn the new-label budget,
+each calibration MMD compares the fixed final-window bank           and Et the number of repair epochs. The trainable parameter
+with one calibration-window set. The robust median/MAD              count for a repair is
+statistics are therefore based on a fixed reference, not leave-
+                                                                                                    X
+                                                                                          Pt = Pc +      Pj ,                (15)
+one-window-out calibration or independent resampling.                                                  j∈At
+   Reference refresh is enabled in the locked confirmation. Af-                                             P
+                                                                    while the full model count is P = Pc + j Pj . The structural
+ter every applied primary DASP repair, the updated predictor is
+                                                                    trainable fraction is ρt = Pt /P. The observed gradient-
+copied to form the new reference snapshot, the reference bank
+                                                                    evaluation count additionally depends on the number of
+is recomputed on the delayed repaired window, and the recent-
+                                                                    applied repairs, batch size, and emergency repairs. This is
+window calibration statistics are recomputed. The primary
+                                                                    why the manuscript reports both a parameter-locality invariant
+procedure has no candidate rejection or rollback stage.
+                                                                    and measured gradient evaluations. A low nominal parameter
+                                                                    fraction would be insufficient if the router triggered many
+B. DELAYED SUPERVISION AND REPAIR MODES
+                                                                    more epochs.
+At outer iteration t, the online procedure predicts Wt , computes
+Et , and stores both in the pending queue. It then repairs τ =      E. INTERPRETABILITY AS AN INTERVENTION RECORD
+t − 1 only after Yτ arrives, using the stored Eτ and newly          DASP does not claim that a selected module is a human-
+computed module conflicts cj,τ . The labeled delayed window         semantic feature such as ‘‘port behavior’’ without a separate
+is split into a 75% repair pool and 25% holdout; repair-pool        feature audit. Its interpretability claim is narrower and testable:
+labels select at most 128 class-balanced training examples.         the method can report which parameterized subspaces were
+Thus, 128 bounds training, not total label exposure.                allowed to change for a particular drift episode. The record
+    The triggered mode uses positive top-k values of pj,τ =         can be joined with the corresponding stream window, scenario
+rj,τ /(1 + cj,τ ) for two epochs. If MMD does not trig-             label, repair mode, and post-repair metrics. This is closer to an
+ger, holdout Macro-F1 below 0.80 selects the three-                 intervention trace than to post-hoc attribution. Feature-level
+epoch performance-gated emergency mode with plasticity              tools such as LIME and SHAP remain complementary because
+min{1, max(0.25, cj,τ )}; otherwise background local consol-        they explain individual predictions rather than the optimizer’s
+idation uses plasticity 0.25 for two epochs. Both no-trigger        repair scope.
+modes rank up to three modules by conflict and retain the
+deterministic fallback specified by the protocol. The classifier    XI. DATASET CONSTRUCTION AND STREAM SEMANTICS
+remains trainable at multiplier 1 on the base learning rate.        A. DATASET ROLES
+                                                                    The five datasets serve different stress roles. CIC-IDS2017
+C. PROOF SKETCHES FOR STRUCTURAL PROPERTIES                         provides enterprise traffic with several attack families and
+The first property is inactive-module invariance. Let Θj be         a commonly used reference point. NF-BoT-IoT-v3 stresses
+the parameter set of an inactive module and let the optimizer       botnet and denial-of-service behavior in a NetFlow representa-
+parameter list exclude Θj . No gradient update is applied to        tion. NF-CSE-CIC-IDS2018-v3 provides a higher-performing
+Θj . Since the weight-decay term is also implemented by the         but still heterogeneous enterprise/IoT setting. NF-ToN-IoT-
+optimizer, it is not applied either. Therefore, conditional on      v3 emphasizes telemetry-rich traffic and remains one of the
+no external state mutation, Θt+1
+                              j   = Θtj . This is stronger than a   harder datasets in the confirmation. NF-UNSW-NB15-v3 is a
+soft regularizer, which only penalizes movement.                    heterogeneous benchmark in which several methods approach
+   The second property is bounded plasticity. Since At =            a performance ceiling. These roles are not interchangeable:
+TopK(at , k) and k = 3 < M = 4, at most three represen-             a method that wins on a saturated dataset may not be robust
+tation modules can be trainable in a repair. The classifier is      under a difficult gradual drift.
+shared and explicitly exempted from the module count. The              The prepared streams preserve the chronological order
+implementation records the active set, so the bound can be          used by the experiment. Accompanying metadata identify
+verified from logs rather than inferred from the configuration.     the dataset, scenario, stream seed, feature count, window
+VOLUME XX, 2026                                                                                                                     13
+                                                                                       Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+count, warm-up interval, and class statistics. The evaluation      TABLE 5. Primary scenario semantics and expected adaptation pressure.
+procedure processes one stream at a time and records a
+summary only after the prediction-first loop completes. No            Scenario              Operational interpretation
+summary from a future stream or model seed is visible to the          S0                    Stationary control; penalizes unnecessary updates.
+                                                                      S1-Sudden             Abrupt regime replacement; tests fast detection and
+online learner.                                                                             repair.
+                                                                      S2-Gradual            Slow transition; tests attribution ambiguity and delayed
+                                                                                            response.
+B. WINDOW PROTOCOL                                                    S3-Incremental        Multiple small changes; tests repeated bounded repairs.
+Each confirmation stream is divided into 36 windows of                S4-Recurrent          Previously seen regime returns; tests retention and
+                                                                                            recovery.
+4,096 flows. Four warm-up windows establish the initial               S5-Blip               Short transient event; tests whether repair overreacts.
+representation reference and classifier state. For a non-warm-        S6-Combined           Compound drift; tests interaction of mechanisms.
+                                                                      S7-Local-Low          Low-intensity local class-conditional change.
+up window Wt , the system first computes predictions and              S7-Local-Medium       Medium-intensity local class-conditional change.
+records the outputs. Only after the one-window delay are labels       S7-Local-High         High-intensity local class-conditional change.
+used for adaptation. Primary DASP splits the labeled delayed
+window 75/25 into repair and holdout partitions, then selects
+at most 128 class-balanced repair examples. The next window        datasets, ten scenarios, five stream seeds, and two model seeds.
+can therefore be influenced by Wt labels, but the prediction       The full 4,000-run count includes all eight methods; it is not a
+on Wt is never influenced by its own labels.                       count of independent datasets.
+   This ordering has three consequences. It increases re-
+alism relative to train-before-predict evaluation. It makes        E. FAIRNESS CONTROLS
+the delayed-supervision path an explicit part of the method
+                                                                   The methods are locked before the confirmation run. The
+contract. It also means that an early routing mistake can affect
+                                                                   warm-up length is four windows, the prepared-stream window
+later windows, which is why the paired stream-level unit is
+                                                                   size is 4,096, and CPU execution uses one thread. All paths
+more meaningful than treating each window as an independent
+                                                                   record 128 new training examples per update, but label access
+test sample.
+                                                                   differs: DASP uses labeled balanced selection plus a 25% hold-
+                                                                   out, SSF selects after label access, and budget-matched com-
+C. TEN SCENARIO DEFINITIONS
+                                                                   parators query uniformly without labels. Total label exposure is
+The primary evaluation includes one stationary control and
+                                                                   therefore unequal. SSF retains its configured sample-selection
+nine drift conditions. S0 is the stable control stream and tests
+                                                                   and forgetting-protection strategy. Experience Replay, A-
+whether adaptation damages a model without a deliberate
+                                                                   GEM, Online EWC, RepShield, Online MLP, and CDDA-
+distribution change. S1-Sudden introduces an abrupt regime
+                                                                   MD are included because they represent replay, gradient
+change. S2-Gradual spreads the transition across multiple win-
+                                                                   projection, regularization, representation protection, direct
+dows. S3-Incremental applies a sequence of smaller changes.
+                                                                   online learning, and distributional detection families. DASP is
+S4-Recurrent revisits a previously observed regime. S5-Blip
+                                                                   not compared to a deliberately weakened SSF implementation;
+inserts a transient episode followed by recovery. S6-Combined
+                                                                   both use the same prediction-first delay, prepared streams, and
+composes more than one drift pattern. S7-Local-Low, S7-
+                                                                   seeds, while the supervision-accounting exception is disclosed
+Local-Medium, and S7-Local-High vary the intensity of a
+                                                                   separately.
+localized class-conditional change. The three local variants
+are especially important for DASP because they test whether
+increasing local severity expands the routed set or merely         XII. EVALUATION CONTRACT AND STATISTICAL ANALYSIS
+increases the update magnitude.                                    A. PREDICTIVE METRICS
+   The complete dataset–scenario pairing is visualized in          For a binary task, the per-window Macro-F1 is the arithmetic
+                                                                                                                               (0)
+Fig. 11. This matrix is both a design diagram and an analysis      mean of the F1 score for the benign and attack classes. If F1
+                                                                         (1)
+map: every cell represents five stream seeds and two model         and F1 are the class-specific scores, then
+seeds, and the color encodes the paired DASP–SSF Macro-
+                                                                                                               (0)        (1)
+F1 gap after aggregation. The figure therefore connects the                                                 F1 + F 1
+controlled scenario taxonomy to the confirmation evidence                               MacroF1t =                   .                             (16)
+                                                                                                               2
+without collapsing the study into a single mean.
+                                                                   Macro-F1 is the primary metric because accuracy can be
+D. SEED STRUCTURE AND PAIRING                                      dominated by benign traffic. Cumulative attack recall and
+The stream seeds are 2001, 2002, 2003, 2101, and 2102. The         cumulative false-negative rate are reported as operational
+model seeds are 91 and 92. For a fixed dataset, scenario, stream   safety measures. Online forgetting is computed by comparing
+seed, and model seed, all eight methods receive the same           historical behavior after each update with the corresponding
+prepared stream, temporal delay, and initial seed assignment,      pre-update reference. Window stability Macro-F1 summarizes
+but the audited label-selection and holdout semantics are          the consistency of predictions across the stream rather than
+method specific. The DASP–SSF comparison is therefore              only the final aggregate.
+paired at the cell level. The 500 paired cells arise from five
+14                                                                                                                                    VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+                                                            Confirmation design and paired DASP--SSF gap
+
+  CIC-IDS2017     +0.016          -0.005         -0.001         +0.002            +0.012            +0.013            +0.002                +0.012         +0.008         +0.010   0.04
+
+
+   NF-BoT-IoT     +0.044          +0.015         -0.003         +0.020            +0.017            +0.036            +0.019                +0.043         +0.035         -0.011   0.02
+
+
+
+
+                                                                                                                                                                                           Macro-F1 gap
+  NF-CSE-CIC      +0.006          +0.007         +0.002         +0.011            +0.006            +0.007            +0.004                +0.001         +0.001         +0.001   0.00
+
+
+   NF-ToN-IoT     -0.002          +0.001         +0.006         -0.002            +0.007            -0.003            +0.013                +0.014         +0.009         -0.001   −0.02
+
+
+    NF-UNSW       +0.001          +0.002         +0.003         +0.002            +0.001            +0.001            +0.003                +0.001         +0.001         +0.002   −0.04
+
+                  S0           den                 l              r.               ur.                p                b.                al-L
+                                              dua              Inc             Rec                 Bli             Com                                  al-M           al-H
+                            Sud            Gra                                                                                        Loc            Loc            Loc
+                                                          10 primary scenarios; each cell averages 5 stream seeds and 2 model seeds
+
+
+FIGURE 11. Confirmation design and paired performance map. Rows are datasets, columns are the ten primary scenarios, and each cell aggregates five
+stream seeds and two model seeds.
+
+
+
+B. COST AND PERFORMANCE METRICS                                                                      from a single stream as independent. The present analysis
+Adaptation time is measured as the sum of update intervals,                                          keeps the exact confirmation values as the primary claim and
+excluding data loading and stream preparation. Median up-                                            treats any resampling interval as supplementary.
+date time is reported because a mean can be dominated by
+emergency repairs. Gradient evaluations count the optimizer-                                         XIII. EXPANDED CONFIRMATION RESULTS
+equivalent forward/backward evaluations recorded during the                                          The compact result table in Section VI gives the headline
+experiment. Prediction throughput is measured separately in                                          comparison. The tables in this section expose the structure
+flows per second. This distinction prevents a method from                                            behind that headline. They are generated from the stored 4,000-
+appearing efficient merely because it performs almost no                                             row summary rather than manually transcribed. Consequently,
+adaptation. Memory payload, model parameter bytes, and                                               readers can reproduce every displayed aggregate by grouping
+peak resident-set increment are included to expose deployment                                        the public summary by dataset, scenario, and method.
+costs.
+                                                                                                     A. DATASET-BY-METHOD PATTERN
+C. PAIRED INFERENCE                                                                                 Table 6 shows that DASP is not supported by a single favorable
+Let di = MacroF1DASPi      − MacroF1SSF i    for paired cell i. The                                 dataset. Its strongest practical separation from SSF occurs
+primary summaries are d̄, the median of di , the number of                                          on NF-BoT-IoT-v3, where the mean gap is approximately
+positive differences, and the number of cells within ±0.01.                                         +0.0215. The gap is smaller on NF-UNSW-NB15-v3 because
+The sign test evaluates whether the probability of a positive                                       several methods are near a ceiling. This pattern is important for
+difference is one half. The paired t-test is used as a sensitivity                                  interpretation: a high mean over all datasets could otherwise
+analysis for the mean, while the Wilcoxon signed-rank test                                          be driven by one easy benchmark. DASP also remains ahead
+probes whether the signed-rank distribution is displaced from                                       on the harder NF-ToN-IoT-v3 setting, although the margin is
+zero. These tests are not applied to individual windows because                                     modest.
+windows within one stream are serially dependent.                                                      The matrix shows a second pattern. Experience Replay is the
+   The confirmation result is therefore interpreted at the                                          strongest non-DASP baseline in aggregate, which is expected
+stream/model-seed cell level. A positive aggregate does not im-                                     because replay supplies historical context without requiring a
+ply universal dominance. The worst cell is reported explicitly,                                     modular backbone. However, its update cost is lower partly
+and the scenario and dataset tables preserve the distributional                                     because it uses a simpler update rule. DASP’s contribution is
+context. This reporting choice is aligned with the goal of                                          not simply to minimize update time; it combines replay with
+evaluating a deployment mechanism rather than selecting only                                        an explicit constraint on where replay gradients can change
+the most favorable windows.                                                                         the model. SSF remains the closest accuracy comparator and
+                                                                                                    the appropriate primary baseline for the paired claim.
+D. EFFECT SIZE AND UNCERTAINTY REPORTING
+The mean gap is accompanied by the win count and sensitivity                                         B. DATASET-LEVEL COST AND ACCURACY
+p-values. In a future archival release, the stored paired cell-                                      Table 7 separates the accuracy gap from the systems ratio.
+level records can additionally support percentile bootstrap                                          DASP’s update speedup remains above 1.7 across all five
+intervals over the 500 cells, with resampling performed at                                           datasets, and the gradient reduction remains close to 1.5
+the paired-cell level. Resampling at the window level would                                          or higher. The stable cost ratio suggests that the benefit is
+understate uncertainty because it treats repeated observations                                       architectural rather than a consequence of one unusually short
+VOLUME XX, 2026                                                                                                                                                                                      15
+                                                                                                            Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 6. Mean Macro-F1 by dataset and method over the confirmation matrix.
+
+
+  Dataset                        DASP           SSF              ER        RepShield       A-GEM             Online MLP             Online EWC           CDDA-MD
+  cic-ids2017                    0.9420      0.9350           0.9336          0.9284           0.9157                 0.9109                 0.9105          0.8672
+  nf-bot-iot-v3                  0.8652      0.8437           0.7632          0.7181           0.7497                 0.7302                 0.7304          0.7349
+  nf-cse-cic-ids2018-v3          0.9627      0.9581           0.9600          0.9547           0.9521                 0.9500                 0.9500          0.9220
+  nf-ton-iot-v3                  0.8684      0.8642           0.8651          0.8430           0.7970                 0.7886                 0.7886          0.4666
+  nf-unsw-nb15-v3                0.9961      0.9944           0.9962          0.9962           0.9962                 0.9961                 0.9962          0.9959
+
+TABLE 7. Dataset-level DASP–SSF comparison. Speedup and gradient reduction are ratios relative to SSF.
+
+
+                       Dataset                      DASP F1      SSF F1        Gap      Wins/100          Update speedup         Grad. reduction
+                       cic-ids2017                   0.9420       0.9350     0.0070             78                     1.86                  1.59
+                       nf-bot-iot-v3                 0.8652       0.8437     0.0215             81                     1.77                  1.45
+                       nf-cse-cic-ids2018-v3         0.9627       0.9581     0.0045             82                     1.93                  1.59
+                       nf-ton-iot-v3                 0.8684       0.8642     0.0042             47                     1.90                  1.58
+                       nf-unsw-nb15-v3               0.9961       0.9944     0.0018             95                     2.03                  1.60
+
+
+TABLE 8. Scenario-level DASP–SSF comparison across five datasets and ten replication cells per scenario.
+
+
+                          Scenario              DASP F1         SSF F1        Gap      Wins/50       Update speedup           Grad. reduction
+                          S0                         0.9604      0.9473     0.0131             43                    1.94                1.58
+                          S1-Sudden                  0.9196      0.9157     0.0040             34                    1.89                1.57
+                          S2-Gradual                 0.9216      0.9202     0.0014             33                    1.88                1.54
+                          S3-Incremental             0.9273      0.9208     0.0065             38                    1.89                1.56
+                          S4-Recurrent               0.9256      0.9171     0.0085             41                    1.91                1.57
+                          S5-Blip                    0.9430      0.9321     0.0110             39                    1.91                1.58
+                          S6-Combined                0.8902      0.8819     0.0083             38                    1.86                1.53
+                          S7-Local-Low               0.9359      0.9218     0.0141             42                    1.92                1.55
+                          S7-Local-Medium            0.9298      0.9188     0.0110             39                    1.86                1.55
+                          S7-Local-High              0.9152      0.9150     0.0002             36                    1.90                1.54
+
+
+TABLE 9. DASP Macro-F1 for every dataset–scenario cell. Values average five stream seeds and two model seeds.
+
+
+                   Dataset                     S0        S1         S2        S3         S4          S5         S6      L-Low      L-Med.       L-High
+                   cic-ids2017             0.9623     0.9332     0.9344    0.9388     0.9292    0.9476      0.9225      0.9484      0.9539      0.9496
+                   nf-bot-iot-v3           0.9388     0.9115     0.8998    0.9068     0.8955    0.9099      0.7092      0.8504      0.8330      0.7970
+                   nf-cse-cic-ids2018-v3   0.9919     0.9218     0.9294    0.9508     0.9373    0.9636      0.9476      0.9958      0.9951      0.9932
+                   nf-ton-iot-v3           0.9131     0.8352     0.8479    0.8440     0.8699    0.8980      0.8759      0.8888      0.8706      0.8402
+                   nf-unsw-nb15-v3         0.9958     0.9965     0.9965    0.9961     0.9961    0.9959      0.9958      0.9962      0.9962      0.9959
+
+
+
+
+stream. The largest speedup appears on NF-UNSW-NB15-v3,                               mative: a positive S0 gap indicates that the performance-gated
+the same dataset in which accuracy differences are compressed                         modular repair path does not merely damage the baseline
+by the ceiling effect.                                                                model when the stream is stable. The local-low and blip
+   The cost table also prevents an overly broad claim. DASP                           gains are consistent with the intended use case for attribution,
+does not improve every systems metric. Its forward throughput                         namely, a change confined to a subset of the representation or
+is lower because four module branches and a fusion stage are                          a short-lived episode. They should be read as scenario-level
+executed for every prediction. The appropriate conclusion                             evidence, not as proof that every local change is correctly
+is therefore a two-axis one: DASP improves the accuracy–                              attributed.
+adaptation trade-off while paying a forward-inference cost. A                            S2-Gradual and S7-Local-High are weaker cases. Gradual
+deployment that is constrained by prediction latency rather                           drift gives the router a less distinct boundary between reference
+than adaptation latency may prefer a fused or sparse imple-                           and current representations. High-intensity local drift can
+mentation in future work.                                                             produce evidence in several modules, reducing the advantage
+                                                                                      of a strict top-k selection. These conditions motivate adaptive
+C. SCENARIO-LEVEL RESPONSE                                                            routing budgets and uncertainty-aware expansion, but they
+Table 8 reports all ten primary conditions. The largest mean                          do not invalidate the primary result because the confirmation
+gains occur in S0, S7-Local-Low, S5-Blip, and S7-Local-                               configuration was locked before inspecting the final summary.
+Medium. The stationary control result is particularly infor-
+16                                                                                                                                                       VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 10. SSF Macro-F1 for every dataset–scenario cell, using the same paired cells as DASP.
+
+
+                    Dataset                      S0          S1           S2        S3          S4        S5           S6    L-Low     L-Med.     L-High
+                    cic-ids2017               0.9464      0.9383       0.9354    0.9366   0.9172      0.9343     0.9200      0.9363     0.9456        0.9393
+                    nf-bot-iot-v3             0.8946      0.8969       0.9026    0.8870   0.8788      0.8736     0.6899      0.8077     0.7977        0.8080
+                    nf-cse-cic-ids2018-v3     0.9857      0.9147       0.9272    0.9401   0.9317      0.9570     0.9439      0.9950     0.9941        0.9918
+                    nf-ton-iot-v3             0.9152      0.8342       0.8421    0.8458   0.8630      0.9008     0.8631      0.8750     0.8613        0.8416
+                    nf-unsw-nb15-v3           0.9944      0.9943       0.9938    0.9944   0.9948      0.9945     0.9927      0.9950     0.9952        0.9944
+
+
+TABLE 11. DASP minus SSF Macro-F1 gap for every dataset–scenario cell. Positive values favor DASP.
+
+
+                      Dataset                      S0            S1        S2        S3      S4          S5       S6        L-Low     L-Med.     L-High
+                      cic-ids2017                0.016     -0.005       -0.001    0.002   0.012        0.013    0.002        0.012     0.008      0.010
+                      nf-bot-iot-v3              0.044      0.015       -0.003    0.020   0.017        0.036    0.019        0.043     0.035     -0.011
+                      nf-cse-cic-ids2018-v3      0.006      0.007        0.002    0.011   0.006        0.007    0.004        0.001     0.001      0.001
+                      nf-ton-iot-v3             -0.002      0.001        0.006   -0.002   0.007       -0.003    0.013        0.014     0.009     -0.001
+                      nf-unsw-nb15-v3            0.001      0.002        0.003    0.002   0.001        0.001    0.003        0.001     0.001      0.002
+
+
+TABLE 12. Operational and retention metrics by method. Values are means over 500 confirmation cells.
+
+
+  Method                      Attack recall       FNR            Forgetting      Stability F1        Update labels          Peak RSS inc. (MB)           Model bytes (KB)
+  DASP                              0.9591      0.0409                0.0473          0.9587                   4,096                           28.6                  82.0
+  SSF                               0.9569      0.0431                0.0572          0.9511                   4,096                           28.9                  82.0
+  Experience Replay                 0.9384      0.0616                0.0544          0.9634                   4,096                           28.4                  82.0
+  RepShield                         0.9304      0.0696                0.0589          0.9650                   4,096                           30.1                  82.0
+  A-GEM                             0.9271      0.0729                0.0569          0.9635                   4,096                           29.1                  82.0
+  Online MLP                        0.9215      0.0785                0.0607          0.9616                   4,096                           31.1                  82.0
+  Online EWC                        0.9214      0.0786                0.0607          0.9616                   4,096                           28.9                  82.0
+  CDDA-MD                           0.8961      0.1039                0.0800          0.9710                   4,096                           27.9                  82.0
+
+
+TABLE 13. Logged DASP structural invariants.                                              algorithm from a method whose history grows with the stream.
+                                                                                             DASP’s structural invariant is summarized in Table 13.
+                   Invariant                             Value                            Across the 500 confirmation cells, 16,000 repair records were
+                   Confirmation cells                     500                             available. No logged repair performed a global update. The
+                   Repair records                      16,000                             maximum active representation-module count was three of
+                   Replay examples per repair             512
+                   Global update count                       0
+                                                                                          four, the median was three, and the minimum was one. These
+                   Maximum active modules               3 of 4                            values should be read together with the classifier exception:
+                   Median active modules                3 of 4                            the shared classifier is always an explicit adaptation group,
+                   Minimum active modules               1 of 4
+                   Memory capacity                      1,024
+                                                                                          while the invariant concerns the four representation modules.
+
+                                                                                          XIV. ABLATION, SENSITIVITY, AND FAILURE DIAGNOSTICS
+                                                                                          A. DEVELOPMENT ABLATION AS MECHANISM DIAGNOSIS
+D. CELL-LEVEL MATRICES
+                                                                                          The development pilot was not used to tune the confirmation
+Tables 9–11 provide a compact audit trail. The DASP and                                   statistics, but it is useful for understanding why the final
+SSF matrices show whether a dataset’s aggregate is driven                                 mechanism contains several components. The initial no-update
+by a single scenario. The gap matrix shows that positive and                              path reached mean Macro-F1 0.7625 against SSF at 0.9211.
+negative cells coexist even when the scenario mean is positive.                           This is a failure of under-adaptation. Classifier calibration
+The negative NF-BoT-IoT-v3/S2-Gradual cell is therefore not                               raised the score to 0.8706, and the early semi-local prototype
+removed as an outlier. It is part of the mechanism’s empirical                            reached 0.8725. The large jump to approximately 0.9266
+boundary and should be used to design the next ablation.                                  occurred only after bounded localized rehearsal and new-
+                                                                                          sample weighting were introduced. The sequence suggests that
+E. RETENTION AND OPERATIONAL BEHAVIOR                                                     locality alone is not sufficient: a selective model still needs
+Table 12 adds metrics that are not visible in Macro-F1 alone.                             enough historical and current supervised context to stabilize
+Attack recall and false-negative rate matter because a detector                           the boundary.
+can obtain a reasonable mean F1 while missing a minority                                     The ablation should not be interpreted as a factorial causal
+attack class. Forgetting and stability show whether a repair                              estimate because the pilot variants were developed sequentially.
+creates a short-term gain at the cost of oscillation. Memory                              It does, however, reject a tempting but incorrect simplification:
+and resident-set measurements distinguish a bounded replay                                simply freezing modules and adding a drift score is not enough.
+VOLUME XX, 2026                                                                                                                                                         17
+                                                                                                  Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 14. Development ablation sequence on the 15 paired pilot cells.
+
+
+         Variant                                                Macro-F1   Interpretation
+         No update                                                0.7625   Under-adaptation
+         Classifier calibration                                   0.8706   Shared boundary repair
+         Early semi-local prototype                               0.8725   Partial locality without sufficient rehearsal
+         Localized rehearsal and new-sample weighting             0.9266   Final mechanism direction
+         SSF comparator                                           0.9211   Development reference
+
+
+
+
+The successful mechanism combines attribution, bounded                     D. NEGATIVE CONTROLS
+replay, weighted delayed labels, strict optimizer masking, and             S0 is a negative control for unnecessary plasticity. If DASP had
+the delayed-label performance gate.                                        a strong negative S0 gap, the method would be overreacting
+                                                                           to noise. The observed positive S0 mean gap, together with
+B. ROUTER SENSITIVITY                                                      the performance-gated maintenance mechanism, provides
+The locked primary router uses three kernel scales, persistence            evidence against that failure mode. A second negative control
+one, a severity threshold of 0.15, and top-k = 3. The                      is the global-update counter: a method could claim locality
+emergency-severity value of 0.60 in the locked experimental                while silently updating every module. The recorded global-
+configuration is inactive because it is not used by the evaluated          update count of zero and the active-module upper bound
+primary DASP procedure. Each setting encodes a trade-off.                  address this implementation risk.
+Increasing the kernel scale set can improve sensitivity to broad
+representation shifts but increases the per-window discrepancy             XV. THEORETICAL AND OPERATIONAL ANALYSIS
+calculation. Raising persistence can suppress false positives              A. CONSTRAINED REPAIR VIEW
+but delays repair under sudden drift. A smaller k increases                Let τ = t − 1 be the delayed window whose stored evidence
+structural sparsity but risks leaving the classifier without               is restored at outer iteration t. The pre-update mode is selected
+a path to the changed representation. A larger k improves                  by
+                                                                                                  mτ = π sτ , Fτhold ,
+                                                                                                                      
+recoverability but moves DASP toward global replay.                                                                                     (17)
+   Because the primary confirmation was locked, the correct
+                                                                           where sτ is stored MMD severity and Fτhold is the delayed-
+use of sensitivity analysis is prospective. The saved logs should
+                                                                           label performance-holdout Macro-F1. Given the routed set
+be replayed under k ∈ {1, 2, 3, 4}, persistence values in {1, 2},
+                                                                           Aτ and mode-specific feasible update set Ω(Aτ , mτ ), the
+and alternative attribution weights α ∈ {0.25, 0.5, 0.75}.
+                                                                           implemented optimization is represented by
+The comparison should report accuracy, update time, active-
+module fraction, and worst-cell degradation. In particular,                 ∆τ = arg              min         Lnew (Θ + ∆) + λr Lreplay (Θ + ∆),
+k = 4 should be treated as a locality ablation rather than as                               ∆∈Ω(Aτ ,mτ )
+                                                                                                                                                      (18)
+a production configuration, because it removes the principal
+                                                                           subject to
+structural constraint.
+                                                                                ∆j = 0           / Aτ ,
+                                                                                              ∀j ∈                     |Bmem
+                                                                                                                    |Aτ | ≤ k,
+                                                                                                                         τ    | ≤ 512.
+C. FAILURE EPISODE ANALYSIS                                                                                                           (19)
+The worst confirmation cell occurs on NF-BoT-IoT-v3 under                  The holdout loss is not part of the training objective and
+S2-Gradual with stream seed 2102 and model seed 91, where                  does not accept or reject a post-update candidate. It selects
+DASP trails SSF by 0.0900 Macro-F1. The failure is not hidden              emergency versus background intensity before optimization.
+by reporting only dataset means. A plausible mechanism is                  Replay constrains forgetting through data, whereas optimizer
+attribution ambiguity: the gradual change produces moderate                exclusion imposes exact inactivity on unrouted representation
+evidence in several modules before the classifier has a stable             modules.
+boundary, and the top-k repair allocates limited plasticity                   The Lagrangian perspective also clarifies why a soft penalty
+among modules whose evidence is not yet separable.                         is not equivalent to DASP. A penalty such as λ∥Θj − Θold  j ∥
+                                                                                                                                         2
+
+   The failure suggests three concrete follow-up diagnostics.              may reduce movement but does not guarantee ∆j = 0. DASP
+First, plot the four attribution trajectories against the delayed          uses an equality constraint implemented through optimizer
+attack recall to determine whether the router leads or lags                parameter exclusion. This makes the locality claim falsifiable:
+the performance drop. Second, compare the selected set with                a parameter hash comparison can either confirm or reject the
+an oracle set computed from a post-hoc feature perturba-                   invariant.
+tion analysis; this tests attribution quality without changing
+the primary result. Third, evaluate a temporary uncertainty-               B. LOCALITY VERSUS EXPRESSIVITY
+triggered expansion that opens the fourth module only when                 The top-k constraint creates an explicit accuracy–locality
+the delayed-label performance gate falls below threshold twice             trade-off. If k = 1, the update is highly selective but may
+consecutively. Such a diagnostic must be labeled as a new                  underfit a compound drift. If k = 4, all representation modules
+method, not retroactively applied to the confirmation run.                 can change and the structural distinction from global replay
+18                                                                                                                                          VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+becomes weak. The locked value k = 3 is a middle point                  E. COMPUTATIONAL DECOMPOSITION
+that permits recovery when several modules carry evidence               The per-window computation has four components: represen-
+while preserving at least one frozen representation path. The           tation extraction, discrepancy estimation, delayed-label subset
+confirmation results should therefore not be generalized to             construction, and local repair. Representation extraction is
+arbitrary k without a new sensitivity experiment.                       shared with prediction and scales with the full input batch.
+   The classifier exception creates a second trade-off. A               Module-wise MMD uses a bounded sample of 128 representa-
+classifier-only repair is computationally cheap and can correct         tions and three kernel scales. The repair term scales with 512
+a shifted class prior, but it cannot create a new representa-           replay examples and at most 128 repair-training labels; holdout
+tion for an unseen attack pattern. A module-only repair can             evaluation is separate. Performance-holdout evaluation is used
+change the representation but may leave the decision boundary           on the no-trigger path to select repair intensity. The top-k mask
+miscalibrated. DASP updates the classifier explicitly while             reduces the trainable parameter set but does not remove the
+routing representation plasticity, which is why the method is           cost of computing routing evidence. This explains why DASP
+best described as localized subspace repair rather than isolated        improves adaptation time while reducing forward throughput
+module retraining.                                                      relative to simpler flat MLP baselines.
+                                                                           The evidence map is deliberately conservative. It distin-
+C. ATTRIBUTION STABILITY UNDER DRIFT TYPES                              guishes a property that is guaranteed by code structure from a
+The router is expected to behave differently across the ten             property that is merely suggested by aggregate performance.
+scenarios. Under S1-Sudden, the discrepancy trajectory should           For example, zero global updates is a structural implementa-
+change sharply and the delayed conflict should become con-              tion fact, whereas the claim that attribution causes the accuracy
+centrated after one label delay. Under S2-Gradual, the signals          gain requires the prospective causal router ablation described
+may rise slowly and become less separable across modules.               in the limitations.
+Under S4-Recurrent, historical memory may reduce conflict if
+the returning regime is already represented. Under S5-Blip, the         XVI. DEPLOYMENT THREAT MODEL AND GOVERNANCE
+                                                                        A. OPERATIONAL DEPLOYMENT BLUEPRINT
+delayed-label performance holdout may escalate the no-trigger
+path when transient performance falls below its threshold.              B. THREATS AGAINST ADAPTATION
+Under the local variants, the key question is not only whether          An adaptive NIDS has threats that a static classifier does not.
+a score is large, but whether the ranking of modules remains            An attacker may attempt to induce false drift by generating a
+stable enough for top-k selection.                                      short burst of unusual but benign-looking traffic. A compro-
+   A useful diagnostic is the rank persistence of the routed set.       mised labeling process may inject incorrect delayed labels and
+Let At and At+1 be two consecutive active sets. Their overlap           push the router toward an incorrect module. A replay-memory
+can be measured by                                                      poisoning attack may insert mislabeled or atypical examples. A
+                                                                        resource-exhaustion attack may increase the frequency of drift-
+                                 |At ∩ At+1 |                           like windows and cause repeated scoring and repair. DASP
+                        Jt =                    .               (20)
+                               |At ∪ At+1 | + ϵ                         does not claim to solve these threats automatically, but its
+                                                                        bounded and logged design makes them explicit monitoring
+High overlap can indicate a persistent localized drift, while           targets.
+low overlap can indicate either a compound drift or an unstable
+router. The current confirmation summary records active-                C. GOVERNANCE AND CHANGE CONTROL
+module counts but does not claim a causal result about rank             A production commit should carry a model version, stream
+persistence. This statistic is a direct extension for the next          identifier, active-module set, attribution vector, performance-
+diagnostic release.                                                     holdout scores, replay cardinality, optimizer configuration,
+                                                                        and a hash of inactive parameters. The record should be
+D. WHY THE PERFORMANCE HOLDOUT IS NOT AN ORACLE                         immutable after commit. If a later incident reveals that a repair
+The delayed-label performance holdout uses labels unavailable           was harmful, the operator should be able to reconstruct the
+at prediction time, but it is not an oracle for the future stream. In   candidate, identify the delayed labels used, and restore the
+the locked modular path it measures bounded delayed-window              previous model version. This is stronger than storing only a
+performance and chooses emergency or background intensity               final checkpoint because the checkpoint does not explain why
+when MMD does not trigger. A favorable score can still be               a change was made.
+followed by an unseen regime, so the gate is not a guarantee                The same governance layer supports controlled experi-
+of future optimality.                                                   mentation. A new router threshold should be deployed as a
+   The prediction-first asymmetry remains: mode selection               versioned configuration and evaluated in shadow mode before
+cannot reverse a prediction that has already been emitted               it is allowed to commit. The primary confirmation configura-
+on the current window. A deployed system should therefore               tion should remain immutable, while prospective variants use
+pair the logged local update with monitoring of subsequent              distinct run and method identifiers. This separation prevents
+windows and an external model registry if operational rollback          an apparently small operational change from contaminating
+is required.                                                            the published baseline.
+VOLUME XX, 2026                                                                                                                       19
+                                                                                                                 Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 15. Mechanism-to-evidence mapping used in the evaluation.
+
+
+        Claim                                         Implementation evidence                                     Empirical evidence
+        Drift is localized                            Four explicit feature modules and per-module scores         Module-count distribution and routing logs
+        Inactive modules are protected                Optimizer exclusion and parameter-hash comparison           Zero global updates; maximum three active modules
+        Replay stabilizes repair                      Class-balanced 512-example historical batch                 Development ablation and retention metrics
+        Adaptation training is bounded                At most 128 new training examples plus disclosed labeled    Gradient evaluations and update-time distribution
+                                                      holdout; memory 1,024; top-k = 3
+        Repair mode is explicit                       Performance-holdout        Macro-F1       and      fixed    Mode logs and worst-cell analysis
+                                                      emergency/background rules
+        DASP improves the primary comparator          Paired cell-level confirmation design                       383/500 wins and positive statistical tests
+
+
+
+TABLE 16. Threats to the adaptive repair path and corresponding controls.                 therefore includes feature count, warm-up length, and the
+                                                                                          locked configuration alongside the summary metrics.
+      Threat                      DASP control or required deployment con-
+                                  trol
+                                                                                          B. BASELINE EQUIVALENCE AUDIT
+      False drift injection       Persistence, severity threshold, and
+                                  performance-holdout monitoring                         The DASP–SSF comparison is paired, but pairing alone does
+      Label poisoning             Label provenance, class-balance checks,                not guarantee fairness. The equivalence audit verifies identical
+                                  and external checkpoint rollback
+      Replay poisoning            Bounded memory, provenance fields, and                 streams, seeds, window size, delay, and recorded training-
+                                  periodic memory audit                                  subset count, while explicitly treating DASP–SSF holdout and
+      Repair flooding             Cooldown, update budget, and rate-limited
+                                  repair service                                         total label exposure as unequal. A missing or partial run is not
+      Silent global update        Optimizer exclusion, parameter hashes,                 replaced with a zero and is not silently dropped from only one
+                                  and global-update counter
+      Audit tampering             Append-only signed routing and model-                  method.
+                                  state records                                             A second fairness question concerns computational budgets.
+                                                                                         DASP uses a modular router and replay batch, while SSF uses
+                                                                                         its own strategic sample-selection mechanism. The correct
+D. EVIDENCE INTEGRATION AND SCOPE                                                        comparison is not to force identical internal operations; it is
+The evidential argument should connect mechanism, protocol,                              to hold the externally meaningful constraints fixed and report
+result, and limitation rather than rely on one headline score.                           internal work explicitly. The manuscript therefore reports
+In this study, the mechanism is the routed subspace and strict                           gradient evaluations, update seconds, throughput, memory,
+optimizer mask. The protocol is the prediction-first delayed-                            and accuracy together. This allows a reader or system operator
+label evaluation across five datasets and ten scenarios. The                             to decide whether the trade-off is favorable for a particular
+result is the paired accuracy and adaptation-cost advantage.                             deployment.
+The principal boundaries are the throughput penalty and
+the difficult gradual-drift cell. Reporting these components                              C. RESULT INTEGRITY AUDIT
+together allows the contribution to be evaluated within its                              The result integrity audit recomputes the headline Macro-F1
+empirical scope.                                                                         and update-cost values from the row-level records. Displayed
+                                                                                         values are generated independently rather than copied from the
+XVII. EXPERIMENTAL INTEGRITY AND REPRODUCIBILITY                                         manuscript text. The paired comparison is joined on dataset,
+CHECKS                                                                                   scenario, stream seed, and model seed. The sign-test, paired
+A. LEAKAGE AUDIT                                                                         t-test, and Wilcoxon values are calculated from the same 500
+The most damaging error in a continual-learning experiment                               paired differences. This chain prevents a common failure mode
+is not a slightly suboptimal hyperparameter; it is information                           in large experiments, where a figure and a table are produced
+leakage. DASP’s protocol prevents current-window leakage                                 from different filtering rules.
+by emitting predictions before delayed-label access. The same
+order is enforced for every baseline. The delayed label queue                             D. INTERPRETATION OF STATISTICAL SIGNIFICANCE
+is indexed by window identifier, so a label batch can only                               The extremely small paired p-values indicate that the direction
+be consumed after its configured delay. Stream metadata                                  of the aggregate comparison is unlikely to arise from a
+remain fixed during evaluation, and the independent analysis                             symmetric zero-median difference under the stated tests. They
+workflow operates only on completed run records rather than                              do not establish that DASP is superior on every dataset, every
+feeding aggregate statistics back into the online procedure.                             scenario, or every future deployment. The paired effect size
+   The leakage audit also covers preprocessing. Standard-                                is modest in Macro-F1 units, and its practical importance
+ization statistics are resolved from the training or warm-up                             depends on the cost of false negatives and on the value assigned
+portion of the prepared stream, not from the concatenation of                            to adaptation time. The paper therefore reports both the
+all windows. If a future window were allowed to influence                                mean gap and the operational trade-off rather than presenting
+the scaler, the resulting performance would not represent                                significance as a substitute for engineering relevance.
+a prediction-first deployment. The reproducibility record
+20                                                                                                                                                              VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 17. Experimental integrity checks and the artifact supporting each check.
+
+
+     Evaluation question                              Check performed                                              Supporting artifact
+     Was the current label used before prediction?    Inspect prediction-first procedure and delay queue           Protocol specification and stream summaries
+     Were DASP and SSF paired fairly?                 Join on dataset/scenario/stream/model seed                   Paired cell-level comparison
+     Is locality structural or cosmetic?              Exclude inactive parameters from optimizer and verify fin-   DASP routing records
+                                                      gerprints
+     Can the replay memory grow without bound?        Check fixed capacity and fixed repair sample                 Locked configuration and run summaries
+     Are negative cases hidden?                       Report minimum gap and worst cell                            Independent failure-case analysis
+     Is the throughput cost visible?                  Report prediction throughput separately from update time     Method-level summary
+     Can the figures be regenerated?                  Regenerate from row-level summaries                          Independent figure-generation workflow
+
+
+
+
+E. FAILURE TRANSPARENCY                                                               inspecting the results. If an error is found, the correction must
+A credible evaluation should expose the strongest counterex-                          be applied to the evaluation procedure or the data-preparation
+ample. DASP’s worst confirmation cell is retained with its                            stage, followed by a new full run. This rule prevents a common
+dataset, scenario, stream seed, and model seed. The failure is                        form of accidental p-hacking in which an inconvenient cell
+not explained away as random noise, and no post-hoc change                            is removed from the summary rather than diagnosed at the
+is applied to the primary result. Instead, the failure motivates                      source.
+a future adaptive-k and uncertainty-triggered expansion study.                           The final gate is visual. The compiled PDF should be
+This preserves the separation between confirmatory evidence                           rendered at ordinary resolution and inspected for figure
+and prospective improvement.                                                          readability, caption association, table continuation, reference
+                                                                                      clipping, and whitespace caused by floats. Figures that are
+F. TEST COVERAGE AND REPRODUCIBILITY GATE                                             mathematically correct but unreadable at column width should
+The implementation is evaluated in layers rather than only                            be regenerated with fewer labels or moved to a two-column
+through the final benchmark. Unit-level checks cover the mem-                         layout. The figures are therefore separated into mechanism
+ory sampler, class balancing, delayed-label queue, requirement                        diagrams and result matrices rather than compressed into one
+normalization, top-k mask, optimizer exclusion, performance-                          dense composite figure.
+gate thresholding, and summary recording. Integration checks
+cover one complete prediction-first stream, including back-                           G. EVIDENCE AND REPRODUCIBILITY BOUNDARY
+ground and emergency local modes. Benchmark checks cover                              Taken together, the integrity checks connect the method con-
+the full pilot and confirmation matrices. This layered structure                      tract, prediction-first evaluation procedure, row-level records,
+is important because a high-level Macro-F1 score cannot detect                        paired analysis, and compiled manuscript. They reduce the risk
+a silent global update or a label-ordering error.                                     of leakage, incomplete pairing, and silent global updates, but
+    The reproducibility gate has four stages. Stage one checks                        they do not substitute for external replication. An archival
+that the required numerical libraries are available and that                          release should therefore include verified dataset licenses,
+deterministic one-thread execution is enabled. Stage two runs                         resolved bibliographic metadata, a pinned software environ-
+a small-scale evaluation and compares the resulting record                            ment, and an author-independent rerun from the released
+structure with the locked protocol. Stage three recomputes the                        configuration.
+aggregate tables from row-level records and verifies that the
+paired join contains exactly 500 cells. Stage four compiles the                       XVIII. OPERATIONAL REPRODUCIBILITY AND
+manuscript and checks that all citations, references, figures,                        AUDITABILITY
+and generated tables resolve. A release is not considered                             The experiment is reproducible at three levels. At the protocol
+reproducible if only the PDF can be compiled while the result                         level, stream metadata specify the 4,096-flow window size and
+summaries cannot be regenerated.                                                      dataset-specific feature counts, while the locked experimental
+    The existing test result of 95 passed and one skipped                             configuration specifies warm-up length, seeds, label delay,
+should be reported with its environment context. A future                             memory capacity, and router thresholds. At the run level, each
+archival package should pin the numerical-computing frame-                            experimental cell is uniquely indexed by dataset, scenario,
+work versions, record the operating system and CPU model,                             method, stream seed, and model seed. At the analysis level,
+and preserve the locked experimental configurations. Any                              row-level and aggregate records contain the values used by
+numerical compatibility warning observed in the local en-                             the manuscript tables and figures.
+vironment should be removed or documented before public                                  A reproduction should verify the following invariants before
+release because a warning that changes tensor behavior would                          comparing accuracy. The protocol metadata must specify 36
+threaten reproducibility even if the final table happened to                          chronological 4,096-flow windows and 78 CIC-IDS2017 or 49
+look plausible.                                                                       NF-v3 features. Prediction must precede delayed-label access,
+    A second gate concerns analysis independence. The inde-                           and supervision accounting must separate the 128-example
+pendent analysis workflow may read completed summaries,                               training subset from total label exposure; a strict shared-label
+but it must not rewrite method outputs or alter paired cells after                    confirmation requires rerunning. The model seed must be reset
+VOLUME XX, 2026                                                                                                                                                  21
+                                                                                                          Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 18. Layered software and experiment validation gate.
+
+
+          Layer                           Representative checks                                           Release criterion
+          Unit                            Memory capacity, class balance, mask cardinality, queue delay   All deterministic unit tests pass
+          Model                           Module output dimensions, classifier fusion, parameter hash     Inactive modules remain unchanged
+          Router                          MMD calibration, conflict normalization, top-k selection        Scores and masks are recorded
+          Mode control                    Performance-holdout threshold, background mode, emergency       Selected mode and locality fields are recorded
+                                          mode
+          Evaluation procedure            Seed reset, prediction-before-label order, record structure     Small-scale evaluation completes with expected fields
+          Pilot                           1,200-run matrix and method coverage                            Every dataset/scenario/method cell is present
+          Confirmation                    4,000-run matrix and paired join                                Exactly 500 DASP–SSF paired cells
+          Analysis                        Tables, figures, tests, quantiles, failure cell                 Values recompute from row-level outputs
+          Manuscript                      BibTeX, labels, figures, PDF compilation                        Zero fatal/citation/reference errors
+
+
+
+TABLE 19. Reproducibility checklist for a confirmation cell.                         use min{1, max(0.25, cj )} and three epochs. The classifier
+                                                                                     uses multiplier 1 on the base learning rate, while all inactive
+     Check                                         Expected value                    modules are excluded from the optimizer. Reference refresh
+     Dataset and scenario                          Protocol identifier               is enabled and runs after every applied primary DASP repair.
+     Stream seed                                   2001, 2002, 2003,
+                                                   2101, or 2102
+     Model seed                                    91 or 92                          APPENDIX B EXPERIMENTAL PROTOCOL SUMMARY
+     Window size                                   4,096 flows
+     Warm-up windows                               4
+                                                                                     The full pilot contains 1,200 runs: five datasets, ten scenarios,
+     Label delay                                   1 window                          three stream seeds, one model seed, and eight methods. The
+     New-example training subset                   At most 128 exam-
+                                                   ples/window; not total
+                                                                                     confirmation contains 4,000 runs: five datasets, ten scenarios,
+                                                   label exposure                    five stream seeds, two model seeds, and eight methods.
+     DASP memory capacity                          1,024 records
+     DASP replay sample                            512 records/repair
+                                                                                     Before archival release, the software tests and environment-
+     Maximum active modules                        3 of 4                            compatibility checks must be repeated using the final released
+     Global update count                           0 for DASP
+     Prediction ordering                           Before current labels
+                                                                                     materials; this manuscript therefore does not assert a cur-
+                                                                                     rent test-pass count. Any numerical-computing compatibility
+                                                                                     warning must be resolved or documented before independent
+                                                                                     reproduction.
+per cell. Each run must record update time separately from
+prediction throughput. Finally, the structural record must show                      APPENDIX C COMPLETE METHOD CONFIGURATION
+that inactive module parameters are unchanged across a logged                        MATRIX
+repair.                                                                              This appendix records the configuration contract used by the
+   The audit trail is also useful for security operations. For                       confirmation protocol. All methods receive the same prepared
+each repair, an analyst can ask what changed, why the router                         stream, four-window warm-up, one-window label delay, and
+selected those modules, which performance-gated mode was                             the same model and stream seeds. The audit identified method-
+selected, and whether historical behavior was preserved. This                        specific supervision semantics: all locked paths record 128
+does not replace a formal change-management process, but it                          new training examples per update, but primary DASP con-
+makes the adaptation decision inspectable. In a production                           structs that subset from a labeled repair pool and additionally
+system, the same record should be signed or stored in an                             evaluates a disjoint 25% labeled performance holdout; primary
+append-only log so that the model state and the explanation                          SSF also selects from a delayed labeled pool, while several
+cannot be separated after an incident.                                               comparator paths use label-blind uniform selection. Therefore,
+                                                                                     the current matrix does not establish a strict shared total-label-
+APPENDIX A LOCKED CONFIGURATION                                                      exposure contract.
+The evaluated DASP configuration uses a four-module parallel                            The matrix clarifies a potential source of confusion in
+MLP with module width 64, a 128-unit batch size, two                                 comparative studies. DASP’s trainable unit is not equivalent
+epochs per triggered/background repair, AdamW learning                               to using a smaller batch. DASP still evaluates the full modular
+rate 10−3 , weight decay 10−4 , one-window label delay, a                            predictor at prediction time and still uses historical examples
+class-balanced optimization subset of at most 128 examples                           during a repair. The distinction is where gradients are allowed
+selected from the labeled repair pool, a separate disjoint 25%                       to change parameters. Similarly, a baseline with fewer gradient
+labeled performance holdout, memory capacity 1,024, and                              evaluations is not automatically more efficient in the opera-
+512 replay examples for DASP repair. The primary router uses                         tional sense if it obtains substantially lower recall or performs
+multi-scale kernel scales {0.5, 1, 2}, severity threshold 0.15,                      almost no adaptation.
+persistence 1, and k = 3; the emergency-severity value 0.60
+in the locked configuration is inactive in the evaluated primary                     A. LOCKED DASP VALUES
+procedure. New delayed-label examples receive weight 3.0;                            The final DASP configuration uses four modules, module
+background modules use plasticity 0.25; emergency modules                            width 64, hidden dimensions 128 and 64 in the surrounding
+22                                                                                                                                                         VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 20. External evaluation controls and the audited DASP supervision exception.
+
+
+   Control                                                                Value                               Rationale
+   Task                                                                   Binary benign/attack                Common label space for all methods
+   Input features                                                         78 for CIC-IDS2017; 49 for          Dataset-specific fixed representation interface
+                                                                          NF-v3 streams
+   Window size                                                            4,096 flows                         Identical temporal granularity
+   Warm-up                                                                4 windows                           Initial reference and classifier calibration
+   Label delay                                                            1 window                            Prediction-first deployment constraint
+   Recorded new training examples                                         128/window                          Common optimization-subset count, not common total
+                                                                                                              label exposure
+   DASP repair-training subset                                            At most 128/window                  Class-balanced selection from the labeled repair pool
+   Stream seeds                                                           2001, 2002, 2003, 2101,             Replication over stream construction
+                                                                          2102
+   Model seeds                                                            91, 92                              Replication over initialization
+   Device                                                                 CPU, one thread                     Deterministic performance measurement
+   Memory capacity                                                        1,024 records                       Bounded historical state
+   DASP performance holdout                                               0.25 of delayed window              Labeled pre-update emergency/background mode selec-
+                                                                                                              tion; outside the 128-example training subset
+   Primary metric                                                         Macro-F1                            Balances benign and attack classes
+
+
+TABLE 21. Method-specific controls used in the confirmation matrix.
+
+
+    Method                           Adaptation unit                              Historical protection                       Distinguishing control
+    DASP                             Attributed modules plus classifier           Class-balanced 512-example replay           MMD/conflict router, top-k = 3, strict opti-
+                                                                                                                              mizer exclusion
+    SSF                              Full predictor update                        Strategic sample selection and forgetting   Fixed sample mask, distillation/forgetting con-
+                                                                                  protection                                  trol
+    Experience Replay                Full predictor update                        Replay memory                               Historical examples mixed with current labels
+    RepShield                        Representation-protection path               Protected representation reference          Robust representation preservation
+    A-GEM                            Full predictor update                        Reference gradient memory                   Gradient projection against memory direction
+    Online MLP                       Full predictor update                        None beyond current state                   Direct online supervised update
+    Online EWC                       Full predictor update                        Importance-weighted regularization          EWC penalty on important parameters
+    CDDA-MD                          Detector-specific update                     Distributional reference                    MMD-style drift detector with compact update
+
+
+
+
+implementation, no dropout, batch size 128, AdamW learning                               permutation. The transformation is applied before model
+rate 10−3 , weight decay 10−4 , and two triggered/background                             training and is identical for all methods within a paired cell.
+repair epochs. The router samples 128 module representa-                                    The scenario labels are used in the analysis as scientific
+tions, uses four calibration windows, kernel scales {0.5, 1, 2},                         conditions, not as method-specific hints. DASP does not
+severity threshold 0.15, persistence one, cooldown zero, and                             receive the string ‘‘S7-Local-Low’’ as an input. It receives
+top-k = 3. The emergency-severity value 0.60 in the locked                               only the stream observations and delayed labels. The scenario
+experimental configuration is inactive in the evaluated primary                          name is available to the experiment manager for grouping after
+procedure. Each repair constructs a class-balanced optimiza-                             the run completes.
+tion subset of at most 128 new examples from the labeled
+repair pool, evaluates a disjoint 25% labeled performance                                 A. PROTOCOL VALIDATION
+holdout, and samples 512 replay examples. Background                                     Before a run is accepted, the evaluation procedure verifies that
+active modules use plasticity 0.25; emergency modules use                                the dataset, scenario, stream seed, and feature count agree with
+min{1, max(0.25, cj )} for three epochs. The classifier multi-                           the requested experimental cell. It also verifies that warm-up
+plier is 1 on the base learning rate. Reference refresh is enabled                       windows precede the first adaptation window. A mismatch
+after every applied primary DASP repair.                                                 produces an invalid run rather than a silently relabeled result.
+   These values should be regarded as part of the method                                 This is particularly important in a 4,000-run study, where an
+definition for the reported result. Changing the memory size,                            indexing error could otherwise appear as a statistical effect.
+router budget, or top-k changes the method and requires a new
+confirmation experiment. In particular, a full-model update                               B. CLASS BALANCE AND LABEL ACCOUNTING
+should not be described as DASP merely because the update
+                                                                                         The memory sampler maintains class balance whenever both
+began with a module-wise score.
+                                                                                         classes are available, and pseudo-labels do not substitute
+                                                                                         for delayed ground truth. On the primary DASP path, class
+APPENDIX D DATASET AND SCENARIO DESIGN                                                   balancing inspects repair-pool labels before selecting at most
+The following design summary explains what is varied and                                 128 new optimization examples, and a disjoint 25% labeled
+what is held fixed in the prepared streams. A scenario is                                performance holdout is evaluated separately. The recorded 128
+a transformation of an ordered stream, not a random label                                field is therefore not a total-label-exposure count. Replay ex-
+VOLUME XX, 2026                                                                                                                                                                 23
+                                                                                                  Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 22. Dataset characteristics and intended stress properties.
+
+
+       Dataset                                    Stream role                                   Main stress property
+       CIC-IDS2017                                Enterprise benchmark                          Multiple attack families and benign variability
+       NF-BoT-IoT-v3                              Botnet/DoS NetFlow benchmark                  Localized botnet and denial-of-service changes
+       NF-CSE-CIC-IDS2018-v3                      Enterprise/IoT NetFlow variant                Heterogeneity with high aggregate separability
+       NF-ToN-IoT-v3                              Telemetry-rich IoT benchmark                  Difficult evolving traffic composition
+       NF-UNSW-NB15-v3                            Heterogeneous modern-flow benchmark           Ceiling performance and small residual gaps
+
+
+TABLE 23. Scenario design with temporal behavior, expected failure mode, and DASP diagnostic.
+
+
+ Scenario                    Temporal behavior                             Expected challenge                           Diagnostic emphasis
+ S0                          No deliberate regime change                   Unnecessary plasticity                       Background-mode stability
+ S1-Sudden                   Abrupt transition                             Detection latency                            Immediate attribution
+ S2-Gradual                  Distributed transition                        Ambiguous attribution                        Score persistence and worst cell
+ S3-Incremental              Several smaller changes                       Repeated repairs                             Replay and cumulative forgetting
+ S4-Recurrent                Return of a prior regime                      Overwriting and recovery                     Replay-conflict behavior
+ S5-Blip                     Brief transient regime                        Overreaction                                 Emergency/background mode behavior
+ S6-Combined                 Compound transformation                       Interacting drift signals                    Module-count budget
+ S7-Local-Low                Weak local change                             Low signal-to-noise ratio                    Positive sparse repair
+ S7-Local-Medium             Moderate local change                         Boundary movement                            Attribution precision
+ S7-Local-High               Strong local change                           Multiple-module activation                   Top-k limitation
+
+
+
+
+amples remain historical memory rather than new supervision.                  3:   Ŷt ← fΘt (Xt ); emit predictions before label access.
+A strict supervision-matched confirmation requires a rerun in                 4:   Compute Et = (rt , st , Dt ) using the current window
+which every method follows one common label-access and                             and reference snapshot.
+holdout contract.                                                             5:   Push (Wt , Ŷt , Et ) into Q.
+                                                                              6:   if labels are available for τ = t − 1 then
+APPENDIX E PREDICTION-FIRST STATE MACHINE                                     7:       Pop (Wτ , Ŷτ , Eτ ) and restore rτ , sτ , Dτ .
+The prediction-first contract is indexed by the outer iteration t             8:       Split the delayed window into repair pool and disjoint
+and delayed repair index τ = t −1. The model first predicts Wt ,                       performance holdout.
+computes representation evidence Et , and enqueues the current                9:       Use repair-pool labels to construct class-balanced
+item. It then receives Yτ , restores the queued evidence Eτ                            Cτnew with at most 128 training examples; draw
+associated with the same delayed window, computes module-                              Bmem
+                                                                                         τ    .
+wise gradient conflict, and selects triggered attributed repair,             10:       Compute cj,τ from Cτnew and Bmem    τ     gradients.
+performance-gated emergency repair, or background local                      11:       if stored MMD decision Dτ triggers then
+consolidation. This textual state machine replaces the older                 12:           Set pj,τ = rj,τ /(1 + cj,τ ) and route positive top-k
+auxiliary diagram so that Figure 1 remains the single canonical                            modules.
+algorithm figure.                                                            13:       else if Fτhold < 0.80 then
+                                                                             14:           Route top-k conflicts for performance-gated emer-
+A. STATE TRANSITION CONDITIONS                                                             gency repair.
+                                                                             15:       else
+The current-window prediction and evidence computation are
+                                                                             16:           Route top-k conflicts for background local consol-
+unconditional and occur before access to Yt . The delayed tran-
+                                                                                           idation.
+sition is controlled by the fixed one-window queue. Triggered
+                                                                             17:       end if
+attributed repair is controlled by the stored MMD decision Dτ ;                                     eτ = Cτnew ∪ Bmem
+                                                                             18:       Construct C                       τ    with new-sample
+within that path, conflict attenuates the stored requirement.
+                                                                                       weight 3.
+When Dτ does not trigger, delayed-label performance-holdout
+                                                                             19:       Exclude all Θj , j ∈ / Aτ , from AdamW; train active
+Macro-F1 selects emergency or background local repair.
+                                                                                       modules and classifier.
+   After the routed update, the repair-training subset is added
+                                                                             20:       Update memory and audit; refresh the enabled refer-
+to bounded memory, the enabled reference state is refreshed
+                                                                                       ence state using Wτ .
+from the applied model and Wτ , and the routing record is
+                                                                             21:       Store the updated model for subsequent windows;
+stored. The evaluated DASP procedure does not implement
+                                                                                       no candidate rollback is executed.
+post-update candidate rejection or rollback.
+                                                                             22:   end if
+                                                                             23: end for
+B. EXPANDED PSEUDOCODE
+ 1: Initialize fΘ , Href , memory M, queue Q, and audit log.                   The pseudocode makes two implementation details explicit.
+ 2: for outer iteration t = 1, . . . , T with current window Wt             First, delayed-label access occurs after prediction, not merely
+     do                                                                     after feature extraction; the 128-example value bounds the
+24                                                                                                                                            VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+optimization subset rather than total observed labels. Second,     the other methods in the locked implementation. The practical
+the optimizer parameter list changes per repair. A post-hoc        implication is that a deployment must choose whether the
+mask applied to gradients would not by itself guarantee            critical resource is inference latency or adaptation latency. A
+protection from optimizer state or weight decay.                   future optimized implementation could fuse the four branches
+                                                                   for prediction while retaining separate parameter groups for
+APPENDIX F STATISTICAL AUDIT OF PAIRED RESULTS                     repair, or could use sparse module execution when the router
+The primary comparison contains 500 paired DASP–SSF cells.         predicts that some groups are inactive for a known traffic class.
+The distribution of paired Macro-F1 gaps is asymmetric but
+centered above zero. The minimum gap is approximately              A. UPDATE-TIME INTERPRETATION
+−0.0900, the first quartile is approximately +0.0002, the me-      The mean update time includes all update intervals. This
+dian is +0.0032, the third quartile is approximately +0.0131,      includes discrepancy calculation, replay sampling, localized
+and the maximum is approximately +0.0684. The quartiles            training, performance-holdout evaluation on the no-trigger
+show that the positive mean is not caused only by a single         path, and any emergency path. Reporting the mean alone can
+extreme win, while the negative minimum confirms that              hide the effect of mode-dependent work, so the median and
+individual failures remain operationally relevant.                 maximum are included in Table 25. The maximum DASP
+   The gradient-evaluation distribution is especially inter-       update time is larger than its mean because a small number of
+pretable. SSF uses 512 evaluations in each paired cell under       difficult cells invoke extra work. The same pattern is present
+the locked protocol, whereas DASP is usually at 320 and            for SSF, but its entire distribution is shifted upward under the
+occasionally increases to 410 when the repair path requires        locked schedule.
+additional work. The cost reduction is therefore not an artifact
+of a few unusually fast cells. It follows from the module mask     B. MEMORY INTERPRETATION
+and the bounded repair schedule.                                   The replay capacity is 1,024 records, while a DASP repair uses
+                                                                   512 records. The memory payload reported in the summary is
+A. MULTIPLE-COMPARISON DISCIPLINE                                  therefore bounded and does not grow with stream length. Peak
+The sign test, paired t-test, and Wilcoxon test are used as        RSS is affected by the runtime, tensor allocations, and file
+complementary analyses of the same primary paired com-             loading, so it is interpreted as an engineering diagnostic rather
+parison. They should not be presented as three independent         than a pure model-size measure. The manuscript reports it to
+discoveries. The sign test is the most robust headline test        make the resource trade-off visible, not to claim a universal
+because it uses only the direction of each paired difference.      memory advantage.
+The other tests provide sensitivity to magnitude and rank
+structure. Exploratory dataset- and scenario-level comparisons     APPENDIX H REPRODUCTION AND ARCHIVAL GUIDE
+are descriptive and should be interpreted with Holm correction     A complete reproduction requires four components: chronolog-
+if formal claims are made across many groups.                      ically prepared streams, the locked experimental configuration,
+                                                                   executable method implementations, and row-level plus ag-
+B. WHAT IS NOT TREATED AS INDEPENDENT                              gregate analysis records. The archival release should provide
+The 16,000 window-level repair records are not counted as          these components together with instructions for reproducing
+16,000 independent hypothesis tests. They are used to verify       the confirmation matrix, statistical comparisons, tables, and
+structural invariants and diagnose routing behavior. Likewise,     figures.
+the 4,000 runs are not treated as 4,000 independent samples
+for the DASP–SSF superiority claim; the paired claim uses the      A. RECOMMENDED EXECUTION ORDER
+500 cells containing both methods. This distinction prevents       The archival sequence should begin with a small-scale evalua-
+pseudo-replication and keeps the inferential unit aligned with     tion on one dataset, one scenario, one stream seed, one model
+the experimental design.                                           seed, and all methods. This initial evaluation verifies software
+                                                                   availability, configuration resolution, prediction ordering, run-
+APPENDIX G PERFORMANCE AND MEMORY AUDIT                            record structure, and basic metric calculation. The full pilot
+The performance results have three distinct layers. Prediction     then covers five datasets, ten scenarios, three stream seeds,
+throughput measures the rate at which a trained model can          one model seed, and eight methods. Only after the full pilot is
+score flows. Adaptation time measures the cost of processing       complete should the confirmation be executed with five stream
+delayed labels and updating the state. Memory and resident-        seeds and two model seeds. The confirmation records are then
+set measurements describe the operating footprint. A method        frozen before manuscript tables are regenerated.
+can be favorable on one layer and unfavorable on another;
+therefore no single scalar efficiency score is reported.           B. FAILURE HANDLING
+   DASP’s throughput penalty is an architectural consequence       A failed run should be marked invalid and repeated from the
+of computing four module branches and a fusion classifier.         same clean seed rather than silently replaced by a partial
+It should not be described as a memory penalty: the model          summary. If a machine-level failure occurs, the evaluation
+parameter footprint and memory payload are comparable to           procedure should retain a diagnostic record and the resolved
+VOLUME XX, 2026                                                                                                                  25
+                                                                                                                  Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 24. Distribution audit for the 500 paired DASP–SSF Macro-F1 gaps.
+
+
+                                     Statistic              Minimum            Q1     Median              Q3      Maximum           Mean
+                                     Macro-F1 gap            -0.0900       0.0002     0.0032       0.0131              0.0684      0.0078
+
+
+TABLE 25. Paired adaptation-cost distribution across the same 500 cells.
+
+
+                                 Metric and method                 Minimum            Q1       Median            Q3     Maximum         Mean
+                                 DASP update seconds                      1.248     1.319        1.357         1.404            5.750   1.415
+                                 SSF update seconds                       2.428     2.514        2.591         2.680            9.229   2.683
+                                 DASP gradient evaluations                  320       320          320           320              410   328.7
+                                 SSF gradient evaluations                   512       512          512           512              512   512.0
+
+
+TABLE 26. Confirmation-level performance summary by method.
+
+
+                        Method                   Macro-F1     Update s      Throughput      Grad. eval.    Memory payload          Peak RSS increment
+                        DASP                       0.9269       1.415          159,219           328.7                 320 KB                28.6 MB
+                        SSF                        0.9191       2.683          455,279           512.0                 320 KB                28.9 MB
+                        Experience Replay          0.9036       0.546          461,493           192.0                 320 KB                28.4 MB
+                        RepShield                  0.8881       0.946          464,789           128.0                 320 KB                30.1 MB
+                        A-GEM                      0.8821       0.495          464,700           128.0                 320 KB                29.1 MB
+                        Online MLP                 0.8751       0.222          464,101            64.0                 320 KB                31.1 MB
+                        Online EWC                 0.8751       0.396          454,905            64.0                 320 KB                28.9 MB
+                        CDDA-MD                    0.7973       0.038          458,585             2.7                 320 KB                27.9 MB
+
+
+TABLE 27. Archival artifact map.
+
+
+     Artifact                                                            Function                                                 Validation use
+     Chronologically prepared streams                                    Ordered windows and labels                               Verify chronology and feature count
+     Stream metadata records                                             Seed and scenario metadata                               Verify pairing and experimental-cell
+                                                                                                                                  identity
+     Locked experimental configuration                                   Fixed hyperparameters                                    Verify method contract
+     Run summaries                                                       One row per method/cell                                  Recompute aggregates
+     Paired cell-level comparison                                        DASP–SSF join                                            Recompute tests and quantiles
+     Protocol-level confirmation record                                  Run-count and invariant audit                            Verify 4,000-run matrix
+     Generated figures                                                   Visual result summaries                                  Verify plotted aggregates
+     LaTeX source                                                        Manuscript and equations                                 Recompile article
+
+
+
+configuration. A result should not enter the paired analysis                                model seeds and stream seeds provide replication but do not
+unless both DASP and SSF completed the same cell. This rule                                 exhaust preprocessing, architecture, or hardware variability.
+is essential for preserving the meaning of the win count.                                   These limitations define the next experiments rather than being
+                                                                                            reasons to reinterpret the current result.
+C. REPORTING CHECKLIST                                                                         The causal router ablation is particularly important for
+Before submission, the authors should replace metadata                                      a journal extension. The current evidence shows that the
+placeholders, verify all dataset licenses, archive the exact                                implementation is structurally local and that the final method
+software environment, record the CPU model, and confirm                                     performs well. It does not isolate the contribution of the
+that the final PDF uses the same result files as the source                                 representation discrepancy, supervised conflict, or top-k mask
+tables. The manuscript should also retain the negative cell and                             separately. A causal ablation would preserve the same replay,
+the throughput limitation. Removing either would make the                                   performance-gate, top-k, label, and optimization budgets while
+narrative less credible, even if the page count became shorter.                             comparing random top-k, fixed-module, MMD-only, conflict-
+                                                                                            only, and combined attribution routing. An all-module variant
+APPENDIX I EXTENDED LIMITATIONS AND FUTURE                                                  should be reported separately as a locality ablation because it
+EXPERIMENTS                                                                                 removes the top-k structural constraint. Such an experiment
+The confirmation establishes a useful but bounded result.                                   would turn the attribution narrative from a plausible mecha-
+The streams are controlled chronological artifacts rather than                              nism into a directly tested causal claim.
+a live multi-site deployment. The feature partition is fixed                                   The natural-stream experiment is equally important for
+and contiguous, so the modules are operational subspaces                                    deployment. Controlled scenarios provide clean diagnostic
+rather than guaranteed semantic concepts. The binary label                                  contrast, but operators encounter changes in service mix,
+space does not test retention of individual attack families. The                            routing policy, benign workload, and attack tooling that do
+26                                                                                                                                                          VOLUME XX, 2026
+Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+TABLE 28. Prioritized future experiment matrix.
+
+
+  Experiment                                  Manipulation                                      Primary outcome                                 Priority
+  Adaptive k                                  k ∈ {1, 2, 3, 4} by uncertainty                   Accuracy versus active-module fraction          High
+  Learned grouping                            Replace contiguous groups with learned groups     Attribution stability                           High
+  Causal router ablation                      Shuffle or mask router scores                     Accuracy loss and locality                      High
+  Natural streams                             Replace controlled scenarios with chronological   External validity                               High
+                                              sites
+  Multi-class retention                       Attack-family labels and open-set attacks         Class-wise forgetting                           High
+  Sparse inference                            Skip inactive prediction branches                 Throughput recovery                             Medium
+  Label noise                                 Corrupt delayed labels at several rates           Performance-gate robustness                     Medium
+  Hardware scaling                            CPU/GPU and batch-size sweep                      Systems portability                             Medium
+
+
+
+
+not fit a single synthetic taxonomy. A natural-stream study                             [11] J. Kirkpatrick, R. Pascanu, N. Rabinowitz et al., ‘‘Overcoming catastrophic
+should keep the prediction-first and delayed-label rules, report                             forgetting in neural networks,’’ Proceedings of the National Academy of
+                                                                                             Sciences, vol. 114, no. 13, pp. 3521–3526, 2017.
+site-level pairing, and treat collection site as a higher-level                         [12] X. Zhang, R. Zhao, Z. Jiang, H. Chen, Y. Ding, E. C. H. Ngai, and S.-
+replication factor. It should not simply concatenate all data                                H. Yang, ‘‘Continual learning with strategic selection and forgetting for
+and call the result ‘‘realistic.’’                                                           network intrusion detection,’’ in IEEE INFOCOM 2025—IEEE Conference
+                                                                                             on Computer Communications, 2025.
+   Finally, the throughput limitation should be treated as an en-                       [13] Y. Liu, W. Niu, H. Li, M. He, X. Ding, J. Gong, R. Yan, Z. Li, and X. Zhang,
+gineering target. The current architecture executes all branches                             ‘‘RepShield: Robust knowledge representation in continual learning for
+to obtain attribution-ready representations. A production ver-                               network intrusion detection,’’ Computer Networks, vol. 283, p. 112308,
+                                                                                             2026.
+sion could maintain a full-resolution path during adaptation                            [14] J. Pfeiffer, A. Kamath, A. Rücklé, K. Cho, and I. Gurevych, ‘‘Adapterfusion:
+and a fused inference path between repairs. The correctness                                  Non-destructive task composition for transfer learning,’’ in Proceedings
+condition would be that fusion does not change the logits                                    of the 16th Conference of the European Chapter of the Association for
+                                                                                             Computational Linguistics, 2021, pp. 2439–2455.
+used for the reported predictions, or that any approximation is                         [15] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and
+measured as a separate deployment variant.                                                   W. Chen, ‘‘LoRA: Low-rank adaptation of large language models,’’ in
+                                                                                             International Conference on Learning Representations, 2022. [Online].
+                                                                                             Available: https://openreview.net/forum?id=nZeVKeeFYf9
+REFERENCES                                                                              [16] Y.-C. Chen et al., ‘‘DyLoRA: Parameter efficient tuning of pre-trained
+ [1] S. Arora, R. Rani, and N. Saxena, ‘‘A systematic review on detection                    models using dynamic search-free low-rank adaptation,’’ in International
+     and adaptation of concept drift in streaming data using machine learning                Conference on Learning Representations, 2023. [Online]. Available:
+     techniques,’’ WIREs Data Mining and Knowledge Discovery, vol. 14, no. 4,                https://openreview.net/forum?id=3ZeR4f8sfX4
+     p. e1536, 2024.                                                                    [17] M. Baena-García, J. del Campo-Ávila, R. Fidalgo, A. Bifet, R. Gavaldà, and
+ [2] J. Li, H. Yu, Z. Zhang, X. Luo, and S. Xie, ‘‘Concept drift adaptation by               R. Morales-Bueno, ‘‘Early drift detection method,’’ in Proceedings of the
+     exploiting drift type,’’ ACM Transactions on Knowledge Discovery from                   4th International Workshop on Knowledge Discovery from Data Streams,
+     Data, vol. 18, no. 4, pp. 1–22, 2024.                                                   2006, pp. 77–86.
+ [3] G. J. Aguiar and A. Cano, ‘‘A comprehensive analysis of concept drift              [18] A. Bifet and R. Gavaldà, ‘‘Learning from time-changing data with adaptive
+     locality in data streams,’’ Knowledge-Based Systems, vol. 289, p. 111535,               windowing,’’ in Proceedings of the 2007 SIAM International Conference
+     2024.                                                                                   on Data Mining, 2007, pp. 443–448.
+ [4] D. Lukats, O. Zielinski, A. Hahn, and F. Stahl, ‘‘A benchmark and survey           [19] A. Gretton, K. M. Borgwardt, M. J. Rasch, B. Schölkopf, and
+     of fully unsupervised concept drift detectors on real-world data streams,’’             A. Smola, ‘‘A kernel two-sample test,’’ Journal of Machine Learning
+     International Journal of Data Science and Analytics, vol. 19, no. 1, pp.                Research, vol. 13, pp. 723–773, 2012. [Online]. Available: https:
+     1–31, 2025.                                                                             //www.jmlr.org/papers/v13/gretton12a.html
+ [5] B. Csaba, W. Zhang, M. Müller, S.-N. Lim, M. Elhoseiny, P. H. S.                   [20] A. H. Ali, M. Charfeddine, B. Ammar, B. B. Hamed, F. Albalwy, A. Alqarafi,
+     Torr, and A. Bibi, ‘‘Label delay in online continual learning,’’ in                     and A. Hussain, ‘‘Unveiling machine learning strategies and considerations
+     Advances in Neural Information Processing Systems, vol. 37, 2024.                       in intrusion detection systems: A comprehensive survey,’’ Frontiers in
+     [Online]. Available: https://proceedings.neurips.cc/paper_files/paper/2024/             Computer Science, vol. 6, p. 1387354, 2024.
+     hash/d8f5f134febb4bd74d8f79e338de382c-Abstract-Conference.html                     [21] N. Moustafa and J. Slay, ‘‘UNSW-NB15: a comprehensive data set for
+ [6] A. S. Palli, J. Jaafar, A. R. Gilal, A. Alsughayyir, H. M. Gomes, A. Al-                network intrusion detection systems,’’ in Military Communications and
+     shanqiti, and M. Omar, ‘‘Online machine learning from non-stationary data               Information Systems Conference, 2015, pp. 1–6.
+     streams in the presence of concept drift and class imbalance: A systematic         [22] I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ‘‘Toward generating
+     review,’’ Journal of Information and Communication Technology, vol. 23,                 a new intrusion detection dataset and intrusion traffic characterization,’’
+     no. 1, pp. 105–139, 2024.                                                               Proceedings of the 4th International Conference on Information Systems
+ [7] W. Chen, K. Yang, Z. Yu, Y. Shi, and C. L. P. Chen, ‘‘A survey on imbalanced            Security and Privacy, pp. 108–116, 2018.
+     learning: Latest research, applications and future directions,’’ Artificial        [23] N. Moustafa, ‘‘A new distributed architecture for evaluating ai-based security
+     Intelligence Review, vol. 57, no. 6, p. 137, 2024.                                      systems at the edge: Network ton-iot telemetry dataset,’’ Sustainable Cities
+ [8] L. Wang, X. Zhang, H. Su, and J. Zhu, ‘‘A comprehensive survey of continual             and Society, vol. 61, p. 102238, 2020.
+     learning: Theory, method and application,’’ IEEE Transactions on Pattern           [24] S. Layeghy and M. Portmann, ‘‘Nf-uq-nids-v2: A network flow dataset for
+     Analysis and Machine Intelligence, vol. 46, no. 8, pp. 5362–5383, 2024.                 network intrusion detection systems,’’ Data, vol. 7, no. 8, p. 103, 2022.
+ [9] S. K. Amalapuram, S. Channappayya, and B. R. Tamma, ‘‘Augmented mem-               [25] M. Luay, S. Layeghy, S. Hosseininoorbin, M. Sarhan, N. Moustafa,
+     ory replay-based continual learning approaches for network intrusion detec-             and M. Portmann, ‘‘Temporal analysis of NetFlow datasets for network
+     tion,’’ in Advances in Neural Information Processing Systems, vol. 36, 2023.            intrusion detection systems,’’ 2025. [Online]. Available: https://arxiv.org/
+     [Online]. Available: https://proceedings.neurips.cc/paper_files/paper/2023/             abs/2503.04404
+     hash/3755a02b1035fbadd5f93a022170e46f-Abstract-Conference.html                     [26] University of Queensland, ‘‘Machine learning-based network intrusion
+[10] A. Chaudhry, M. Ranzato, M. Rohrbach, and M. Elhoseiny, ‘‘Efficient                     detection system datasets,’’ Dataset portal, 2025, accessed: 2026-07-26.
+     lifelong learning with A-GEM,’’ in International Conference on Learning                 [Online]. Available: https://staff.itee.uq.edu.au/marius/NIDS_datasets/
+     Representations, 2019. [Online]. Available: https://openreview.net/forum?          [27] M. T. Ribeiro, S. Singh, and C. Guestrin, ‘‘Why should i trust you?
+     id=Hkf2_sC5FX                                                                           explaining the predictions of any classifier,’’ in Proceedings of the 22nd
+
+VOLUME XX, 2026                                                                                                                                                        27
+                                                                                     Author Name: Drift-Attributed Subspace Plasticity for NIDS
+
+
+
+     ACM SIGKDD International Conference on Knowledge Discovery and Data
+     Mining, 2016, pp. 1135–1144.
+[28] S. M. Lundberg and S.-I. Lee, ‘‘A unified approach to interpreting model
+     predictions,’’ in Advances in Neural Information Processing Systems, vol. 30,
+     2017.
+[29] G. Schwalbe and B. Finzel, ‘‘A comprehensive taxonomy for explainable
+     artificial intelligence: A systematic survey of surveys on methods and
+     concepts,’’ Data Mining and Knowledge Discovery, vol. 38, no. 5, pp. 3043–
+     3101, 2024.
+[30] O. Rainio, J. Teuho, and R. Klén, ‘‘Evaluation metrics and statistical tests
+     for machine learning,’’ Scientific Reports, vol. 14, no. 1, p. 6086, 2024.
+
+
+
+
+28                                                                                                                             VOLUME XX, 2026
+

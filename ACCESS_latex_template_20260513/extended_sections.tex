@@ -1,0 +1,392 @@
+\section{Detailed Method and Structural Invariants}
+\label{sec:detailed-method}
+
+Section~\ref{sec:method} is the canonical method definition. This section retains only operational lifecycle details and structural properties needed to audit that definition; it does not introduce a second algorithm.
+
+\subsection{Calibration and reference lifecycle}
+After warm-up, the evaluation procedure creates a frozen copy of the fitted model as the reference snapshot. The reference representation bank is extracted from the final warm-up window. The four calibration representation sets are then produced by that same frozen model on the last four warm-up windows, and each calibration MMD compares the fixed final-window bank with one calibration-window set. The robust median/MAD statistics are therefore based on a fixed reference, not leave-one-window-out calibration or independent resampling.
+
+Reference refresh is enabled in the locked confirmation. After every applied primary DASP repair, the updated predictor is copied to form the new reference snapshot, the reference bank is recomputed on the delayed repaired window, and the recent-window calibration statistics are recomputed. The primary procedure has no candidate rejection or rollback stage.
+
+\subsection{Delayed supervision and repair modes}
+At outer iteration $t$, the online procedure predicts $W_t$, computes $\mathcal E_t$, and stores both in the pending queue. It then repairs $\tau=t-1$ only after $Y_{\tau}$ arrives, using the stored $\mathcal E_{\tau}$ and newly computed module conflicts $c_{j,\tau}$. The labeled delayed window is split into a 75\% repair pool and 25\% holdout; repair-pool labels select at most 128 class-balanced training examples. Thus, 128 bounds training, not total label exposure.
+
+The triggered mode uses positive top-$k$ values of $p_{j,\tau}=r_{j,\tau}/(1+c_{j,\tau})$ for two epochs. If MMD does not trigger, holdout Macro-F1 below 0.80 selects the three-epoch performance-gated emergency mode with plasticity $\min\{1,\max(0.25,c_{j,\tau})\}$; otherwise background local consolidation uses plasticity 0.25 for two epochs. Both no-trigger modes rank up to three modules by conflict and retain the deterministic fallback specified by the protocol. The classifier remains trainable at multiplier 1 on the base learning rate.
+\subsection{Proof sketches for structural properties}
+The first property is inactive-module invariance. Let $\Theta_j$ be the parameter set of an inactive module and let the optimizer parameter list exclude $\Theta_j$. No gradient update is applied to $\Theta_j$. Since the weight-decay term is also implemented by the optimizer, it is not applied either. Therefore, conditional on no external state mutation, $\Theta_j^{t+1}=\Theta_j^t$. This is stronger than a soft regularizer, which only penalizes movement.
+
+The second property is bounded plasticity. Since $\mathcal A_t=\operatorname{TopK}(a_t,k)$ and $k=3<M=4$, at most three representation modules can be trainable in a repair. The classifier is shared and explicitly exempted from the module count. The implementation records the active set, so the bound can be verified from logs rather than inferred from the configuration.
+
+The third property is bounded memory exposure. Each repair samples at most 512 replay records and at most 128 repair-training labels. The optimization set is therefore bounded by 640 examples before internal batching; the separate 25\% delayed-label performance holdout is evaluated outside this training set. This prevents a long stream from silently increasing the per-window training set. The memory itself is capped at 1,024 records and maintained with class balancing.
+
+\subsection{Complexity accounting}
+Let $P_j$ be the parameter count of module $j$, $P_c$ the classifier parameter count, $B_r$ the replay size, $B_n$ the new-label budget, and $E_t$ the number of repair epochs. The trainable parameter count for a repair is
+\begin{equation}
+ P_t=P_c+\sum_{j\in\mathcal A_t}P_j,
+\end{equation}
+while the full model count is $P=P_c+\sum_jP_j$. The structural trainable fraction is $\rho_t=P_t/P$. The observed gradient-evaluation count additionally depends on the number of applied repairs, batch size, and emergency repairs. This is why the manuscript reports both a parameter-locality invariant and measured gradient evaluations. A low nominal parameter fraction would be insufficient if the router triggered many more epochs.
+
+\subsection{Interpretability as an intervention record}
+DASP does not claim that a selected module is a human-semantic feature such as ``port behavior'' without a separate feature audit. Its interpretability claim is narrower and testable: the method can report which parameterized subspaces were allowed to change for a particular drift episode. The record can be joined with the corresponding stream window, scenario label, repair mode, and post-repair metrics. This is closer to an intervention trace than to post-hoc attribution. Feature-level tools such as LIME and SHAP remain complementary because they explain individual predictions rather than the optimizer's repair scope.
+
+\section{Dataset Construction and Stream Semantics}
+\label{sec:stream-semantics}
+
+\subsection{Dataset roles}
+The five datasets serve different stress roles. CIC-IDS2017 provides enterprise traffic with several attack families and a commonly used reference point. NF-BoT-IoT-v3 stresses botnet and denial-of-service behavior in a NetFlow representation. NF-CSE-CIC-IDS2018-v3 provides a higher-performing but still heterogeneous enterprise/IoT setting. NF-ToN-IoT-v3 emphasizes telemetry-rich traffic and remains one of the harder datasets in the confirmation. NF-UNSW-NB15-v3 is a heterogeneous benchmark in which several methods approach a performance ceiling. These roles are not interchangeable: a method that wins on a saturated dataset may not be robust under a difficult gradual drift.
+
+The prepared streams preserve the chronological order used by the experiment. Accompanying metadata identify the dataset, scenario, stream seed, feature count, window count, warm-up interval, and class statistics. The evaluation procedure processes one stream at a time and records a summary only after the prediction-first loop completes. No summary from a future stream or model seed is visible to the online learner.
+
+\subsection{Window protocol}
+Each confirmation stream is divided into 36 windows of 4,096 flows. Four warm-up windows establish the initial representation reference and classifier state. For a non-warm-up window $W_t$, the system first computes predictions and records the outputs. Only after the one-window delay are labels used for adaptation. Primary DASP splits the labeled delayed window 75/25 into repair and holdout partitions, then selects at most 128 class-balanced repair examples. The next window can therefore be influenced by $W_t$ labels, but the prediction on $W_t$ is never influenced by its own labels.
+
+This ordering has three consequences. It increases realism relative to train-before-predict evaluation. It makes the delayed-supervision path an explicit part of the method contract. It also means that an early routing mistake can affect later windows, which is why the paired stream-level unit is more meaningful than treating each window as an independent test sample.
+
+\subsection{Ten scenario definitions}
+The primary evaluation includes one stationary control and nine drift conditions. S0 is the stable control stream and tests whether adaptation damages a model without a deliberate distribution change. S1-Sudden introduces an abrupt regime change. S2-Gradual spreads the transition across multiple windows. S3-Incremental applies a sequence of smaller changes. S4-Recurrent revisits a previously observed regime. S5-Blip inserts a transient episode followed by recovery. S6-Combined composes more than one drift pattern. S7-Local-Low, S7-Local-Medium, and S7-Local-High vary the intensity of a localized class-conditional change. The three local variants are especially important for DASP because they test whether increasing local severity expands the routed set or merely increases the update magnitude.
+
+The complete dataset--scenario pairing is visualized in Fig.~\ref{fig:experiment-matrix}. This matrix is both a design diagram and an analysis map: every cell represents five stream seeds and two model seeds, and the color encodes the paired DASP--SSF Macro-F1 gap after aggregation. The figure therefore connects the controlled scenario taxonomy to the confirmation evidence without collapsing the study into a single mean.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{dasp_experiment_matrix}
+\caption{Confirmation design and paired performance map. Rows are datasets, columns are the ten primary scenarios, and each cell aggregates five stream seeds and two model seeds.}
+\label{fig:experiment-matrix}
+\end{figure*}
+
+\begin{table}[t]
+\caption{Primary scenario semantics and expected adaptation pressure.}
+\label{tab:scenario-semantics}
+\centering
+\scriptsize
+\begin{tabular}{p{0.22\columnwidth}p{0.62\columnwidth}}
+\toprule
+Scenario & Operational interpretation\\
+\midrule
+S0 & Stationary control; penalizes unnecessary updates.\\
+S1-Sudden & Abrupt regime replacement; tests fast detection and repair.\\
+S2-Gradual & Slow transition; tests attribution ambiguity and delayed response.\\
+S3-Incremental & Multiple small changes; tests repeated bounded repairs.\\
+S4-Recurrent & Previously seen regime returns; tests retention and recovery.\\
+S5-Blip & Short transient event; tests whether repair overreacts.\\
+S6-Combined & Compound drift; tests interaction of mechanisms.\\
+S7-Local-Low & Low-intensity local class-conditional change.\\
+S7-Local-Medium & Medium-intensity local class-conditional change.\\
+S7-Local-High & High-intensity local class-conditional change.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Seed structure and pairing}
+The stream seeds are 2001, 2002, 2003, 2101, and 2102. The model seeds are 91 and 92. For a fixed dataset, scenario, stream seed, and model seed, all eight methods receive the same prepared stream, temporal delay, and initial seed assignment, but the audited label-selection and holdout semantics are method specific. The DASP--SSF comparison is therefore paired at the cell level. The 500 paired cells arise from five datasets, ten scenarios, five stream seeds, and two model seeds. The full 4,000-run count includes all eight methods; it is not a count of independent datasets.
+
+\subsection{Fairness controls}
+The methods are locked before the confirmation run. The warm-up length is four windows, the prepared-stream window size is 4,096, and CPU execution uses one thread. All paths record 128 new training examples per update, but label access differs: DASP uses labeled balanced selection plus a 25\% holdout, SSF selects after label access, and budget-matched comparators query uniformly without labels. Total label exposure is therefore unequal. SSF retains its configured sample-selection and forgetting-protection strategy. Experience Replay, A-GEM, Online EWC, RepShield, Online MLP, and CDDA-MD are included because they represent replay, gradient projection, regularization, representation protection, direct online learning, and distributional detection families. DASP is not compared to a deliberately weakened SSF implementation; both use the same prediction-first delay, prepared streams, and seeds, while the supervision-accounting exception is disclosed separately.
+
+\section{Evaluation Contract and Statistical Analysis}
+\label{sec:evaluation-contract}
+
+\subsection{Predictive metrics}
+For a binary task, the per-window Macro-F1 is the arithmetic mean of the F1 score for the benign and attack classes. If $F_1^{(0)}$ and $F_1^{(1)}$ are the class-specific scores, then
+\begin{equation}
+ \operatorname{MacroF1}_t=\frac{F_1^{(0)}+F_1^{(1)}}{2}.
+\end{equation}
+Macro-F1 is the primary metric because accuracy can be dominated by benign traffic. Cumulative attack recall and cumulative false-negative rate are reported as operational safety measures. Online forgetting is computed by comparing historical behavior after each update with the corresponding pre-update reference. Window stability Macro-F1 summarizes the consistency of predictions across the stream rather than only the final aggregate.
+
+\subsection{Cost and performance metrics}
+Adaptation time is measured as the sum of update intervals, excluding data loading and stream preparation. Median update time is reported because a mean can be dominated by emergency repairs. Gradient evaluations count the optimizer-equivalent forward/backward evaluations recorded during the experiment. Prediction throughput is measured separately in flows per second. This distinction prevents a method from appearing efficient merely because it performs almost no adaptation. Memory payload, model parameter bytes, and peak resident-set increment are included to expose deployment costs.
+
+\subsection{Paired inference}
+Let $d_i=\operatorname{MacroF1}_{i}^{\mathrm{DASP}}-\operatorname{MacroF1}_{i}^{\mathrm{SSF}}$ for paired cell $i$. The primary summaries are $\bar d$, the median of $d_i$, the number of positive differences, and the number of cells within $\pm0.01$. The sign test evaluates whether the probability of a positive difference is one half. The paired $t$-test is used as a sensitivity analysis for the mean, while the Wilcoxon signed-rank test probes whether the signed-rank distribution is displaced from zero. These tests are not applied to individual windows because windows within one stream are serially dependent.
+
+The confirmation result is therefore interpreted at the stream/model-seed cell level. A positive aggregate does not imply universal dominance. The worst cell is reported explicitly, and the scenario and dataset tables preserve the distributional context. This reporting choice is aligned with the goal of evaluating a deployment mechanism rather than selecting only the most favorable windows.
+
+\subsection{Effect size and uncertainty reporting}
+The mean gap is accompanied by the win count and sensitivity p-values. In a future archival release, the stored paired cell-level records can additionally support percentile bootstrap intervals over the 500 cells, with resampling performed at the paired-cell level. Resampling at the window level would understate uncertainty because it treats repeated observations from a single stream as independent. The present analysis keeps the exact confirmation values as the primary claim and treats any resampling interval as supplementary.
+
+\section{Expanded Confirmation Results}
+\label{sec:expanded-results}
+
+The compact result table in Section~\ref{sec:results} gives the headline comparison. The tables in this section expose the structure behind that headline. They are generated from the stored 4,000-row summary rather than manually transcribed. Consequently, readers can reproduce every displayed aggregate by grouping the public summary by dataset, scenario, and method.
+
+\input{extended_tables.tex}
+
+\subsection{Dataset-by-method pattern}
+Table~\ref{tab:dataset-method-f1} shows that DASP is not supported by a single favorable dataset. Its strongest practical separation from SSF occurs on NF-BoT-IoT-v3, where the mean gap is approximately $+0.0215$. The gap is smaller on NF-UNSW-NB15-v3 because several methods are near a ceiling. This pattern is important for interpretation: a high mean over all datasets could otherwise be driven by one easy benchmark. DASP also remains ahead on the harder NF-ToN-IoT-v3 setting, although the margin is modest.
+
+The matrix shows a second pattern. Experience Replay is the strongest non-DASP baseline in aggregate, which is expected because replay supplies historical context without requiring a modular backbone. However, its update cost is lower partly because it uses a simpler update rule. DASP's contribution is not simply to minimize update time; it combines replay with an explicit constraint on where replay gradients can change the model. SSF remains the closest accuracy comparator and the appropriate primary baseline for the paired claim.
+
+\subsection{Dataset-level cost and accuracy}
+Table~\ref{tab:dataset-cost-detail} separates the accuracy gap from the systems ratio. DASP's update speedup remains above 1.7 across all five datasets, and the gradient reduction remains close to 1.5 or higher. The stable cost ratio suggests that the benefit is architectural rather than a consequence of one unusually short stream. The largest speedup appears on NF-UNSW-NB15-v3, the same dataset in which accuracy differences are compressed by the ceiling effect.
+
+The cost table also prevents an overly broad claim. DASP does not improve every systems metric. Its forward throughput is lower because four module branches and a fusion stage are executed for every prediction. The appropriate conclusion is therefore a two-axis one: DASP improves the accuracy--adaptation trade-off while paying a forward-inference cost. A deployment that is constrained by prediction latency rather than adaptation latency may prefer a fused or sparse implementation in future work.
+
+\subsection{Scenario-level response}
+Table~\ref{tab:scenario-detail} reports all ten primary conditions. The largest mean gains occur in S0, S7-Local-Low, S5-Blip, and S7-Local-Medium. The stationary control result is particularly informative: a positive S0 gap indicates that the performance-gated modular repair path does not merely damage the baseline model when the stream is stable. The local-low and blip gains are consistent with the intended use case for attribution, namely, a change confined to a subset of the representation or a short-lived episode. They should be read as scenario-level evidence, not as proof that every local change is correctly attributed.
+
+S2-Gradual and S7-Local-High are weaker cases. Gradual drift gives the router a less distinct boundary between reference and current representations. High-intensity local drift can produce evidence in several modules, reducing the advantage of a strict top-$k$ selection. These conditions motivate adaptive routing budgets and uncertainty-aware expansion, but they do not invalidate the primary result because the confirmation configuration was locked before inspecting the final summary.
+
+\subsection{Cell-level matrices}
+Tables~\ref{tab:dasp-cell-f1}--\ref{tab:gap-cell} provide a compact audit trail. The DASP and SSF matrices show whether a dataset's aggregate is driven by a single scenario. The gap matrix shows that positive and negative cells coexist even when the scenario mean is positive. The negative NF-BoT-IoT-v3/S2-Gradual cell is therefore not removed as an outlier. It is part of the mechanism's empirical boundary and should be used to design the next ablation.
+
+\subsection{Retention and operational behavior}
+Table~\ref{tab:method-operational} adds metrics that are not visible in Macro-F1 alone. Attack recall and false-negative rate matter because a detector can obtain a reasonable mean F1 while missing a minority attack class. Forgetting and stability show whether a repair creates a short-term gain at the cost of oscillation. Memory and resident-set measurements distinguish a bounded replay algorithm from a method whose history grows with the stream.
+
+DASP's structural invariant is summarized in Table~\ref{tab:dasp-invariants}. Across the 500 confirmation cells, 16,000 repair records were available. No logged repair performed a global update. The maximum active representation-module count was three of four, the median was three, and the minimum was one. These values should be read together with the classifier exception: the shared classifier is always an explicit adaptation group, while the invariant concerns the four representation modules.
+
+\section{Ablation, Sensitivity, and Failure Diagnostics}
+\label{sec:ablation-expanded}
+
+\subsection{Development ablation as mechanism diagnosis}
+The development pilot was not used to tune the confirmation statistics, but it is useful for understanding why the final mechanism contains several components. The initial no-update path reached mean Macro-F1 0.7625 against SSF at 0.9211. This is a failure of under-adaptation. Classifier calibration raised the score to 0.8706, and the early semi-local prototype reached 0.8725. The large jump to approximately 0.9266 occurred only after bounded localized rehearsal and new-sample weighting were introduced. The sequence suggests that locality alone is not sufficient: a selective model still needs enough historical and current supervised context to stabilize the boundary.
+
+\begin{table*}[t]
+\caption{Development ablation sequence on the 15 paired pilot cells.}
+\label{tab:development-ablation}
+\centering
+\scriptsize
+\begin{tabular}{p{0.35\textwidth}cp{0.42\textwidth}}
+\toprule
+Variant & Macro-F1 & Interpretation\\
+\midrule
+No update & 0.7625 & Under-adaptation\\
+Classifier calibration & 0.8706 & Shared boundary repair\\
+Early semi-local prototype & 0.8725 & Partial locality without sufficient rehearsal\\
+Localized rehearsal and new-sample weighting & 0.9266 & Final mechanism direction\\
+SSF comparator & 0.9211 & Development reference\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The ablation should not be interpreted as a factorial causal estimate because the pilot variants were developed sequentially. It does, however, reject a tempting but incorrect simplification: simply freezing modules and adding a drift score is not enough. The successful mechanism combines attribution, bounded replay, weighted delayed labels, strict optimizer masking, and the delayed-label performance gate.
+
+\subsection{Router sensitivity}
+The locked primary router uses three kernel scales, persistence one, a severity threshold of 0.15, and top-$k=3$. The emergency-severity value of 0.60 in the locked experimental configuration is inactive because it is not used by the evaluated primary DASP procedure. Each setting encodes a trade-off. Increasing the kernel scale set can improve sensitivity to broad representation shifts but increases the per-window discrepancy calculation. Raising persistence can suppress false positives but delays repair under sudden drift. A smaller $k$ increases structural sparsity but risks leaving the classifier without a path to the changed representation. A larger $k$ improves recoverability but moves DASP toward global replay.
+
+Because the primary confirmation was locked, the correct use of sensitivity analysis is prospective. The saved logs should be replayed under $k\in\{1,2,3,4\}$, persistence values in $\{1,2\}$, and alternative attribution weights $\alpha\in\{0.25,0.5,0.75\}$. The comparison should report accuracy, update time, active-module fraction, and worst-cell degradation. In particular, $k=4$ should be treated as a locality ablation rather than as a production configuration, because it removes the principal structural constraint.
+
+\subsection{Failure episode analysis}
+The worst confirmation cell occurs on NF-BoT-IoT-v3 under S2-Gradual with stream seed 2102 and model seed 91, where DASP trails SSF by 0.0900 Macro-F1. The failure is not hidden by reporting only dataset means. A plausible mechanism is attribution ambiguity: the gradual change produces moderate evidence in several modules before the classifier has a stable boundary, and the top-$k$ repair allocates limited plasticity among modules whose evidence is not yet separable.
+
+The failure suggests three concrete follow-up diagnostics. First, plot the four attribution trajectories against the delayed attack recall to determine whether the router leads or lags the performance drop. Second, compare the selected set with an oracle set computed from a post-hoc feature perturbation analysis; this tests attribution quality without changing the primary result. Third, evaluate a temporary uncertainty-triggered expansion that opens the fourth module only when the delayed-label performance gate falls below threshold twice consecutively. Such a diagnostic must be labeled as a new method, not retroactively applied to the confirmation run.
+
+\subsection{Negative controls}
+S0 is a negative control for unnecessary plasticity. If DASP had a strong negative S0 gap, the method would be overreacting to noise. The observed positive S0 mean gap, together with the performance-gated maintenance mechanism, provides evidence against that failure mode. A second negative control is the global-update counter: a method could claim locality while silently updating every module. The recorded global-update count of zero and the active-module upper bound address this implementation risk.
+
+
+\section{Theoretical and Operational Analysis}
+\label{sec:theory-analysis}
+
+\subsection{Constrained repair view}
+Let $\tau=t-1$ be the delayed window whose stored evidence is restored at outer iteration $t$. The pre-update mode is selected by
+\begin{equation}
+m_{\tau}=\pi\!\left(s_{\tau},F^{\mathrm{hold}}_{\tau}\right),
+\end{equation}
+where $s_{\tau}$ is stored MMD severity and $F^{\mathrm{hold}}_{\tau}$ is the delayed-label performance-holdout Macro-F1. Given the routed set $\mathcal A_{\tau}$ and mode-specific feasible update set $\Omega(\mathcal A_{\tau},m_{\tau})$, the implemented optimization is represented by
+\begin{equation}
+\Delta_{\tau}=\arg\min_{\Delta\in\Omega(\mathcal A_{\tau},m_{\tau})}
+\mathcal L_{\mathrm{new}}(\Theta+\Delta)+\lambda_r\mathcal L_{\mathrm{replay}}(\Theta+\Delta),
+\end{equation}
+subject to
+\begin{equation}
+\Delta_j=0\quad\forall j\notin\mathcal A_{\tau},\qquad
+|\mathcal A_{\tau}|\leq k,
+\qquad |B_{\tau}^{\mathrm{mem}}|\leq512.
+\end{equation}
+The holdout loss is not part of the training objective and does not accept or reject a post-update candidate. It selects emergency versus background intensity before optimization. Replay constrains forgetting through data, whereas optimizer exclusion imposes exact inactivity on unrouted representation modules.
+
+The Lagrangian perspective also clarifies why a soft penalty is not equivalent to DASP. A penalty such as $\lambda\lVert\Theta_j-\Theta_j^{\mathrm{old}}\rVert^2$ may reduce movement but does not guarantee $\Delta_j=0$. DASP uses an equality constraint implemented through optimizer parameter exclusion. This makes the locality claim falsifiable: a parameter hash comparison can either confirm or reject the invariant.
+\subsection{Locality versus expressivity}
+The top-$k$ constraint creates an explicit accuracy--locality trade-off. If $k=1$, the update is highly selective but may underfit a compound drift. If $k=4$, all representation modules can change and the structural distinction from global replay becomes weak. The locked value $k=3$ is a middle point that permits recovery when several modules carry evidence while preserving at least one frozen representation path. The confirmation results should therefore not be generalized to arbitrary $k$ without a new sensitivity experiment.
+
+The classifier exception creates a second trade-off. A classifier-only repair is computationally cheap and can correct a shifted class prior, but it cannot create a new representation for an unseen attack pattern. A module-only repair can change the representation but may leave the decision boundary miscalibrated. DASP updates the classifier explicitly while routing representation plasticity, which is why the method is best described as localized subspace repair rather than isolated module retraining.
+
+\subsection{Attribution stability under drift types}
+The router is expected to behave differently across the ten scenarios. Under S1-Sudden, the discrepancy trajectory should change sharply and the delayed conflict should become concentrated after one label delay. Under S2-Gradual, the signals may rise slowly and become less separable across modules. Under S4-Recurrent, historical memory may reduce conflict if the returning regime is already represented. Under S5-Blip, the delayed-label performance holdout may escalate the no-trigger path when transient performance falls below its threshold. Under the local variants, the key question is not only whether a score is large, but whether the ranking of modules remains stable enough for top-$k$ selection.
+
+A useful diagnostic is the rank persistence of the routed set. Let $\mathcal A_t$ and $\mathcal A_{t+1}$ be two consecutive active sets. Their overlap can be measured by
+\begin{equation}
+ J_t=\frac{|\mathcal A_t\cap\mathcal A_{t+1}|}{|\mathcal A_t\cup\mathcal A_{t+1}|+\epsilon}.
+\end{equation}
+High overlap can indicate a persistent localized drift, while low overlap can indicate either a compound drift or an unstable router. The current confirmation summary records active-module counts but does not claim a causal result about rank persistence. This statistic is a direct extension for the next diagnostic release.
+
+\subsection{Why the performance holdout is not an oracle}
+The delayed-label performance holdout uses labels unavailable at prediction time, but it is not an oracle for the future stream. In the locked modular path it measures bounded delayed-window performance and chooses emergency or background intensity when MMD does not trigger. A favorable score can still be followed by an unseen regime, so the gate is not a guarantee of future optimality.
+
+The prediction-first asymmetry remains: mode selection cannot reverse a prediction that has already been emitted on the current window. A deployed system should therefore pair the logged local update with monitoring of subsequent windows and an external model registry if operational rollback is required.
+
+\subsection{Computational decomposition}
+The per-window computation has four components: representation extraction, discrepancy estimation, delayed-label subset construction, and local repair. Representation extraction is shared with prediction and scales with the full input batch. Module-wise MMD uses a bounded sample of 128 representations and three kernel scales. The repair term scales with 512 replay examples and at most 128 repair-training labels; holdout evaluation is separate. Performance-holdout evaluation is used on the no-trigger path to select repair intensity. The top-$k$ mask reduces the trainable parameter set but does not remove the cost of computing routing evidence. This explains why DASP improves adaptation time while reducing forward throughput relative to simpler flat MLP baselines.
+
+\begin{table*}[t]
+\caption{Mechanism-to-evidence mapping used in the evaluation.}
+\label{tab:claim-evidence-map}
+\centering
+\scriptsize
+\begin{tabular}{p{0.24\textwidth}p{0.31\textwidth}p{0.29\textwidth}}
+\toprule
+Claim & Implementation evidence & Empirical evidence\\
+\midrule
+Drift is localized & Four explicit feature modules and per-module scores & Module-count distribution and routing logs\\
+Inactive modules are protected & Optimizer exclusion and parameter-hash comparison & Zero global updates; maximum three active modules\\
+Replay stabilizes repair & Class-balanced 512-example historical batch & Development ablation and retention metrics\\
+Adaptation training is bounded & At most 128 new training examples plus disclosed labeled holdout; memory 1,024; top-$k=3$ & Gradient evaluations and update-time distribution\\
+Repair mode is explicit & Performance-holdout Macro-F1 and fixed emergency/background rules & Mode logs and worst-cell analysis\\
+DASP improves the primary comparator & Paired cell-level confirmation design & 383/500 wins and positive statistical tests\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The evidence map is deliberately conservative. It distinguishes a property guaranteed by the optimizer structure from a property merely suggested by aggregate performance. For example, zero global updates is a structural property of the evaluated procedure, whereas the claim that attribution causes the accuracy gain requires the prospective causal router ablation described in the limitations.
+
+\section{Deployment Threat Model and Governance}
+\label{sec:deployment-threat}
+
+\subsection{Operational deployment blueprint}
+\subsection{Threats against adaptation}
+An adaptive NIDS has threats that a static classifier does not. An attacker may attempt to induce false drift by generating a short burst of unusual but benign-looking traffic. A compromised labeling process may inject incorrect delayed labels and push the router toward an incorrect module. A replay-memory poisoning attack may insert mislabeled or atypical examples. A resource-exhaustion attack may increase the frequency of drift-like windows and cause repeated scoring and repair. DASP does not claim to solve these threats automatically, but its bounded and logged design makes them explicit monitoring targets.
+
+\begin{table}[t]
+\caption{Threats to the adaptive repair path and corresponding controls.}
+\label{tab:threat-controls}
+\centering
+\scriptsize
+\begin{tabular}{p{0.28\columnwidth}p{0.48\columnwidth}}
+\toprule
+Threat & DASP control or required deployment control\\
+\midrule
+False drift injection & Persistence, severity threshold, and performance-holdout monitoring\\
+Label poisoning & Label provenance, class-balance checks, and external checkpoint rollback\\
+Replay poisoning & Bounded memory, provenance fields, and periodic memory audit\\
+Repair flooding & Cooldown, update budget, and rate-limited repair service\\
+Silent global update & Optimizer exclusion, parameter hashes, and global-update counter\\
+Audit tampering & Append-only signed routing and model-state records\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Governance and change control}
+A production commit should carry a model version, stream identifier, active-module set, attribution vector, performance-holdout scores, replay cardinality, optimizer configuration, and a hash of inactive parameters. The record should be immutable after commit. If a later incident reveals that a repair was harmful, the operator should be able to reconstruct the candidate, identify the delayed labels used, and restore the previous model version. This is stronger than storing only a final checkpoint because the checkpoint does not explain why a change was made.
+
+The same governance layer supports controlled experimentation. A new router threshold should be deployed as a versioned configuration and evaluated in shadow mode before it is allowed to commit. The primary confirmation configuration should remain immutable, while prospective variants use distinct run and method identifiers. This separation prevents an apparently small operational change from contaminating the published baseline.
+
+\subsection{Evidence integration and scope}
+The evidential argument should connect mechanism, protocol, result, and limitation rather than rely on one headline score. In this study, the mechanism is the routed subspace and strict optimizer mask. The protocol is the prediction-first delayed-label evaluation across five datasets and ten scenarios. The result is the paired accuracy and adaptation-cost advantage. The principal boundaries are the throughput penalty and the difficult gradual-drift cell. Reporting these components together allows the contribution to be evaluated within its empirical scope.
+
+
+\section{Experimental Integrity and Reproducibility Checks}
+\label{sec:quality-assurance}
+
+\subsection{Leakage audit}
+The most damaging error in a continual-learning experiment is not a slightly suboptimal hyperparameter; it is information leakage. DASP's protocol prevents current-window leakage by emitting predictions before delayed-label access. The same order is enforced for every baseline. The delayed label queue is indexed by window identifier, so a label batch can only be consumed after its configured delay. Stream metadata remain fixed during evaluation, and the independent analysis workflow operates only on completed run records rather than feeding aggregate statistics back into the online procedure.
+
+The leakage audit also covers preprocessing. Standardization statistics are resolved from the training or warm-up portion of the prepared stream, not from the concatenation of all windows. If a future window were allowed to influence the scaler, the resulting performance would not represent a prediction-first deployment. The reproducibility record therefore includes feature count, warm-up length, and the locked configuration alongside the summary metrics.
+
+\subsection{Baseline equivalence audit}
+The DASP--SSF comparison is paired, but pairing alone does not guarantee fairness. The equivalence audit verifies identical streams, seeds, window size, delay, and recorded training-subset count, while explicitly treating DASP--SSF holdout and total label exposure as unequal. A missing or partial run is not replaced with a zero and is not silently dropped from only one method.
+
+A second fairness question concerns computational budgets. DASP uses a modular router and replay batch, while SSF uses its own strategic sample-selection mechanism. The correct comparison is not to force identical internal operations; it is to hold the externally meaningful constraints fixed and report internal work explicitly. The manuscript therefore reports gradient evaluations, update seconds, throughput, memory, and accuracy together. This allows a reader or system operator to decide whether the trade-off is favorable for a particular deployment.
+
+\subsection{Result integrity audit}
+The result integrity audit recomputes the headline Macro-F1 and update-cost values from the row-level records. Displayed values are generated independently rather than copied from the manuscript text. The paired comparison is joined on dataset, scenario, stream seed, and model seed. The sign-test, paired $t$-test, and Wilcoxon values are calculated from the same 500 paired differences. This chain prevents a common failure mode in large experiments, where a figure and a table are produced from different filtering rules.
+
+\begin{table*}[t]
+\caption{Experimental integrity checks and the artifact supporting each check.}
+\label{tab:qa-checks}
+\centering
+\scriptsize
+\begin{tabular}{p{0.28\textwidth}p{0.33\textwidth}p{0.28\textwidth}}
+\toprule
+Evaluation question & Check performed & Supporting artifact\\
+\midrule
+Was the current label used before prediction? & Inspect prediction-first procedure and delay queue & Protocol specification and stream summaries\\
+Were DASP and SSF paired fairly? & Join on dataset/scenario/stream/model seed & Paired cell-level comparison\\
+Is locality structural or cosmetic? & Exclude inactive parameters from optimizer and verify fingerprints & DASP routing records\\
+Can the replay memory grow without bound? & Check fixed capacity and fixed repair sample & Locked configuration and run summaries\\
+Are negative cases hidden? & Report minimum gap and worst cell & Independent failure-case analysis\\
+Is the throughput cost visible? & Report prediction throughput separately from update time & Method-level summary\\
+Can the figures be regenerated? & Regenerate from row-level summaries & Independent figure-generation workflow\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Interpretation of statistical significance}
+The extremely small paired p-values indicate that the direction of the aggregate comparison is unlikely to arise from a symmetric zero-median difference under the stated tests. They do not establish that DASP is superior on every dataset, every scenario, or every future deployment. The paired effect size is modest in Macro-F1 units, and its practical importance depends on the cost of false negatives and on the value assigned to adaptation time. The paper therefore reports both the mean gap and the operational trade-off rather than presenting significance as a substitute for engineering relevance.
+
+\subsection{Failure transparency}
+A credible evaluation should expose the strongest counterexample. DASP's worst confirmation cell is retained with its dataset, scenario, stream seed, and model seed. The failure is not explained away as random noise, and no post-hoc change is applied to the primary result. Instead, the failure motivates a future adaptive-$k$ and uncertainty-triggered expansion study. This preserves the separation between confirmatory evidence and prospective improvement.
+
+
+\subsection{Test coverage and reproducibility gate}
+The implementation is evaluated in layers rather than only through the final benchmark. Unit-level checks cover the memory sampler, class balancing, delayed-label queue, requirement normalization, top-$k$ mask, optimizer exclusion, performance-gate thresholding, and summary recording. Integration checks cover one complete prediction-first stream, including background and emergency local modes. Benchmark checks cover the full pilot and confirmation matrices. This layered structure is important because a high-level Macro-F1 score cannot detect a silent global update or a label-ordering error.
+
+The reproducibility gate has four stages. Stage one checks that the required numerical libraries are available and that deterministic one-thread execution is enabled. Stage two runs a small-scale evaluation and compares the resulting record structure with the locked protocol. Stage three recomputes the aggregate tables from row-level records and verifies that the paired join contains exactly 500 cells. Stage four compiles the manuscript and checks that all citations, references, figures, and generated tables resolve. A release is not considered reproducible if only the PDF can be compiled while the result summaries cannot be regenerated.
+
+\begin{table*}[t]
+\caption{Layered software and experiment validation gate.}
+\label{tab:test-coverage}
+\centering
+\scriptsize
+\begin{tabular}{p{0.18\textwidth}p{0.35\textwidth}p{0.29\textwidth}}
+\toprule
+Layer & Representative checks & Release criterion\\
+\midrule
+Unit & Memory capacity, class balance, mask cardinality, queue delay & All deterministic unit tests pass\\
+Model & Module output dimensions, classifier fusion, parameter hash & Inactive modules remain unchanged\\
+Router & MMD calibration, conflict normalization, top-$k$ selection & Scores and masks are recorded\\
+Mode control & Performance-holdout threshold, background mode, emergency mode & Selected mode and locality fields are recorded\\
+Evaluation procedure & Seed reset, prediction-before-label order, record structure & Small-scale evaluation completes with expected fields\\
+Pilot & 1,200-run matrix and method coverage & Every dataset/scenario/method cell is present\\
+Confirmation & 4,000-run matrix and paired join & Exactly 500 DASP--SSF paired cells\\
+Analysis & Tables, figures, tests, quantiles, failure cell & Values recompute from row-level outputs\\
+Manuscript & BibTeX, labels, figures, PDF compilation & Zero fatal/citation/reference errors\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The existing test result of 95 passed and one skipped should be reported with its environment context. A future archival package should pin the numerical-computing framework versions, record the operating system and CPU model, and preserve the locked experimental configurations. Any numerical compatibility warning observed in the local environment should be removed or documented before public release because a warning that changes tensor behavior would threaten reproducibility even if the final table happened to look plausible.
+
+A second gate concerns analysis independence. The independent analysis workflow may read completed summaries, but it must not rewrite method outputs or alter paired cells after inspecting the results. If an error is found, the correction must be applied to the evaluation procedure or the data-preparation stage, followed by a new full run. This rule prevents a common form of accidental p-hacking in which an inconvenient cell is removed from the summary rather than diagnosed at the source.
+
+The final gate is visual. The compiled PDF should be rendered at ordinary resolution and inspected for figure readability, caption association, table continuation, reference clipping, and whitespace caused by floats. Figures that are mathematically correct but unreadable at column width should be regenerated with fewer labels or moved to a two-column layout. The figures are therefore separated into mechanism diagrams and result matrices rather than compressed into one dense composite figure.
+
+\subsection{Evidence and reproducibility boundary}
+Taken together, the integrity checks connect the method contract, prediction-first evaluation procedure, row-level records, paired analysis, and compiled manuscript. They reduce the risk of leakage, incomplete pairing, and silent global updates, but they do not substitute for external replication. An archival release should therefore include verified dataset licenses, resolved bibliographic metadata, a pinned software environment, and an author-independent rerun from the released configuration.
+
+\section{Operational Reproducibility and Auditability}
+\label{sec:reproducibility-expanded}
+
+The experiment is reproducible at three levels. At the protocol level, stream metadata specify the 4,096-flow window size and dataset-specific feature counts, while the locked experimental configuration specifies warm-up length, seeds, label delay, memory capacity, and router thresholds. At the run level, each experimental cell is uniquely indexed by dataset, scenario, method, stream seed, and model seed. At the analysis level, row-level and aggregate records contain the values used by the manuscript tables and figures.
+
+A reproduction should verify the following invariants before comparing accuracy. The protocol metadata must specify 36 chronological 4,096-flow windows and 78 CIC-IDS2017 or 49 NF-v3 features. Prediction must precede delayed-label access, and supervision accounting must separate the 128-example training subset from total label exposure; a strict shared-label confirmation requires rerunning. The model seed must be reset per cell. Each run must record update time separately from prediction throughput. Finally, the structural record must show that inactive module parameters are unchanged across a logged repair.
+
+\begin{table}[t]
+\caption{Reproducibility checklist for a confirmation cell.}
+\label{tab:repro-checklist}
+\centering
+\scriptsize
+\begin{tabular}{p{0.55\columnwidth}p{0.25\columnwidth}}
+\toprule
+Check & Expected value\\
+\midrule
+Dataset and scenario & Protocol identifier\\
+Stream seed & 2001, 2002, 2003, 2101, or 2102\\
+Model seed & 91 or 92\\
+Window size & 4,096 flows\\
+Warm-up windows & 4\\
+Label delay & 1 window\\
+New-example training subset & At most 128 examples/window; not total label exposure\\
+DASP memory capacity & 1,024 records\\
+DASP replay sample & 512 records/repair\\
+Maximum active modules & 3 of 4\\
+Global update count & 0 for DASP\\
+Prediction ordering & Before current labels\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The audit trail is also useful for security operations. For each repair, an analyst can ask what changed, why the router selected those modules, which performance-gated mode was selected, and whether historical behavior was preserved. This does not replace a formal change-management process, but it makes the adaptation decision inspectable. In a production system, the same record should be signed or stored in an append-only log so that the model state and the explanation cannot be separated after an incident.
+
+
+
+

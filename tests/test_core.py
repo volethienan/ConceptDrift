@@ -602,7 +602,7 @@ def test_prepared_stream_preserves_order_and_source_ids(tmp_path) -> None:
     )
     stream = load_prepared_stream(path)
     assert len(stream.windows) == 3
-    assert torch.equal(stream.windows[2].x, torch.tensor(x[2]))
+    assert torch.equal(stream.windows[2].x, torch.tensor(x[2].tolist()))
     assert np.array_equal(stream.windows[1].source_ids, source_ids[1])
     assert stream.windows[2].phase == "B"
 
@@ -980,7 +980,7 @@ def test_primary_benchmark_exposes_the_eight_declared_methods() -> None:
         "ssf",
         "repshield",
         "cdda_md",
-        "dasp",
+        "modular_dasp",
     ]
 
 
@@ -1136,8 +1136,9 @@ def test_s4_keeps_two_attack_classes_identifiable_during_dual_drift() -> None:
         (stream.windows[0], ("hulk", "ftp")),
         (stream.windows[3], ("ddos", "ssh")),
     ]:
-        subtype_one = set(window.subtypes[window.y.numpy() == 1].tolist())
-        subtype_two = set(window.subtypes[window.y.numpy() == 2].tolist())
+        labels = np.asarray(window.y.tolist())
+        subtype_one = set(window.subtypes[labels == 1].tolist())
+        subtype_two = set(window.subtypes[labels == 2].tolist())
         assert subtype_one == {expected[0]}
         assert subtype_two == {expected[1]}
         center_one = window.x[window.y == 1].mean(dim=0)
@@ -1609,3 +1610,41 @@ def test_nf_bounded_stream_sorts_globally_before_start_row(tmp_path) -> None:
     )
     assert [window.start_time for window in stream.windows] == [30, 50]
     assert [window.end_time for window in stream.windows] == [40, 60]
+
+
+def test_modular_dasp_strict_freeze_updates_only_routed_module() -> None:
+    config = load_config("configs/modular_dasp_smoke.yaml")
+    model = ModularOnlineMLP(16, 2, [32, 16], n_modules=4, module_dim=8)
+    generator = torch.Generator().manual_seed(123)
+    x = torch.randn(64, 16, generator=generator)
+    y = (x[:, 0] > 0).long()
+    memory = ReservoirMemory(64, 123)
+    memory.add(x, y)
+    before_module_2 = {
+        name: value.detach().clone()
+        for name, value in model.modules_list[1].state_dict().items()
+    }
+    before_module_1 = {
+        name: value.detach().clone()
+        for name, value in model.modules_list[0].state_dict().items()
+    }
+    steps = _train_dasp(
+        model,
+        x,
+        y,
+        {"module_1": 1.0, "module_2": 0.0, "module_3": 0.0, "module_4": 0.0, "classifier": 1.0},
+        config,
+        torch.device("cpu"),
+        memory,
+        strict_freeze=True,
+        use_projection_memory=False,
+    )
+    assert steps > 0
+    assert any(
+        not torch.equal(value, before_module_1[name])
+        for name, value in model.modules_list[0].state_dict().items()
+    )
+    assert all(
+        torch.equal(value, before_module_2[name])
+        for name, value in model.modules_list[1].state_dict().items()
+    )

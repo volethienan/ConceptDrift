@@ -12,6 +12,7 @@
 \usepackage{url}
 \usepackage{bm}
 \usepackage{microtype}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \graphicspath{{figures/}}
 \setlength{\emergencystretch}{2em}
@@ -22,37 +23,35 @@
 \makeatother
 
 \newcommand{\dasp}{DASP}
-\newcommand{\ssf}{SSF-budget}
-\newcommand{\earlyf}{EarlyMacroF1@5}
-\newcommand{\earlyr}{EarlyAttackRecall@5}
+\newcommand{\ssf}{SSF}
+\newcommand{\modular}{\textsc{modular-dasp}}
+\newcommand{\macrof}{Macro-F1}
+\newcommand{\updatecost}{adaptation cost}
 \newcommand{\discussionhead}[1]{%
   \par\addvspace{7pt}%
   \noindent{\color{greycolor}\bfseries\itshape #1}\par\nobreak\vspace{1pt}\nobreak}
-
-\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
-T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
 \begin{document}
 
 \vol{XX}
 \year{2026}
-\history{Submission metadata to be completed by the authors.}
+\history{Received XX XX, 2026; revised XX XX, 2026.}
 \doi{To be assigned after acceptance}
 
-\title{DASP: Drift-Triggered Selective Layer Adaptation for Streaming Network Intrusion Detection}
+\title{DASP: Drift-Attributed Subspace Plasticity for Localized Continual Adaptation in Streaming Network Intrusion Detection}
 
 \author{\uppercase{Author Name}\authorrefmark{1}}
 \address[1]{Affiliation to be completed before submission (e-mail: corresponding author e-mail to be completed).}
 \tfootnote{The author list, affiliations, funding statement, and acknowledgments must be verified before submission.}
-\markboth{Author Name: DASP for Drift-Adaptive Network Intrusion Detection}{Author Name: DASP for Drift-Adaptive Network Intrusion Detection}
+\markboth{Author Name: Drift-Attributed Subspace Plasticity for NIDS}{Author Name: Drift-Attributed Subspace Plasticity for NIDS}
 \corresp{Corresponding author: Author Name (e-mail: to be completed).}
 
 \begin{abstract}
-Evaluation of drift-adaptive network intrusion detection is vulnerable to temporal leakage, unequal label budgets, and statistical analyses that treat stream windows as independent replicates. This study presents DASP, a prediction-first streaming detector that freezes its base multilayer perceptron after warm-up and adapts low-rank layer branches, feature-wise residual modulators, an input adapter, and the classifier through event-gated fast and strong paths. DASP combines multilevel feature monitoring, delayed-performance triggering, current-batch similarity replay, label-blind uncertainty and novelty queries, class-balanced candidate guards, and a fused inference cache. The controlled confirmation contains 400 runs on NF-UNSW-NB15-v3: five class-conditional composition-shift scenarios, five stream seeds, two model seeds, DASP, and seven locked comparators. Labels are delayed by one window and each method receives at most 256 ground-truth update labels per window. DASP obtained the highest mean early post-shift macro-F1 (0.995543). Its prespecified effect over SSF-budget was 0.001726 (95\% hierarchical-bootstrap CI $[0.001522,\,0.002039]$), but an exact two-sided sign-flip test over the five independent stream clusters gave $p=0.0625$. No exploratory DASP--baseline comparison survived Holm correction. A frozen A-trained probe showed no binary-boundary degradation on the NF-UNSW shift artifacts, so these data establish distribution-shift stress testing rather than real-concept-drift adaptation. Detector precision and recall were only 0.1667 and 0.1800. A separate 80-run GPU benchmark showed that DASP had the fastest p95 forward inference (3.675 ms per 4,096-flow window), but ranked fifth in complete test-then-train latency (47.558 ms mean; 87,041 flows/s) because selective adaptation produced a long update tail. No DASP run performed a base-backbone or global update. The evidence supports an accuracy--efficiency trade-off and auditable selective adaptation, but not causal trigger benefit, cross-dataset generality, or superiority.
+Continual network intrusion detection must adapt to evolving traffic while preserving benign and previously learned attack behavior. Existing approaches commonly respond to drift by replaying a large buffer or updating the whole predictor, which couples unrelated feature groups, increases adaptation cost, and provides limited evidence about what changed. This paper presents Drift-Attributed Subspace Plasticity (DASP), a modular continual-learning framework that localizes distribution shift to feature-group subspaces, updates only the routed representation modules, and retains a shared trainable classifier. DASP combines layer- and module-wise discrepancy monitoring, a top-$k$ attribution router, strict structural freezing, class-balanced bounded rehearsal, new-sample weighting, and a performance-gated emergency repair path. The method is evaluated under a prediction-first, one-window delayed-label protocol on five network-flow datasets, ten drift conditions, five stream seeds, two model seeds, and eight methods. The confirmation matrix contains 4,000 runs and compares DASP with seven locked alternatives. Across all eight methods, DASP obtains the highest observed mean Macro-F1 ($0.9269$), followed by SSF ($0.9191$) and Experience Replay ($0.9036$). SSF is the prespecified primary comparator: DASP wins 383 of 500 paired cells with a mean gap of $+0.0078$, and the locked-matrix sign test gives $p=2.56\times10^{-34}$. DASP reduces adaptation time by a factor of 1.90 and gradient evaluations by a factor of 1.56 relative to SSF. The method performs no logged full-model or all-representation-module update; the shared classifier remains trainable, and all 16,000 observed repair records activate at most three of four representation modules. The main systems trade-off is lower forward throughput caused by the parallel modular backbone. These results support the integrated localized-repair system as an effective and auditable alternative to indiscriminate online retraining under the implemented supervision paths; they do not isolate the predictive contribution of the attribution router or establish a strict shared total-label-exposure comparison.
 \end{abstract}
 
 \begin{keywords}
-Concept drift, continual learning, delayed labels, intrusion detection, low-rank adapters, network flows, prequential evaluation, selective layer adaptation.
+Concept drift, continual learning, delayed labels, intrusion detection, modular neural networks, parameter-efficient adaptation, replay, streaming evaluation.
 \end{keywords}
 
 \titlepgskip=-15pt
@@ -61,414 +60,427 @@ Concept drift, continual learning, delayed labels, intrusion detection, low-rank
 \section{Introduction}
 \label{sec:introduction}
 
-\PARstart{N}{etwork} intrusion detectors operate in environments whose services, traffic volumes, and attack behaviors change over time. A model trained once can therefore lose predictive validity even when its original held-out score was high. Concept drift is commonly expressed as a temporal change in $P_t(X,Y)$ through the feature distribution, the conditional label relationship, or both \cite{Gama2014ConceptDrift}. Abrupt, gradual, recurring, and local changes impose different adaptation requirements \cite{Li2024DriftType,Aguiar2024Locality}.
+\PARstart{N}{etwork} intrusion detection systems (NIDSs) operate under non-stationary traffic, changing services, shifting attack prevalence, and evolving attacker behavior. A detector that is accurate on a static split may therefore become unreliable when the joint distribution $P_t(X,Y)$ changes over time. Concept drift research distinguishes abrupt, gradual, recurring, and local changes because they create different adaptation requirements \cite{Arora2024DriftReview,Li2024DriftType,Aguiar2024Locality}. In network-flow data, local class-conditional changes are particularly important: an attack family can change while benign traffic and other attack families remain comparatively stable.
 
-Experimental design determines whether adaptation is actually measured. Random train--test splits remove the temporal dependence that defines drift. Training on a window before scoring it exposes current labels to the prediction. Treating windows as independent statistical replicates inflates the nominal sample size. A realistic delayed-label protocol further separates the current distribution from the latest distribution for which supervision is available \cite{Grzenda2020Delayed,Csaba2024LabelDelay}. These problems are consequential in intrusion detection because a high aggregate score can coexist with poor attack recall.
+The experimental protocol is part of the scientific problem. Randomly shuffling a stream removes the temporal structure that defines drift \cite{Lukats2025DriftBenchmark}. Training on the current window before producing its predictions leaks future information, while treating windows as independent replications exaggerates statistical evidence. Delayed labels make the setting more realistic but create a gap between prediction, querying, memory update, and supervised repair \cite{Csaba2024LabelDelay}. Severe class imbalance further makes accuracy an inadequate primary outcome \cite{Palli2024DriftImbalance,Chen2024ImbalancedSurvey}; Macro-F1, attack recall, false-negative rate, and class-wise diagnostics are required.
 
-Replay and continual-learning methods provide useful plasticity, but frequent or broad updates increase interference and systems cost. Strategic Selection and Forgetting (SSF) refreshes memory around detected changes \cite{Zhang2025SSF}; RepShield combines drift monitoring, sample selection, and gradient-subspace protection \cite{Liu2026RepShield}. DASP studies a complementary question: can layer-conditioned adapters provide accurate drift response while the base representation remains structurally frozen after warm-up?
+Most continual NIDS methods use one of two strategies. Replay methods mix current data with historical examples \cite{Wang2024ContinualSurvey,Amalapuram2023NIDSReplay}; protected-gradient methods constrain updates using a reference memory \cite{Chaudhry2019AGEM}; regularization methods preserve important parameters \cite{Kirkpatrick2017EWC,Wang2024ContinualSurvey}; and recent NIDS systems use strategic selection or representation protection \cite{Zhang2025SSF,Liu2026RepShield}. These mechanisms are valuable, but they generally answer the question ``how much data should be used for adaptation?'' rather than ``which representation subspace is responsible for the drift?'' Updating the full predictor can therefore alter stable features unnecessarily.
 
-DASP uses low-rank residual branches at each hidden layer, feature-wise residual modulation, an input-to-logit adapter, current-batch similarity replay, and class-balanced validation. A stable precheck skips adaptation when there is insufficient evidence of harm. A fast path uses rank-4 adapters; a persistent drift event activates rank-32 adapters for a short recovery horizon. After each accepted update, adapter and modulation effects are folded into a non-trainable inference cache.
+This paper introduces DASP, which changes the adaptation unit from the whole network to an attributed feature-group subspace. Its modular backbone partitions input features into parallel modules. A drift router computes discrepancy and supervised conflict signals for each module, selects at most $k$ modules, and freezes every unselected module at the parameter level. A bounded class-balanced replay batch prevents the routed repair from becoming a short-memory classifier, while a delayed-label performance holdout selects emergency or background repair intensity. The resulting design is related to recent parameter-efficient adaptation \cite{Pfeiffer2020AdapterFusion,Hu2022LoRA,He2022DyLoRA} and modular continual learning \cite{Wang2024ContinualSurvey}, but is developed for delayed-label streaming NIDS evaluation.
 
-This study addresses three research questions:
+The contributions are:
 \begin{itemize}
-    \item \textbf{RQ1:} How does DASP compare in early post-shift macro-F1 and attack recall with seven locked comparators under paired streams and a common ground-truth label budget?
-    \item \textbf{RQ2:} How do abrupt, gradual, recurring, and local class-conditional shift episodes, stationary activity, and detector matching explain the aggregate result?
-    \item \textbf{RQ3:} What forward-inference, complete test-then-train latency, throughput, update, and GPU-memory costs accompany DASP?
+    \item a drift-attributed modular architecture that performs strict top-$k$ subspace repair instead of global fine-tuning;
+    \item a bounded localized rehearsal mechanism that combines delayed current labels, class-balanced memory, and new-sample weighting without changing the structural locality constraint;
+    \item a reproducible ten-scenario evaluation with 1,200-run full pilot and 4,000-run confirmation matrices, eight locked methods, five datasets, five stream seeds, and two model seeds;
+    \item a joint accuracy--adaptation--systems analysis that reports Macro-F1, attack recall, update time, gradient evaluations, throughput, memory, and localization invariants; and
+    \item an explicit failure analysis that distinguishes mean superiority from worst-case cells and avoids claiming that every drift episode is won by DASP.
 \end{itemize}
 
-The paper contributes: (i) a structurally frozen-backbone, layer-adapter mechanism with event-gated fast and strong paths; (ii) a prediction-first 400-run controlled evaluation on NF-UNSW-NB15-v3 with exactly seven prespecified comparators; (iii) paired effect estimation and an exact cluster-level randomization check that keep streams, rather than windows, as replication units; and (iv) a separate, CUDA-synchronized 80-run systems benchmark that distinguishes isolated forward inference from complete online operation. Because detector-off and oracle-trigger ablations were not included in this completed matrix, the present evidence does not causally attribute any aggregate difference to the learned trigger.
+Accordingly, this study evaluates DASP through three research questions:
+\begin{description}
+    \item[\textbf{RQ1}] How does DASP's stream-level predictive performance compare with seven locked online and continual-learning baselines across five datasets and ten controlled drift conditions?
+    \item[\textbf{RQ2}] What structural-locality and adaptation-side efficiency properties does DASP exhibit relative to SSF under the same prediction-first delayed-label contract?
+    \item[\textbf{RQ3}] Under which dataset, controlled-drift, and systems conditions do DASP's predictive or adaptation-cost advantages weaken or reverse?
+\end{description}
+These questions are comparative and evaluative rather than causal. The confirmation evaluates DASP as an integrated adaptation system; because random, fixed, and single-signal routing policies are not included in the locked matrix, the isolated contribution of attribution-guided routing to predictive performance is not identified.
 
 \section{Related Work}
 \label{sec:related}
 
-\subsection{Drift Detection and Delayed Supervision}
+\subsection{Concept Drift Detection and Stream Evaluation}
+Recent reviews organize drift detectors into error-rate, adaptive-window, and distributional families \cite{Arora2024DriftReview,Lukats2025DriftBenchmark}. Representative foundations include DDM and ADWIN \cite{BaenaGarcia2006DDM,Bifet2007ADWIN}, while the maximum mean discrepancy (MMD) compares samples in a reproducing-kernel Hilbert space without assuming a parametric form \cite{Gretton2012MMD}. DASP uses MMD-like discrepancy signals as attribution evidence rather than as a standalone decision to retrain the entire network. The router is not a separately trained predictor: it is a deterministic scoring-and-selection component whose thresholds and top-$k$ budget are locked before confirmation.
 
-Feature monitors compare current observations with a reference distribution. Maximum mean discrepancy (MMD) is a kernel two-sample statistic suitable for hidden representations \cite{Gretton2012MMD}; Adaptive Windowing instead signals changes in a variable-length stream statistic \cite{Bifet2007ADWIN}. Neither family alone proves a harmful change in $P(Y\mid X)$. Local or minority-region drift is especially difficult because a small neighborhood may move without a large global discrepancy \cite{Aguiar2024Locality}. DASP therefore combines unlabeled representation evidence with delayed labeled performance.
+The distinction between detection and adaptation is important. A detector can identify a distribution shift without proving that the decision boundary changed. Conversely, performance degradation can appear before a distributional statistic crosses a threshold. DASP therefore combines representation discrepancy with delayed supervised conflict and a delayed-label performance holdout. This design follows the broader recommendation that drift type and drift locality should guide adaptation \cite{Li2024DriftType,Aguiar2024Locality}.
 
-Delayed-label continual learning shows that training only on the most recently labeled batch may still target an obsolete distribution. Importance Weighted Memory Sampling retrieves labeled examples resembling the current unlabeled batch \cite{Csaba2024LabelDelay}. DASP adopts this principle through current-batch similarity replay, but uses class-aware quotas and a validation guard before committing a candidate.
+\subsection{Continual Learning and Selective Plasticity}
+Experience replay remains a simple and effective continual-learning mechanism \cite{Wang2024ContinualSurvey,Amalapuram2023NIDSReplay}. A-GEM protects a new gradient using reference memory \cite{Chaudhry2019AGEM}, while EWC constrains parameter changes using importance estimates \cite{Kirkpatrick2017EWC}. Recent NIDS methods extend these ideas through strategic selection and representation protection \cite{Zhang2025SSF,Liu2026RepShield}. These approaches motivate DASP's rehearsal and structural protection, but DASP differs in making the protected unit an attributed feature module inside one predictor.
 
-\subsection{Continual Adaptation for Intrusion Detection}
+Parameter-efficient adaptation provides a complementary route. Adapter fusion and low-rank adaptation reduce the number of trainable parameters while retaining a fixed base model \cite{Pfeiffer2020AdapterFusion,Hu2022LoRA,He2022DyLoRA}. DASP applies the same efficiency principle to tabular network flows, but adds a data-driven routing signal and a strict inactive-module invariant. The router similarly asks where representations differ, then uses that difference to select plasticity. The routing rule is data-driven rather than learned end-to-end; its scores are computed from calibrated discrepancy and delayed-label conflict signals. This distinction matters because the confirmation experiment evaluates a fixed routing procedure, not a jointly optimized router.
 
-Experience Replay interleaves current and stored examples and is a strong reference under recurring regimes \cite{Rolnick2019Replay}. Buffer composition matters under class imbalance and task-free intrusion streams \cite{Amalapuram2023NIDSReplay}. Gradient-constrained methods such as A-GEM instead restrict interference with episodic memory \cite{Chaudhry2019AGEM}.
+\subsection{Continual NIDS and Benchmark Data}
+Recent NIDS surveys identify UNSW-NB15 and CIC-IDS2017 as widely used benchmark families \cite{Ali2024NIDSSurvey,Moustafa2015UNSW,Sharafaldin2018CICIDS}. The ToN-IoT dataset extends the setting to telemetry-rich IoT environments \cite{Moustafa2019ToNIoT}. NetFlow-oriented datasets improve scalability and reduce dependence on payload inspection \cite{Layeghy2022NFv2,Luay2025NetFlowV3,UQNIDSDatasets2025}. Recent continual NIDS methods such as augmented replay, SSF, and RepShield establish relevant comparison points \cite{Amalapuram2023NIDSReplay,Zhang2025SSF,Liu2026RepShield}. DASP uses these families as locked comparators rather than selectively reporting only favorable methods.
 
-SSF selects representative drift samples and removes outdated entries before fine-tuning \cite{Zhang2025SSF}. Its mechanism-faithful and budget-matched forms are both included because pseudo-label insertion and ground-truth label budgets answer different fairness questions. RepShield protects historical representations with a learned gradient subspace \cite{Liu2026RepShield}. DASP differs by freezing the base hidden blocks after warm-up and adapting only residual branches, modulation parameters, the input adapter, and the classifier.
+\subsection{Interpretability and Statistical Reporting}
+Interpretability methods such as LIME and SHAP explain predictions after the model has acted \cite{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}. DASP exposes a structural explanation during adaptation: the router reports the selected modules, their plasticity values, and the replay budget. This is a different, intervention-oriented form of explanation. The paper reports paired stream-level comparisons, avoids window-level pseudo-replication, and uses exact paired tests together with effect sizes, consistent with recent guidance on machine-learning metrics and statistical tests \cite{Rainio2024Metrics}.
 
-\section{DASP}
+\subsection{Synthesis and Research Gap}
+Within the cited concept-drift, continual-learning, and continual-NIDS literature, three linked gaps remain. First, drift detectors usually answer whether a stream has changed, whereas a repair policy must also decide where parameter updates are admissible. Second, continual-learning methods protect prior knowledge mainly through replay, regularization, distillation, or gradient constraints applied to a globally shared predictor; these mechanisms do not by themselves provide a falsifiable module-level locality invariant. Third, continual NIDS studies often report predictive quality without jointly auditing delayed-label semantics, update cost, inference throughput, and the exact unit of statistical replication. DASP addresses this intersection by treating attribution as a routing decision, locality as a hard optimizer constraint, and stream evaluation as a paired deployment contract. This framing is narrower than a claim of universally better continual learning: the contribution is a testable combination of attribution, constrained repair, and auditability for streaming NIDS.
+
+\section{Problem Formulation}
+\label{sec:problem}
+
+Let a stream be a sequence of windows $\mathcal{W}=\{W_t\}_{t=1}^{T}$, where $W_t=\{(x_i,y_i)\}_{i=1}^{n_t}$, $x_i\in\mathbb{R}^{d}$, and $y_i\in\{0,1\}$. At prediction time, labels in the current window are unavailable. After a fixed delay $\delta=1$, delayed labels become available under the implemented method-specific supervision path. Primary DASP splits the labeled window into repair and holdout partitions and selects at most $B_{\mathrm{train}}=128$ repair examples. Hence, $B_{\mathrm{train}}$ bounds the optimization subset, not total label exposure. The detector must produce $\hat{y}_t$ before using any labels from $W_t$.
+
+The task is deliberately scoped to binary benign-versus-attack prediction with one-window delayed supervision and bounded repair training. In this paper, \emph{attribution} means an operational assignment of repair responsibility from discrepancy and delayed-label conflict scores; it does not denote causal feature attribution. The classifier is a shared adaptation group, while the locality claim concerns the four representation modules. The goal is not only to maximize predictive quality, but to minimize unnecessary parameter motion. Let $\Theta$ denote all parameters and $\mathcal{A}_t\subseteq\{1,\ldots,M\}$ denote the attributed active module set. DASP seeks
+\begin{equation}
+\max \; \mathbb{E}[\operatorname{MacroF1}] - \lambda_u \operatorname{UpdateCost} - \lambda_m \operatorname{Motion}(\Theta_{\neg\mathcal{A}_t}),
+\label{eq:objective}
+\end{equation}
+subject to $|\mathcal{A}_t|\leq k$, where $k=3$ in the locked confirmation configuration. The last term encodes the structural preservation requirement: inactive modules must not change during a repair.
+
+\section{Drift-Attributed Subspace Plasticity}
 \label{sec:method}
 
-\subsection{Prediction-First Streaming State}
+\subsection{Design Rationale and System State}
+A conventional depth-wise MLP exposes globally shared hidden layers, so an update motivated by one feature group can move parameters used by every group. DASP instead creates four parallel representation modules and a shared fusion classifier. The modules are not assumed to be causally independent or intrinsically human-interpretable. They are a controlled intervention surface: each parameter group can be excluded from the optimizer and verified independently, while the classifier remains trainable because concept drift may move the decision boundary even when representation discrepancy is modest. Replay supplies historical supervision, whereas the routing mask determines where that supervision may alter parameters.
 
-Let $W_t=\{x_{t,i}\}_{i=1}^{n}$ be the unlabeled flows in window $t$, and let $Y_t$ become available after one window. The deployed predictor is $f_{\theta_t}$. The protocol executes
-\begin{align}
-\hat{Y}_t &= f_{\theta_t}(W_t), \label{eq:predict}\\
-\theta_{t+1} &= \mathcal{A}\!\left(\theta_t,W_t,Y_{t-1},M_t,D_t\right), \label{eq:update}
-\end{align}
-where $M_t$ is bounded labeled memory and $D_t$ is detector state. Equation (\ref{eq:predict}) is completed before $Y_t$ is revealed. An accepted candidate can affect only $W_{t+1}$ and later windows.
-
-The warm-up MLP has hidden widths 256--128--64. After warm-up, all base block parameters $\theta^{\mathrm{base}}$ are frozen:
+The persistent state at iteration $t$ is
 \begin{equation}
-\theta^{\mathrm{base}}_t=\theta^{\mathrm{base}}_4,\quad t\geq4,
-\qquad \texttt{global\_update}_t=0.
-\label{eq:invariant}
+\mathcal{S}_t=\left(\Theta_t,\mathcal{M}_t,\mathcal{H}^{\mathrm{ref}}_t,\mathcal{Q}_t\right),
+\label{eq:system-state}
 \end{equation}
-The executable assertion in (\ref{eq:invariant}) makes a base-backbone update a failed run rather than a fallback behavior.
-
-\subsection{Layer Adapters and Fused Inference}
-
-For hidden layer $\ell$, DASP augments the frozen affine map with a low-rank residual branch:
+where $\Theta_t$ is the model state, $\mathcal{M}_t$ is bounded replay memory, $\mathcal{H}^{\mathrm{ref}}_t$ is the reference-representation bank, and $\mathcal{Q}_t$ is the pending-update queue. Before labels for $W_t$ are available, the online procedure computes representation evidence $\mathcal{E}_t=(\mathbf r_t,s_t,D_t)$, emits $\hat Y_t$, and enqueues $(W_t,\hat Y_t,\mathcal{E}_t)$. Let $\tau=t-1$. When $Y_{\tau}$ arrives, the procedure retrieves the stored item for $W_{\tau}$, restores $\mathcal{E}_{\tau}$, computes $\mathbf c_{\tau}$, $\mathbf p_{\tau}$, and $\mathcal A_{\tau}$, and updates the model for subsequent windows. Thus,
 \begin{equation}
-z_{t,\ell}=W_\ell h_{t,\ell-1}+b_\ell+
-s_\ell U_{\ell,r}V_{\ell,r}h_{t,\ell-1},
-\label{eq:adapter}
+\mathcal{S}_{t+1}=\mathcal{T}\!\left(\mathcal{S}_t,W_t,\mathcal{E}_t,Y_{\tau},\mathcal{Q}_t[\tau]\right),\qquad \tau=t-1,
+\label{eq:state-transition}
 \end{equation}
-where $r$ is the active adapter rank. After the layer nonlinearity, a bounded feature-wise modulator applies
+and no routing quantity indexed by $t$ is combined with labels from $W_{t-1}$.
+
+\subsection{Modular Feature-Subspace Backbone}
+The backbone partitions the standardized input into $M=4$ contiguous groups. Module $j$ maps its feature slice $x^{(j)}$ into a 64-dimensional representation,
 \begin{equation}
-\widetilde{h}_{t,\ell}
-=h_{t,\ell}\odot\left(1+\rho\tanh g_\ell\right)
-+\rho\tanh q_\ell .
-\label{eq:modulation}
+h_j=f_j(x^{(j)};\theta_j),\qquad j=1,\ldots,M,
+\label{eq:module}
 \end{equation}
-An additional low-dimensional input adapter contributes directly to the logits. The classifier, adapters, input adapter, and modulators are trainable; the base $W_\ell,b_\ell$ are not.
-
-At deployment, $U_{\ell,r}V_{\ell,r}$ and the affine modulation terms are algebraically folded into cached linear layers. The cache is refreshed only after a commit and is non-trainable. This removes adapter branches and modulation operations from the ordinary forward path while preserving equivalent logits.
-
-\subsection{Feature and Delayed-Performance Triggers}
-
-For each hidden layer, a multiscale MMD monitor compares the current representation with a calibrated reference:
+and the shared classifier produces
 \begin{equation}
-d_{t,\ell}=\frac{1}{|\mathcal{K}|}\sum_{\sigma\in\mathcal{K}}
-\widehat{\mathrm{MMD}}^2_{k_\sigma}
-\left(H_{\ell}^{\mathrm{ref}},H_{\ell}(W_t)\right).
+z=g([h_1\Vert h_2\Vert\cdots\Vert h_M];\phi),\qquad
+\hat y=\arg\max_c z_c.
+\label{eq:classifier}
+\end{equation}
+The same fixed partition is used for every stream cell. Its purpose is parameter-level controllability, not a claim that contiguous groups correspond to independent causal mechanisms.
+
+\subsection{Warm-Up Calibration and MMD Requirement}
+Warm-up trains the initial predictor and fills $\mathcal{M}_t$. The implementation then freezes a reference-model snapshot and constructs $\mathcal{H}^{\mathrm{ref}}$ from the final warm-up window. The four calibration representation sets are produced by this same frozen reference model on the last four warm-up windows. For each module, calibration compares the fixed final-window bank with each calibration-window representation set; it is neither leave-one-window-out nor based on an independently sampled reference. For module $j$, DASP subsamples at most $q=128$ reference and current representations, computes squared pairwise distances over the joined sample, and uses the median positive distance $b_{j,t}$ as the base bandwidth. The multi-scale kernel is
+\begin{equation}
+K_{j,t}(u,v)=\frac{1}{3}\sum_{s\in\{0.5,1,2\}}
+\exp\left(-\frac{\lVert u-v\rVert_2^2}{2b_{j,t}s^2}\right).
+\label{eq:multiscale-kernel}
+\end{equation}
+The implementation uses the non-negative biased estimate
+\begin{equation}
+m_{j,t}=\left[\frac{1}{n^2}\sum_{a,b}K(u_a,u_b)
++\frac{1}{m^2}\sum_{a,b}K(v_a,v_b)
+-\frac{2}{nm}\sum_{a,b}K(u_a,v_b)\right]_+.
 \label{eq:mmd}
 \end{equation}
-The detector uses 192 samples, scales $\{0.5,1,2\}$, an ordinary threshold of 0.15 with two-window persistence, and an emergency threshold of 0.60. A cheaper input gate uses severity 0.075 before layer-level scoring.
+Across the four calibration windows, let $\widetilde\mu_j$ and $\operatorname{MAD}_j$ denote the median and median absolute deviation of $m_{j,t}$. DASP computes
+\begin{align}
+z_{j,t}&=\max\left(0,\frac{m_{j,t}-\widetilde\mu_j}
+{1.4826\max(\operatorname{MAD}_j,10^{-6})+\epsilon}\right),\\
+r_{j,t}&=\operatorname{clip}\left(
+\frac{z_{j,t}-\kappa}{z_{\max}-\kappa},0,1\right),
+\label{eq:requirement}
+\end{align}
+with $\kappa=2$, $z_{\max}=12$. Severity is the mean of the largest $\min(k,M)$ requirement scores. In the evaluated DASP configuration, a drift episode is triggered when severity exceeds $\theta_s=0.15$ for $P=1$ consecutive window (equivalently, the current window alone). The locked experimental configuration also specifies an emergency-severity value of $0.60$, but this parameter is not used by the evaluated primary procedure and is therefore inactive in the reported DASP results.
 
-Feature evidence is joined by a delayed-performance trigger. Let $\widetilde{F}_{t-1}$ and $\widetilde{R}_{t-1}$ be five-window reference medians. After four valid history observations, strong adaptation is eligible when
+\subsection{Delayed Conflict and Top-$k$ Routing}
+Let $\tau=t-1$ denote the delayed window being repaired at outer iteration $t$. The implementation partitions labeled $W_{\tau}$ into a 75\% repair pool and a disjoint 25\% performance holdout, then uses repair-pool labels to select at most 128 class-balanced training examples. Thus, 128 is a training-subset count; the matrix compares the implemented supervision paths rather than a shared 128-total-label-query protocol.
+
+Let $C_{\tau}^{\mathrm{new}}$ be the sampled delayed repair-training batch and $B_{\tau}^{\mathrm{mem}}$ a class-balanced replay batch. DASP compares current-window and replay gradients for each adaptation module,
 \begin{equation}
-\widetilde{F}_{t-1}-F_{t-1}\geq0.08
-\quad\lor\quad
-\widetilde{R}_{t-1}-R_{t-1}\geq0.08.
-\label{eq:performance_trigger}
+c_{j,\tau}=\max\left(0,-\frac{\langle g_{j,\tau}^{\mathrm{new}},g_{j,\tau}^{\mathrm{mem}}\rangle}
+{\lVert g_{j,\tau}^{\mathrm{new}}\rVert_2\lVert g_{j,\tau}^{\mathrm{mem}}\rVert_2+\epsilon}\right).
+\label{eq:conflict}
 \end{equation}
-The trigger has a two-update cooldown. Current feature statistics may use $W_t$, but performance triggering and parameter updates use delayed labels only.
-
-\subsection{Current-Batch Querying and Similarity Replay}
-
-DASP first forms a label-blind query from the current unlabeled window using predictive entropy, prototype novelty, and model--prototype disagreement. Half of the query is reserved for global coverage; the remainder is distributed by predicted class and prototype neighborhood. This selection chooses which labels will be requested after the fixed delay; it does not reveal labels during prediction.
-
-Memory contains at most 5,000 labeled flows. Labeled examples are retrieved using cosine similarity to a 512-flow query from the current unlabeled batch. Class quotas, prediction confidence, and a Jensen--Shannon prior-divergence adjustment prevent the replay pool from collapsing entirely onto the model's current predicted class. The stable path requests at most 64 new labels; any adapting path remains bounded by 256 ground-truth labels per window.
-
-\subsection{Fast and Strong Adaptation}
-
-If the stable precheck finds no warning or delayed performance event, DASP retains the current parameters and only performs bounded memory refresh. A warning activates a rank-4 fast candidate trained for one epoch with up to 128 replay samples. A persistent feature or performance event activates rank-32 adapters for a five-window recovery horizon, with two epochs and up to 256 replay samples. The base blocks remain frozen in both paths.
-
-Candidate validation uses a cumulative prequential guard with recent/current and memory components. Relative to fallback $b$, candidate $c$ must satisfy
+A high $c_{j,\tau}$ indicates greater forgetting risk. During a triggered attributed repair, the stored requirement for the same delayed window is attenuated as
 \begin{equation}
-\Delta F_c\geq0,\qquad
-\Delta R^{\mathrm{atk}}_c\geq-0.01,\qquad
-\Delta R^{\min}_c\geq-0.01.
-\label{eq:pareto}
+p_{j,\tau}=\frac{r_{j,\tau}}{1+\lambda_c c_{j,\tau}},\qquad \lambda_c=1.
+\label{eq:attribution}
 \end{equation}
-Candidates are ranked by macro-F1, minimum-class recall, attack recall, and lower-confidence evidence. Full and half-step commits are considered; otherwise the frozen fallback is retained.
+The active set contains at most the $k=3$ modules with the largest positive $p_{j,\tau}$; if none is positive, the maximum-scoring module is selected. The no-trigger branches rank modules by conflict and use a deterministic first-layer fallback if the active list is empty.
+
+\begin{table*}[t]
+\caption{Implementation-faithful repair policy for the reported primary DASP path. The classifier multiplier is 1 on the base learning rate $10^{-3}$ in every mode.}
+\label{tab:dasp-repair-policy}
+\centering
+\scriptsize
+\begin{tabular}{p{0.20\textwidth}p{0.22\textwidth}p{0.22\textwidth}p{0.20\textwidth}c}
+\toprule
+Mode & Condition for delayed window $\tau$ & Routed representation modules & Module plasticity & Epochs\\
+\midrule
+Triggered attributed repair & Stored MMD severity triggers at $\theta_s=0.15$ with $P=1$ & Up to three positive top-$k$ values of $p_{j,\tau}$; maximum-score fallback & $p_{j,\tau}=r_{j,\tau}/(1+c_{j,\tau})$ & 2\\
+Performance-gated emergency repair & No MMD trigger and $F^{\mathrm{hold}}_{\tau}<0.80$ & Three highest-conflict modules; deterministic fallback if needed & $\min\{1,\max(0.25,c_{j,\tau})\}$ & 3\\
+Background local consolidation & No MMD trigger and $F^{\mathrm{hold}}_{\tau}\geq0.80$ & Three highest-conflict modules; deterministic fallback if needed & $0.25$ & 2\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The delayed-label performance holdout is evaluated before optimization and only selects emergency versus background intensity. The evaluated primary DASP procedure applies the selected update directly; it has no post-update candidate acceptance or rollback step.
+
+\subsection{Replay, Memory Lifecycle, and Strict Freezing}
+The localized rehearsal batch is
+\begin{equation}
+\widetilde C_{\tau}=C_{\tau}^{\mathrm{new}}\cup B_{\tau}^{\mathrm{mem}},
+\label{eq:rehearsal}
+\end{equation}
+where $|B_{\tau}^{\mathrm{mem}}|\leq512$, current examples receive weight $w_{\mathrm{new}}=3$, and replay examples receive unit weight. The weighted loss is
+\begin{equation}
+\mathcal{L}_{\tau}=\frac{\sum_{(x_i,y_i)\in\widetilde C_{\tau}}w_i\,
+\ell(g(f(x_i)),y_i)}{\sum_i w_i}.
+\label{eq:loss}
+\end{equation}
+The memory capacity is 1,024. After localized training, $C_{\tau}^{\mathrm{new}}$ is inserted into memory. Reference refresh is enabled in the locked confirmation. After every applied primary DASP repair---triggered, emergency, or background---the updated model is deep-copied as the new reference snapshot, reference representations are recomputed on $W_{\tau}$, and calibration is recomputed over the recent windows ending at $\tau$.
+
+For selected modules, the learning rate is scaled by the mode-specific plasticity. The structural mask is
+\begin{equation}
+\eta_{j,\tau}=\begin{cases}
+p_{j,\tau}, & j\in\mathcal A_{\tau},\\
+0, & j\notin\mathcal A_{\tau},
+\end{cases}
+\qquad \eta_{\mathrm{classifier},\tau}=1.
+\label{eq:mask}
+\end{equation}
+Zero-plasticity modules are omitted from the AdamW optimizer rather than merely assigned a zero gradient. Consequently, neither gradient updates nor decoupled weight decay can change inactive modules. Pre- and post-update parameter-state fingerprints, together with the active-module count, are recorded to verify these structural invariants.
+\subsection{End-to-End Window Algorithm}
+Figure~\ref{fig:window-algorithm} presents the complete implemented DASP transition, while Fig.~\ref{fig:dasp-pseudocode} provides the corresponding pseudocode. These descriptions specify the complete transition without assuming a factorial contribution from any individual component.
 
 \begin{figure*}[t]
 \centering
-\begin{minipage}{0.96\textwidth}
+\includegraphics[width=0.98\textwidth]{dasp_algorithm_flowchart}
+\caption{Overview of the one-window delayed-label DASP adaptation cycle. For each current window $W_t$, predictions and MMD evidence are computed before label access and stored in a pending-update queue. At the same outer iteration, labels for $W_{\tau}$, $\tau=t-1$, restore the matching evidence; module-wise gradient conflict and the delayed-label performance holdout then determine repair intensity. The selected localized update is applied directly, unaffected modules remain frozen, and memory, reference, and audit state are updated. The reported primary path does not implement post-update candidate rollback.}
+\label{fig:window-algorithm}
+\end{figure*}
+
+\begin{figure}[t]
+\caption{Prediction-first DASP pseudocode}
+\label{fig:dasp-pseudocode}
 \begin{algorithmic}[1]
-\REQUIRE chronological windows $W_t$, delayed labels $Y_{t-1}$, model $f_{\theta_t}$, memory $M_t$
-\FOR{each window $t$}
-    \STATE transform and predict $W_t$; record forward and decision timing
-    \STATE compute the input gate and, when eligible, layer-level MMD
-    \STATE reveal $Y_{t-1}$ and update delayed performance history
-    \STATE create a label-blind current query and similarity-weighted labeled replay
-    \IF{persistent feature or delayed-performance event}
-        \STATE train rank-32 adapter/modulation candidates on the strong path
-    \ELSIF{warning evidence}
-        \STATE train a rank-4 fast candidate
+\STATE Warm up $f_{\Theta}$; initialize $\mathcal M$, $\mathcal H^{\mathrm{ref}}$, and pending queue $\mathcal Q$.
+\FOR{each outer iteration $t$ with current window $W_t$}
+  \STATE Predict $\hat Y_t=f_{\Theta_t}(X_t)$ before using labels from $W_t$.
+  \STATE Compute and store $\mathcal E_t=(\mathbf r_t,s_t,D_t)$ from $W_t$ and $\mathcal H_t^{\mathrm{ref}}$.
+  \STATE Enqueue $(W_t,\hat Y_t,\mathcal E_t)$ in $\mathcal Q$.
+  \IF{labels are available for $\tau=t-1$}
+    \STATE Dequeue $(W_{\tau},\hat Y_{\tau},\mathcal E_{\tau})$ and restore $\mathbf r_{\tau},s_{\tau},D_{\tau}$.
+    \STATE From delayed labels, split repair pool/holdout and form class-balanced $C_{\tau}^{\mathrm{new}}$ with at most 128 training examples; draw $B_{\tau}^{\mathrm{mem}}$.
+    \STATE Compute module conflicts $c_{j,\tau}$ from $C_{\tau}^{\mathrm{new}}$ and $B_{\tau}^{\mathrm{mem}}$ gradients.
+    \IF{stored MMD decision $D_{\tau}$ triggers}
+      \STATE Route positive top-$k$ $p_{j,\tau}=r_{j,\tau}/(1+c_{j,\tau})$; use maximum-score fallback.
+    \ELSIF{$F^{\mathrm{hold}}_{\tau}<0.80$}
+      \STATE Route top-$k$ conflicts for three-epoch performance-gated emergency repair.
     \ELSE
-        \STATE skip parameter adaptation and refresh bounded memory only
+      \STATE Route top-$k$ conflicts for two-epoch background local consolidation with $p=0.25$.
     \ENDIF
-    \STATE commit only a candidate satisfying (\ref{eq:pareto})
-    \STATE refresh the fused inference cache and assert (\ref{eq:invariant})
+    \STATE Train on $\widetilde C_{\tau}=C_{\tau}^{\mathrm{new}}\cup B_{\tau}^{\mathrm{mem}}$.
+    \STATE Update routed modules and classifier; exclude unaffected modules from AdamW.
+    \STATE Update memory and audit; refresh the enabled reference state using $W_{\tau}$.
+    \STATE Commit $\Theta_{t+1}$ for subsequent windows; no candidate rollback is executed.
+  \ENDIF
 \ENDFOR
 \end{algorithmic}
-\end{minipage}
-\caption{Prediction-first DASP execution. Current-window labels cannot affect their own predictions. Base hidden blocks are frozen after warm-up; only adapter, modulation, input-adapter, and classifier parameters can change.}
-\label{alg:dasp}
-\end{figure*}
+\end{figure}
+
+\subsection{Complexity, Worked Example, and Interpretability}
+Let $P_j$ be the parameters of module $j$, $P_c$ the classifier parameters, $q$ the MMD subsample size, $h$ the module representation width, $B$ the rehearsal batch size, and $E_t$ the selected epoch budget. The biased MMD computation costs $O(Mq^2h)$, conflict estimation requires two gradient calculations over the adaptation groups, and localized repair costs $O(E_tB(P_c+\sum_{j\in\mathcal A_t}P_j))$. Replay and reference storage require $O(B_{\mathrm{mem}}d+Mqh)$. All four modules are still evaluated at inference, explaining why update work can decrease while forward throughput remains lower than a flat MLP.
+
+As an arithmetic illustration, let $\mathbf r_{\tau}=(0.18,0.82,0.46,0.70)$ and $\mathbf c_{\tau}=(0.10,0.22,0.61,0.18)$. Equation~(\ref{eq:attribution}) gives $\mathbf p_{\tau}\approx(0.164,0.672,0.286,0.593)$; with $k=3$, modules $\{2,4,3\}$ and the classifier are updated, while module 1 remains byte-identical. This example illustrates the implemented calculation and is not presented as an empirical ablation result.
+
+The routing record is therefore an operational intervention record: it stores MMD, robust scores, conflict, plasticity, selected modules, replay size, repair mode, gradient evaluations, and whether any full-model update occurred. It explains the scope of parameter change rather than providing post-hoc feature importance \cite{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}.
 
 \section{Experimental Design}
-\label{sec:experimental}
+\label{sec:experiments}
 
-\subsection{Dataset, Task, and Controlled Streams}
-
-The evaluated task is binary Benign/Attack classification on NF-UNSW-NB15-v3, derived from the NF-v3 feature representation \cite{Luay2025NetFlowV3,UQNIDSDatasets2025}. All attack families are mapped to the Attack class. The prepared runner input contains 49 numeric features and two labels. Multiclass attack-family recognition is outside the present evidence.
-
-Each stream contains 36 windows of 4,096 flows. Windows 0--3 are a one-time warm-up, windows 4--11 are stable composition A, windows 12--23 contain composition B or its transition, and windows 24--35 contain the scenario-specific final regime. The scenarios are stationary S0, abrupt A$\rightarrow$B S1, gradual A$\rightarrow$B S2, recurring A$\rightarrow$B$\rightarrow$A S3, and local/minority S4. Attack prevalence is fixed in the controlled generator. Recurrent A uses new source flows rather than replaying earlier rows.
-
-The stream generator changes attack-family composition and therefore directly controls $P(X\mid Y=\mathrm{Attack})$, not $P(Y\mid X)$. On the five confirmation seeds, attack-only MMD averaged 0.084611, 0.082309, 0.084171, and 0.001641 for S1--S4, respectively. However, a logistic probe trained on A did not lose macro-F1 on B: mean A-minus-B differences were $-0.000777$, $-0.001206$, $-0.001014$, and $-0.001383$. Accordingly, this manuscript calls the completed NF-UNSW episodes \emph{controlled class-conditional distribution shifts}; it does not use them as direct evidence of a changed binary $P(Y\mid X)$ decision boundary.
-
-\subsection{Comparators and Fairness Controls}
-
-Table \ref{tab:baselines} lists DASP and the seven locked comparators. No algorithm was added after inspecting the confirmation. Neural methods share the stream, warm-up, initialization pair, label delay, and 256-label maximum. SSF-faithful preserves its pseudo-label insertion mechanism; SSF-budget disables pseudo-label insertion to expose the ground-truth-budget-matched comparison. A subsequent protocol locks detector-off and oracle-trigger DASP ablations for future confirmation, but they are not retroactively inserted into this completed matrix and no result is claimed for them here.
-
-\begin{table*}[t]
-\caption{Locked Comparator Matrix}
-\label{tab:baselines}
-\centering
-\footnotesize
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{p{0.18\textwidth}p{0.50\textwidth}p{0.22\textwidth}}
-\toprule
-Method & Update mechanism & Role \\
-\midrule
-Frozen & Warm-up model remains fixed & No-adaptation reference \\
-Periodic FT & Fine-tunes every four windows & Schedule-based adaptation \\
-Online MLP & Updates on every delayed labeled window & Naive online learner \\
-Experience Replay & Current delayed labels plus reservoir replay & Strong rehearsal comparator \\
-SSF-faithful & Selection/forgetting with pseudo-label insertion & Mechanism-faithful SSF \\
-SSF-budget & SSF with pseudo-label insertion disabled & Ground-truth-budget match \\
-RepShield & Drift signal, replay, and gradient-subspace protection & IDS continual-learning comparator \\
-DASP & Event-gated layer adapters and fused inference cache & Proposed method \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\subsection{Online Protocol and Outcomes}
-
-For every evaluated window, the deployed model predicts first; metrics and available unlabeled drift statistics are recorded; labels from the preceding window are then revealed; the method updates; and new parameters become available only to the next window. Model, scaler, detector, optimizer, and memory state are never reset inside a stream.
-
-For an event starting at $t_d$, the primary endpoint is
-\begin{equation}
-\earlyf=\frac{1}{5}\sum_{j=0}^{4}F_{\mathrm{macro}}(t_d+j).
-\label{eq:early}
-\end{equation}
-\earlyr{} is defined analogously. S3 first drift and recurrence are separate episodes. Secondary outcomes are minimum post-drift macro-F1, recovery time and deficit, recurrence gain, forgetting, detector matching, stationary update activity, latency, throughput, labels, memory, and global-update count.
-
-\subsection{Confirmation and Statistical Analysis}
-
-The locked confirmation crosses five scenarios, stream seeds 2101--2105, model seeds 101--102, and eight methods, yielding 400 runs. Shift outcomes comprise 50 paired episode observations per method: ten observations each for S1, S2, S3 first shift, S3 recurrence, and S4. Paired differences preserve method, scenario, stream, and model-seed alignment. A 10,000-iteration hierarchical bootstrap resamples stream seeds within the single dataset and provides effect intervals. An exact two-sided sign-flip test uses the five dataset--stream clusters as the independent units. The prespecified DASP--SSF-budget macro-F1 contrast is unadjusted; the seven exploratory DASP--baseline tests are Holm-adjusted within each metric. Windows and the two model seeds nested within a stream are never treated as independent replicates.
-
-Superiority requires both a positive 95\% paired interval and a two-sided stream-cluster randomization result below 0.05 for the prespecified contrast, while preserving attack recall, recurrence, the label limit, and the no-global-update invariant. Exploratory all-baseline claims additionally require Holm-adjusted $p<0.05$. A positive mean or interval alone does not satisfy this gate.
-
-\subsection{GPU Systems Benchmark}
-
-Systems measurements use a separate 80-run matrix: the same five scenarios and eight methods, stream seed 2001, and model seeds 11 and 12. This matrix is used only for timing and resources; its accuracy does not replace confirmation accuracy. The environment is Windows 11, Python 3.12.7, PyTorch 2.3.1 with CUDA 12.1, two PyTorch CPU threads, and an NVIDIA GeForce RTX 3050 Laptop GPU with 6 GB memory.
-
-CUDA is synchronized before closing forward and update wall-clock intervals, and peak CUDA counters are reset before every run. Prediction/decision time includes preprocessing, forward execution, and drift scoring. Complete test-then-train time adds metric computation and the delayed update exactly once. Throughput is total evaluated flows divided by complete time.
-
-\section{Results}
-\label{sec:results}
-
-\subsection{Integrity and Primary Distribution-Shift Evaluation}
-
-All 400 confirmation runs and all 80 systems runs completed. The audits found no missing or duplicate cells and no non-finite primary outcomes. Every method has 50 confirmation runs and ten systems runs. DASP produced zero global-update violations.
-
-Table \ref{tab:adaptation} shows the confirmation means over S1, S2, S3 first shift, S3 recurrence, and S4. DASP achieved the highest mean \earlyf{} (0.995543) and the highest mean minimum post-shift macro-F1 (0.990591). SSF-faithful had the highest \earlyr{} (0.995240), illustrating a precision--recall trade-off rather than uniform dominance.
-
-\begin{table*}[t]
-\caption{Controlled Class-Conditional Shift Evaluation on NF-UNSW-NB15-v3}
-\label{tab:adaptation}
-\centering
-\footnotesize
-\setlength{\tabcolsep}{5.2pt}
-\begin{tabular}{lccc}
-\toprule
-Method & \earlyf{} & \earlyr{} & Mean minimum post-shift F1 \\
-\midrule
-DASP & \textbf{0.995543} & 0.990353 & \textbf{0.990591} \\
-Experience Replay & 0.995066 & 0.987765 & 0.989647 \\
-Periodic FT & 0.994954 & 0.985828 & 0.989341 \\
-RepShield & 0.994899 & 0.987204 & 0.989183 \\
-Frozen & 0.994781 & 0.988615 & 0.989706 \\
-Online MLP & 0.994773 & 0.985611 & 0.989949 \\
-SSF-budget & 0.993817 & 0.986624 & 0.986633 \\
-SSF-faithful & 0.989516 & \textbf{0.995240} & 0.971160 \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-Table \ref{tab:paired} gives paired DASP-minus-baseline effects. DASP had a positive descriptive \earlyf{} bootstrap interval against six of seven comparators, while the Experience Replay interval crossed zero ($[-0.000060,\,0.001019]$). At the five independent stream-cluster level, the prespecified DASP--SSF-budget exact test gave $p=0.0625$ and the corresponding Attack-Recall test gave $p=0.25$. None of the seven exploratory comparisons survived Holm correction for either metric. The completed matrix therefore estimates small favorable effects but does not pass the inferential superiority gate.
-
-\begin{table*}[t]
-\caption{Paired DASP Effects, 95\% Hierarchical Bootstrap Intervals, and Stream-Cluster Tests}
-\label{tab:paired}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{3.8pt}
-\begin{tabular}{lrrrrr}
-\toprule
-Baseline & $\Delta$\earlyf{} (95\% CI) & Exact $p$ & Holm $p$ & $\Delta$\earlyr{} (95\% CI) & F1 win rate \\
-\midrule
-Experience Replay & $+0.000477$ $[-0.000060,\,0.001019]$ & 0.1875 & 0.5000 & $+0.002588$ $[-0.000416,\,0.004633]$ & 0.66 \\
-Online MLP & $+0.000770$ $[0.000267,\,0.001270]$ & 0.1250 & 0.5000 & $+0.004742$ $[0.000923,\,0.007729]$ & 0.68 \\
-Periodic FT & $+0.000590$ $[0.000076,\,0.001065]$ & 0.1875 & 0.5000 & $+0.004525$ $[0.000706,\,0.008344]$ & 0.60 \\
-RepShield & $+0.000644$ $[0.000255,\,0.000924]$ & 0.1250 & 0.5000 & $+0.003149$ $[-0.000959,\,0.006190]$ & 0.72 \\
-SSF-budget & $+0.001726$ $[0.001522,\,0.002046]$ & 0.0625 & 0.4375 & $+0.003729$ $[0.000145,\,0.007186]$ & 0.78 \\
-SSF-faithful & $+0.006027$ $[0.003994,\,0.009074]$ & 0.0625 & 0.4375 & $-0.004887$ $[-0.009792,\,-0.000361]$ & 0.84 \\
-Frozen & $+0.000762$ $[0.000263,\,0.001627]$ & 0.0625 & 0.4375 & $+0.001738$ $[0.000923,\,0.003113]$ & 0.42 \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=0.92\textwidth]{nf_unsw_drift_episode_heatmap.pdf}
-\caption{Mean early macro-F1 over the first five post-shift windows. S3 first shift and recurrence are reported separately. Values are descriptive episode means; paired stream-level intervals and cluster tests determine inferential claims.}
-\label{fig:drift_heatmap}
-\end{figure*}
-
-\subsection{Shift Type, Recurrence, and Recovery}
-
-Figure \ref{fig:drift_heatmap} shows that all methods operate near the binary-task ceiling. DASP leads S2, S3 recurrence, and S4 among the displayed means, while Experience Replay is slightly higher in S1 and S3 first shift. For DASP, S3 \earlyf{} changes from 0.995651 at first shift to 0.995014 at recurrence, a recurrence gain of $-0.000638$. Attack recall changes from 0.991946 to 0.989140 ($-0.002805$). The decline is small but does not support a recurrence-improvement claim.
-
-The preregistered recovery time is zero for every method because the first post-drift score already exceeds 90\% of the high pre-drift reference. Recovery deficit is likewise zero. These outcomes are ceiling-limited and do not discriminate adaptation on this binary NF-UNSW stream; early F1, early attack recall, and the post-drift minimum are therefore the informative outcomes.
-
-\subsection{Detector Behavior and Stationary Activity}
-
-Detector totals are deduplicated at the run level before aggregation. DASP matched 9 of 50 controlled drift events, producing precision 0.1667, recall 0.1800, and mean matched delay 4.22 windows. Table \ref{tab:detector} also shows that high-recall comparator triggers incur many signals outside the matching region. Trigger definitions differ across methods, so these counts diagnose their executed mechanisms rather than establish a universal detector ranking.
+\subsection{Datasets and Task}
+We evaluate binary benign-versus-attack detection on five network-flow collections: CIC-IDS2017, NF-BoT-IoT-v3, NF-CSE-CIC-IDS2018-v3, NF-ToN-IoT-v3, and NF-UNSW-NB15-v3. The classical source datasets are described in \cite{Ali2024NIDSSurvey,Sharafaldin2018CICIDS,Moustafa2015UNSW,Moustafa2019ToNIoT}; the NetFlow construction and dataset portal are documented in \cite{Layeghy2022NFv2,Luay2025NetFlowV3,UQNIDSDatasets2025}. All methods use the same chronologically ordered experimental streams. No future window contributes to a prediction.
 
 \begin{table}[t]
-\caption{Run-Level Drift-Event Matching}
-\label{tab:detector}
+\caption{Dataset and stream protocol.}
+\label{tab:datasets}
 \centering
-\scriptsize
-\begin{tabular}{lrrrr}
+\begin{tabular}{p{0.42\columnwidth}p{0.42\columnwidth}}
 \toprule
-Method & Precision & Recall & False alarms & Delay \\
+Dataset & Role in evaluation\\
 \midrule
-DASP & 0.1667 & 0.1800 & 45 & 4.22 \\
-SSF-budget & 0.1318 & 0.5800 & 191 & 0.69 \\
-SSF-faithful & 0.0635 & 0.9800 & 723 & 0.31 \\
-RepShield & 0.0428 & 1.0000 & 1,117 & 0.02 \\
+CIC-IDS2017 & Enterprise traffic with multiple attack families\\
+NF-BoT-IoT-v3 & IoT botnet and denial-of-service behavior\\
+NF-CSE-CIC-IDS2018-v3 & Enterprise/IoT flow variant with evolving attack composition\\
+NF-ToN-IoT-v3 & Telemetry-rich IoT and network traffic\\
+NF-UNSW-NB15-v3 & Heterogeneous modern network-flow benchmark\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Across 320 evaluated S0 windows, DASP adapted in 7.1875\% and emitted an alarm or fast trigger in 4.6875\%. It used 24,896 ground-truth update labels across the ten stationary runs, versus 81,920 for the always-updating methods. This supports selectivity and reduced label use, but it does not rescue the weak event-matching recall.
+\subsection{Ten Primary Drift Conditions}
+The protocol contains ten conditions: stationary control ($S0$), sudden drift ($S1$), gradual drift ($S2$), incremental drift ($S3$), recurrent drift ($S4$), transient blip ($S5$), combined drift ($S6$), and local class-conditional drift at low, medium, and high intensity ($S7$-Local-Low/Medium/High). Local scenarios change the composition associated with selected classes while retaining non-target traffic as an anchor. The taxonomy follows the distinction between drift type and locality in \cite{Arora2024DriftReview,Li2024DriftType,Aguiar2024Locality}.
 
-\subsection{GPU Latency, Throughput, and Memory}
+\subsection{Methods and Fairness Controls}
+The eight methods are locked before evaluation: Online MLP, Experience Replay, Online EWC, A-GEM, SSF, RepShield, CDDA-MD, and modular DASP. All methods receive the same prepared stream, one-window prediction-first delay, and seed assignment. Their supervision paths differ: primary DASP selects 128 class-balanced repair examples from a labeled pool and evaluates a disjoint 25\% holdout; primary SSF also selects after label access, whereas the budget-matched comparators use label-blind uniform selection. The matrix therefore does not establish equal total label exposure. Method-specific controls and this exception are reported explicitly in Table~\ref{tab:method-config-detail} and Appendix~\ref{app:method-matrix}. The SSF implementation follows strategic sample selection and forgetting protection \cite{Zhang2025SSF}; RepShield follows representation-protection motivation \cite{Liu2026RepShield}; the remaining baselines represent direct online training, replay, regularization, and gradient projection.
 
-Table \ref{tab:systems} separates isolated forward inference from complete test-then-train operation. DASP has the fastest p95 forward inference, 3.675 ms/window, 1.32$\times$ faster than the next method, Periodic FT. This result is consistent with the fused inference cache. DASP nevertheless ranks fifth in mean complete latency because its selective events have a long update tail: 47.558 ms mean and 298.144 ms p95.
+\subsection{Pilot and Confirmation Matrices}
+The full pilot contains $5\times10\times3\times1\times8=1{,}200$ runs. The confirmation matrix contains $5\times10\times5\times2\times8=4{,}000$ runs, with stream seeds $\{2001,2002,2003,2101,2102\}$ and model seeds $\{91,92\}$. Each dataset--scenario--seed--model cell is paired across methods. The confirmation has 500 DASP--SSF paired comparisons.
 
-\begin{table*}[t]
-\caption{Clean GPU Systems Benchmark (Median Run-Level Summaries)}
-\label{tab:systems}
-\centering
-\scriptsize
-\setlength{\tabcolsep}{4.0pt}
-\begin{tabular}{lrrrrr}
-\toprule
-Method & p95 forward & Mean complete & p95 complete & Complete throughput & Peak CUDA \\
- & (ms/window) & (ms/window) & (ms/window) & (flows/s) & allocated (MiB) \\
-\midrule
-Frozen & 6.030 & \textbf{9.597} & 12.819 & \textbf{427,868} & 73.64 \\
-Online MLP & 6.201 & 28.536 & 32.412 & 143,690 & 73.64 \\
-Periodic FT & 4.855 & 34.012 & 46.009 & 120,492 & 73.64 \\
-Experience Replay & 6.236 & 45.206 & 58.881 & 90,613 & 73.64 \\
-DASP & \textbf{3.675} & 47.558 & 298.144 & 87,041 & 82.33 \\
-SSF-faithful & 6.668 & 414.464 & 474.516 & 9,897 & 75.93 \\
-SSF-budget & 6.273 & 428.194 & 490.389 & 9,566 & 75.93 \\
-RepShield & 11.205 & 1,205.065 & 1,526.875 & 3,494 & 79.04 \\
-\bottomrule
-\end{tabular}
-\end{table*}
+\subsection{Metrics and Statistical Analysis}
+The primary metric is Macro-F1 because it weights benign and attack classes equally. We also report attack recall, false-negative rate, cumulative Macro-F1, online forgetting, update time, median update time, gradient evaluations, prediction throughput, memory payload, and peak resident memory. Metric choice under class imbalance should combine class-balanced summaries with class-wise error analysis \cite{Chen2024ImbalancedSurvey,Rainio2024Metrics}.
 
-DASP is 5.20\% slower than Experience Replay in mean complete latency, but 8.71$\times$, 9.00$\times$, and 25.34$\times$ faster than SSF-faithful, SSF-budget, and RepShield, respectively. Its median adaptation-event rate is 0.090625 and its median ground-truth update use is 2,624 labels per run, compared with 8,192 for every-window updating methods. The cost is memory: DASP has the largest peak allocated CUDA memory (82.33 MiB) and a 94 MiB peak reserved footprint.
+The analysis unit is the paired dataset--scenario--stream-seed--model-seed cell, not the window. We report paired mean gaps, medians, wins, and a sign test. Cells are paired exactly across methods, but cells sharing a dataset or scenario generator are not claimed to be independent draws from all possible operational deployments. We additionally use a paired $t$-test and Wilcoxon signed-rank test as sensitivity analyses, with Holm correction when multiple exploratory comparisons are made \cite{Rainio2024Metrics}. Bootstrap intervals may be added after the final archival run; the present analysis emphasizes the exact paired results to avoid treating highly correlated windows as independent. The very small nominal p-values are therefore interpreted as sensitivity evidence for the locked matrix, while the dataset-wise, scenario-wise, and worst-cell summaries carry the generalization argument.
+
+\subsection{Reproducibility and Performance Measurement}
+All runs use single-thread CPU execution, fixed stream and model seeds, a locked experimental configuration, and deterministic run identifiers. Adaptation time is the sum of update intervals, excluding data preparation. Prediction throughput is measured separately from update time, so a faster predictor is not conflated with a faster adaptation algorithm. The same streaming evaluation procedure is applied consistently across the full protocol.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Overall Confirmation Results}
+Table~\ref{tab:overall} is generated directly from the 4,000-run confirmation. DASP obtains the highest observed mean Macro-F1, $0.9269$, followed by SSF at $0.9191$ and Experience Replay at $0.9036$. The DASP--SSF mean gap is $+0.0078$ and the median gap is $+0.0032$. DASP wins 383 of 500 paired cells and remains within $\pm0.01$ of SSF in 303 cells. The sign test gives $p=2.56\times10^{-34}$; the paired $t$-test and Wilcoxon sensitivity tests give $p=4.59\times10^{-20}$ and $p=2.39\times10^{-27}$, respectively.
+
+\input{generated_tables.tex}
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.88\textwidth]{nf_unsw_accuracy_performance_tradeoff.pdf}
-\caption{Confirmation early macro-F1 versus mean complete test-then-train latency from the separate GPU benchmark. The horizontal axis is logarithmic. Higher and farther left is preferable; accuracy and systems evidence come from separate prespecified matrices.}
-\label{fig:tradeoff}
+\includegraphics[width=0.90\textwidth]{dataset_macro_f1}
+\caption{Mean Macro-F1 by dataset over the confirmation matrix. DASP is highlighted in red.}
+\label{fig:datasetf1}
 \end{figure*}
 
-One CUDA SVD batch used PyTorch's more accurate fallback solver after the default solver did not converge. No run crashed or was retried. The executed fallback time is retained because it is part of the comparator's realized computation.
+\subsection{Dataset-Level Analysis}
+Table~\ref{tab:dataset} summarizes all methods by dataset, while Fig.~\ref{fig:datasetf1} shows the method distribution. DASP is the best method on CIC-IDS2017 ($0.9420$), NF-BoT-IoT-v3 ($0.8652$), NF-CSE-CIC-IDS2018-v3 ($0.9627$), and NF-ToN-IoT-v3 ($0.8684$). On NF-UNSW-NB15-v3, several methods are effectively saturated near $0.996$; DASP reaches $0.9961$, while A-GEM, Experience Replay, RepShield, and Online EWC reach $0.9962$. Thus, the last dataset is a ceiling case rather than a decisive separation between methods.
+
+The largest positive DASP--SSF dataset gap is on NF-BoT-IoT-v3, $+0.0215$. The difference is compatible with the design hypothesis that class-conditional botnet changes can often be repaired through a subset of feature modules rather than by updating all parameters; the confirmation matrix does not by itself establish that this mechanism is causal. NF-ToN-IoT-v3 remains the most difficult dataset, but DASP still exceeds SSF by $+0.0042$ on average. The large negative outlier is NF-BoT-IoT-v3, $S2$-Gradual, stream seed 2102, model seed 91, where DASP trails SSF by $0.0900$; this cell is retained as a failure case rather than removed.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.94\textwidth]{scenario_gap_heatmap}
+\caption{DASP minus SSF Macro-F1 gap by dataset and drift condition. Positive values are blue; negative values are red.}
+\label{fig:heatmap}
+\end{figure*}
+
+\subsection{Drift-Condition Analysis}
+Fig.~\ref{fig:heatmap} shows that the mean DASP--SSF gap is positive in all ten scenarios. The largest mean gains occur for S7-Local-Low ($+0.0141$), S0 ($+0.0131$), S7-Local-Medium ($+0.0110$), and S5-Blip ($+0.0110$). S7-Local-High is approximately tied ($+0.0002$), and S2-Gradual is also close ($+0.0014$). This pattern suggests that attribution is most useful when the drift is localized or transient, while high-intensity local drift can activate several modules and reduce the advantage of selectivity.
+
+
+Figs.~\ref{fig:traj-cic}--\ref{fig:traj-unsw} provide the corresponding window-level view for all eight methods. The trajectories reinforce the aggregate result but do not show uniform window-by-window dominance. On CIC-IDS2017, DASP ranks first overall at $0.9420$, exceeds SSF by $0.0070$, and has the highest scenario mean in seven of ten conditions. On NF-BoT-IoT-v3, it again leads seven conditions and has the largest dataset-level advantage over SSF ($+0.0215$), although S2-Gradual and S7-Local-High remain boundary cases. On NF-CSE-CIC-IDS2018-v3, DASP leads overall by only $0.0027$ over Experience Replay and exceeds SSF in all ten scenario means, but it ranks seventh in S5-Blip. NF-ToN-IoT-v3 is more mixed: DASP leads five conditions and exceeds the strongest baseline by only $0.0032$. NF-UNSW-NB15-v3 is a ceiling case: DASP ranks sixth at $0.9961$, only $0.0001$ below the leading group, while still exceeding SSF in every scenario mean. These crossings and exceptions support a bounded comparative-effectiveness claim rather than universal superiority.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{window_macro_f1_cic_ids2017}
+\caption{Window-level Macro-F1 trajectories of all eight methods on CIC-IDS2017. Each line is the mean over five stream seeds and two model seeds; the red band is a 95\% normal-approximation confidence interval for DASP. Scenario segments are independent runs, gaps prevent connections across resets, and dotted markers indicate the first nonstationary window. L/M/H denote low-, medium-, and high-intensity local drift.}
+\label{fig:traj-cic}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{window_macro_f1_nf_bot_iot_v3}
+\caption{Window-level Macro-F1 trajectories of all eight methods on NF-BoT-IoT-v3. Curves and uncertainty are aggregated over five stream seeds and two model seeds. DASP is emphasized in red; independent scenario segments are separated by gaps, and dotted markers identify the first nonstationary window.}
+\label{fig:traj-bot}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{window_macro_f1_nf_cse_cic_ids2018_v3}
+\caption{Window-level Macro-F1 trajectories of all eight methods on NF-CSE-CIC-IDS2018-v3. The red DASP curve includes a 95\% normal-approximation confidence band. Segment gaps denote independent scenario resets; dotted markers indicate drift onset.}
+\label{fig:traj-cse}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{window_macro_f1_nf_ton_iot_v3}
+\caption{Window-level Macro-F1 trajectories of all eight methods on NF-ToN-IoT-v3, averaged over five stream seeds and two model seeds. The frequent crossings between DASP and the strongest baselines visualize the smaller, condition-dependent effect on this dataset.}
+\label{fig:traj-ton}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{window_macro_f1_nf_unsw_nb15_v3}
+\caption{Window-level Macro-F1 trajectories of all eight methods on NF-UNSW-NB15-v3. The compressed vertical scale reflects near-ceiling performance; differences among the leading methods are correspondingly small. DASP is emphasized in red and its band shows the 95\% normal-approximation confidence interval.}
+\label{fig:traj-unsw}
+\end{figure*}
+
+\subsection{Adaptation Cost and Systems Performance}
+DASP's mean update time is 1.415 s per stream, compared with 2.683 s for SSF. It uses 328.7 gradient evaluations versus 512 for SSF, giving a 1.90-fold update speedup and a 1.56-fold gradient reduction. The advantage is stable across datasets: the update speedup ranges from 1.77 on NF-BoT-IoT-v3 to 2.03 on NF-UNSW-NB15-v3.
+
+The main cost is prediction throughput. DASP reaches approximately 159,219 flows/s, whereas the other MLP-based methods are near 455,000--465,000 flows/s. The modular backbone executes four parallel feature modules and a fusion classifier, so the throughput reduction is an architectural cost of attribution. This is acceptable when adaptation time and auditability are primary constraints, but it should not be hidden in a single ``efficiency'' number. Fig.~\ref{fig:frontier} reports the accuracy--update frontier explicitly.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.78\textwidth]{accuracy_update_frontier}
+\caption{Accuracy--adaptation frontier. Bubble size is proportional to gradient evaluations; DASP is highlighted in red.}
+\label{fig:frontier}
+\end{figure*}
+
+\subsection{Localization and Structural Preservation}
+Across the 500 DASP confirmation runs, 16,000 window-level repair records were available. The active-module count has minimum 1, median 3, and maximum 3; no record opens all four modules. The replay size is exactly 512 in the logged repair records. The global-update count is zero. These invariants distinguish DASP from an implementation that merely labels a full-model update as selective.
+
+\subsection{Development Ablation and Failure Analysis}
+The small development pilot illustrates why the final mechanism was required. The original no-update path reached mean Macro-F1 $0.7625$ against SSF $0.9211$. Classifier calibration improved it to $0.8706$, the early semi-local prototype to $0.8725$, and bounded localized rehearsal with new-sample weighting to approximately $0.9266$ on the same 15 paired cells. The ablation is diagnostic, not a confirmation claim: it shows that the principal failure mode was under-adaptation, not an invalid locality hypothesis.
+
+The worst confirmation cell is retained in the analysis because aggregate means can conceal instability. In the NF-BoT-IoT-v3 S2-Gradual cell with stream seed 2102 and model seed 91, DASP's Macro-F1 is 0.0900 below SSF. This failure is consistent with gradual attribution ambiguity: several modules can receive moderate evidence before the classifier has a stable boundary. Future work should test adaptive $k$, uncertainty-triggered expansion, and a boundary-focused performance gate on this condition without changing the locked primary result.
 
 \section{Discussion}
 \label{sec:discussion}
 
-\discussionhead{A. PREDICTIVE ACCURACY WITHOUT UNIVERSAL SUPERIORITY}
+\discussionhead{RQ1: Comparative predictive effectiveness}
+The answer to RQ1 is qualified rather than universal. DASP has the highest observed mean Macro-F1 among the eight locked methods, with $0.9269$ compared with $0.9191$ for SSF and $0.9036$ for Experience Replay. Against the prespecified SSF comparator, the mean paired gap is $+0.0078$ and DASP wins 383 of 500 cells. The effect is therefore consistent across much of the locked matrix, but its magnitude is modest and the cell-level distribution contains meaningful losses. The evidence supports comparative effectiveness under the evaluated delayed-label protocol, not unconditional superiority.
 
-DASP attains the highest observed mean early macro-F1 and has positive descriptive bootstrap intervals against six comparators. However, the primary exact stream-cluster test is $p=0.0625$, the Replay interval crosses zero, and no exploratory comparison survives Holm correction. The inferential gate therefore remains closed. The correct conclusion is ``highest observed mean in this matrix with small estimated effects,'' not a supported pairwise or universal superiority claim.
+\discussionhead{RQ2: Structural locality and adaptation efficiency}
+For RQ2, the locked implementation exhibits clear structural-locality and adaptation-efficiency properties. No repair opens all four representation modules, the global-update counter remains zero, and inactive modules are excluded from the optimizer; the shared classifier is the declared exception to the representation-module invariant. Relative to SSF, DASP reduces mean update time by approximately $1.90\times$ and gradient evaluations by approximately $1.56\times$. These observations establish implemented locality and lower adaptation work, but they do not isolate the causal contribution of each router, replay, or performance-gate component.
 
-SSF-faithful exposes a second trade-off. It has substantially lower macro-F1 and post-shift minimum, yet the highest attack recall. DASP's estimated recall difference is $-0.004887$, smaller than the planned 0.01 non-inferiority margin in magnitude, but the current completed matrix did not implement the cross-dataset non-inferiority analysis. No recall non-inferiority claim is made.
+\discussionhead{RQ3: Boundary conditions and systems trade-offs}
+The observed advantage weakens under gradual drift and high-intensity local drift, where attribution evidence is less sharply separated across modules. The strongest counterexample is the NF-BoT-IoT-v3/S2-Gradual cell with stream seed 2102 and model seed 91, where DASP trails SSF by $0.0900$ Macro-F1. DASP also has substantially lower prediction throughput than the flat MLP-based alternatives because all four representation branches are evaluated before fusion. Localized repair is therefore most defensible when adaptation cost, bounded parameter motion, and auditability are prioritized; a prediction-throughput-constrained deployment may prefer a simpler or optimized architecture.
 
-\discussionhead{B. ACCURACY DOES NOT VALIDATE THE DETECTOR}
+\discussionhead{Mechanistic interpretation}
+The development sequence indicates that the earlier selective path was too conservative: classifier calibration alone did not provide enough historical context to stabilize benign and attack boundaries. Bounded rehearsal supplies that context, while the top-$k$ mask prevents replay from becoming global retraining. Because the ablation was sequential rather than factorial, this is a mechanism-consistent interpretation of the observed pattern rather than an isolated causal estimate for each component. The confirmation therefore validates the combined DASP system, not the independent predictive contribution of its attribution router.
 
-DASP detector recall is 0.18 and precision is 0.1667. Its high predictive scores therefore cannot be attributed to reliable one-to-one event detection; they may arise from the strong warm-up model, fast-path behavior, guarded memory refresh, or other components. The completed matrix lacks detector-off and oracle-trigger ablations, so the relative contribution of these mechanisms remains unresolved. The detector is particularly difficult to validate under a near-ceiling binary stream: performance may stay above the recovery floor even when the controlled distribution changes.
-
-Recurrence is similarly nuanced. DASP has the highest mean S3 recurrence F1 among the locked methods, but its own recurrence gain is slightly negative. This supports retention relative to several comparators, not improvement over its first-drift state. Better detector evidence requires streams that produce a material binary decision-boundary change and include localized minority degradation.
-
-\discussionhead{C. FUSED FORWARD SPEED VERSUS UPDATE TAIL}
-
-The fused inference cache succeeds at its intended purpose. DASP is first of eight methods in p95 forward inference. Complete service cost tells a different story: event updates create a 298-ms p95 tail, placing DASP fifth in mean test-then-train latency. This distinction is operationally important. A deployment that performs inference and adaptation on separate workers may benefit from the 3.675-ms forward path, whereas a single synchronous worker must provision for update stalls.
-
-DASP is far faster end-to-end than both SSF forms and RepShield, uses fewer labels, and adapts in fewer windows. It is not faster than Frozen, Online MLP, Periodic FT, or Replay in complete operation, and it has the largest allocated GPU footprint. The evidence therefore supports selective computational efficiency relative to expensive continual methods, not global systems dominance.
-
-\discussionhead{D. EVIDENCE SCOPE}
-
-This confirmation covers one dataset and binary classification. It is statistically paired across five stream seeds and two model seeds, but only the stream seeds are independent replication units. The exact test consequently has coarse resolution and the primary $p=0.0625$ does not establish superiority. The cross-dataset protocol remains the appropriate next evaluation: NF-CSE-CIC-IDS2018-v3, NF-ToN-IoT-v3, NF-BoT-IoT-v3, and LUFlow must be executed with the same current DASP code before any broad claim is restored. Multiclass attack-family drift is also untested.
-
+\discussionhead{Relation to interpretability}
+The router output is an intervention trace: ``module 2 and module 4 were opened, modules 1 and 3 were frozen, and 512 historical examples were replayed.'' This explanation is operationally useful for incident response and model governance. It complements, rather than replaces, feature-level explanation methods such as LIME and SHAP \cite{Ribeiro2016LIME,Lundberg2017SHAP,Schwalbe2024XAITaxonomy}.
 \section{Threats to Validity and Limitations}
 \label{sec:limitations}
-
-\textbf{Construct validity:} The controlled generator creates known changes in attack-family composition while holding attack prevalence fixed, but it does not intervene directly on $P(Y\mid X)$. On the confirmation streams, the A-trained probe did not degrade on B, and NF-UNSW binary performance is near ceiling. These episodes are therefore evidence of class-conditional distribution shift, not verified real concept drift. Zero recovery times further show that the perturbations do not create a sufficiently harmful binary decision shift.
-
-\textbf{Internal validity:} All methods share paired streams, initializations, delay, and ground-truth budgets. Published baselines still require implementation choices. SSF-faithful and SSF-budget are separated to disclose pseudo-label differences. Trigger counts are mechanism-specific and should not be interpreted as measurements from an identical detector. Because detector-off and oracle-trigger ablations were not run in this matrix, the predictive effect of the proposed trigger is not causally identified.
-
-\textbf{Statistical conclusion validity:} Five stream seeds and two nested model seeds provide paired confirmation within NF-UNSW, but there is only one dataset. Hierarchical-bootstrap intervals quantify conditional stream-seed uncertainty, not dataset-level generalization. The exact sign-flip test over five stream clusters did not reach 0.05, and no exploratory contrast survived Holm correction. Near-ceiling values compress effect sizes. Windows and nested model seeds are not independent samples.
-
-\textbf{External validity:} Results may change with other IDS datasets, longer label delays, partial labels, new attack classes, encrypted traffic, different backbones, natural chronological streams, or multiclass tasks. The previous five-dataset and chronological outputs belong to earlier DASP implementations and are not pooled with the current confirmation.
-
-\textbf{Systems validity:} Timing comes from one Windows laptop GPU with two PyTorch CPU threads. Energy, concurrent packet capture, transfer overlap, queueing, and multi-tenant interference were not measured. The 80-run systems matrix uses one stream seed and two model seeds; it characterizes the tested implementation rather than a hardware-independent complexity bound. The SVD fallback is disclosed because it affects realized comparator time.
+\begin{itemize}
+    \item The datasets are prepared chronological artifacts, not a live deployment. Their scenario transformations create controlled distributional changes but do not establish that every episode changes the real-world binary decision function $P(Y\mid X)$. The term concept drift is therefore used for the experimental stress protocol, not as a claim that every transformed stream reproduces natural operational drift.
+    \item The five stream seeds and two model seeds provide substantial replication but do not cover every possible preprocessing or architecture choice.
+    \item The comparison is binary. Multi-class attack-family retention, open-set attacks, and severe label noise remain future work.
+    \item The modular partition is feature-group based. Learned or attention-head routing may be preferable when features are not naturally ordered.
+    \item The locked matrix does not include random top-$k$, fixed-module, MMD-only, or conflict-only routing controls. Consequently, the study does not identify how much of the observed performance is contributed by attribution-guided routing separately from replay, weighting, the modular backbone, and performance-gate logic.
+    \item Primary DASP uses delayed repair-pool labels to select 128 class-balanced training examples and separately evaluates a 25\% holdout; other paths use different selection semantics. The recorded 128 field is therefore not total label exposure. The matrix supports a protocol-specific comparison, while a strict shared-label contract requires rerunning all methods under one access rule.
+    \item DASP's lower prediction throughput is a genuine systems limitation. The measured speed is hardware- and implementation-specific, so it should not be generalized as a universal throughput advantage. A production implementation should consider fused kernels, vectorized modules, or a sparse execution path.
+    \item The confirmation tests are paired across cells; the window-level logs are used for diagnosis and not treated as independent statistical replications. The reported p-values therefore support the paired confirmation contrast under this protocol, not an unrestricted population-level claim.
+\item The primary comparator and method realizations are fixed by the locked study protocol. Unless an official implementation is explicitly identified, the results apply to these evaluated realizations rather than every possible realization of the named method. Independent reimplementation, external chronological data, and hardware replication remain necessary before broader claims about generality or production readiness.
+\end{itemize}
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-DASP performs prediction-first selective adaptation through low-rank layer branches, feature-wise modulation, current-batch similarity replay, class-balanced guards, and a fused inference cache while leaving the base hidden blocks frozen after warm-up. In 400 locked NF-UNSW-NB15-v3 runs, DASP achieved the highest mean early macro-F1, but the primary exact stream-cluster test gave $p=0.0625$ and no exploratory comparison survived Holm correction. The controlled artifacts changed attack-family distributions without degrading an A-trained binary probe, so they do not verify real concept drift. DASP's detector precision and recall remain weak, its causal trigger benefit is untested, and recurrence is slightly below its own first-shift performance.
+This paper presented DASP, a drift-attributed subspace-plasticity framework for streaming NIDS. DASP combines module-wise drift requirements, conflict-aware top-$k$ routing, strict freezing, class-balanced bounded rehearsal, performance-gated local repair modes, and transparent localization logs. On the 4,000-run confirmation matrix, DASP achieved Macro-F1 0.9269 versus 0.9191 for SSF, won 383 of 500 paired cells, reduced update time by approximately 1.90-fold, and reduced gradient evaluations by approximately 1.56-fold. It performed no logged full-model or all-representation-module update, kept the shared classifier trainable, and never activated more than three of four representation modules in the repair records.
 
-The 80-run GPU benchmark establishes a systems trade-off. DASP has the fastest p95 forward inference but ranks fifth in complete test-then-train latency, is slightly slower than Replay, and uses the most allocated CUDA memory. It is nevertheless substantially faster than SSF and RepShield while using fewer labels and adapting in fewer windows. The defensible conclusion is that DASP is an accurate, selective, and fast-forward streaming design under this single-dataset distribution-shift evaluation, with unresolved trigger quality and update-tail costs. Boundary-impacting, cross-dataset, causal-ablation, and natural-stream confirmation are required before a broader state-of-the-art claim.
+The integrated localized-repair system is a credible alternative under the implemented supervision paths, but the confirmation neither isolates the attribution router nor enforces equal total label exposure. The principal qualification is equally important: modular execution lowers prediction throughput and a small number of difficult drift cells remain. Future work should evaluate learned feature grouping, adaptive module budgets, natural chronological streams, multi-class attack-family retention, and controlled routing ablations comparing random top-$k$, fixed-module, MMD-only, conflict-only, and combined attribution policies under the same repair budget.
 
 \section*{Data Availability}
-
-The source NF-UNSW-NB15-v3 data are publicly available from the NF-v3 dataset providers \cite{Luay2025NetFlowV3,UQNIDSDatasets2025}. The 400-run confirmation is stored under \path{outputs_dasp_fast_nf_unsw_locked_7_gpu}; the CUDA-synchronized 80-run systems benchmark is stored under \path{outputs_dasp_fast_nf_unsw_locked7_performance_gpu_v2}; and the integrated drift/performance tables and figures are stored under \path{outputs_dasp_fast_nf_unsw_locked_7_gpu/analysis_locked7_drift_performance}. A public archival repository and persistent identifier must be added before submission.
+The archival repository contains the chronologically prepared streams, locked experimental configuration, executable method implementations, run-level confirmation records, and derived analysis outputs needed to reproduce the reported results. Public dataset provenance follows the sources cited in Section~\ref{sec:experiments}.
 
 \section*{Ethics Statement}
-
-This study analyzes public, de-identified network-flow benchmark data and performs no intervention on a live network. It involves no human participants, private records, or personal-contact data. Dataset use and redistribution must follow the source licenses.
+This study uses public, de-identified network-flow benchmark data and performs no intervention on a live network. It involves no human participants, private records, or personal-contact data. Dataset use and redistribution must follow the source licenses.
 
 \section*{Author Contributions}
-
-The authors must replace this placeholder with a verified CRediT statement. Relevant roles include conceptualization, methodology, software, validation, formal analysis, data curation, visualization, writing--original draft, writing--review and editing, supervision, and project administration.
+The authors must replace this placeholder with a verified CRediT statement covering conceptualization, methodology, software, validation, formal analysis, data curation, visualization, writing, supervision, and project administration.
 
 \section*{Funding}
-
-Funding information must be completed and verified by the authors. No funding source is asserted in this draft.
+Funding information must be completed and verified by the authors. No funding source is asserted by this draft.
 
 \section*{Conflict of Interest}
-
-Conflict-of-interest information must be verified by every author. No competing-interest declaration is inferred by the manuscript preparation workflow.
+Conflict-of-interest information must be verified by every author. No competing-interest declaration is inferred by this manuscript preparation workflow.
 
 \section*{Declaration of Generative AI and AI-Assisted Technologies}
+Generative AI tools assisted manuscript organization, language editing, method-implementation inspection, figure generation, and reproducibility checks. The authors remain responsible for verifying every numerical result, citation, methodological statement, and final claim.
 
-Generative AI tools assisted manuscript organization, language editing, code inspection, and reproducibility checks. The study design, algorithm choices, execution, interpretation, and final claims remain the responsibility of the authors. The authors must verify every numerical result, citation, and statement before submission.
+\input{extended_sections.tex}
 
 \appendices
 
-\section{Locked Configuration and Reproducibility Record}
+\section{Locked Configuration}
 \label{app:config}
+The evaluated DASP configuration uses a four-module parallel MLP with module width 64, a 128-unit batch size, two epochs per triggered/background repair, AdamW learning rate $10^{-3}$, weight decay $10^{-4}$, one-window label delay, a class-balanced optimization subset of at most 128 examples selected from the labeled repair pool, a separate disjoint 25\% labeled performance holdout, memory capacity 1,024, and 512 replay examples for DASP repair. The primary router uses multi-scale kernel scales $\{0.5,1,2\}$, severity threshold 0.15, persistence 1, and $k=3$; the emergency-severity value 0.60 in the locked configuration is inactive in the evaluated primary procedure. New delayed-label examples receive weight 3.0; background modules use plasticity 0.25; emergency modules use $\min\{1,\max(0.25,c_j)\}$ and three epochs. The classifier uses multiplier 1 on the base learning rate, while all inactive modules are excluded from the optimizer. Reference refresh is enabled and runs after every applied primary DASP repair.
 
-\textbf{Model and stream:} The binary runner uses 49 numeric inputs, hidden widths 256--128--64, 36 windows of 4,096 flows, four warm-up windows, batch size 256, AdamW learning rate $10^{-3}$, weight decay $10^{-4}$, one-window label delay, memory capacity 5,000, and a maximum of 256 ground-truth update labels per window.
+\section{Experimental Protocol Summary}
+The full pilot contains 1,200 runs: five datasets, ten scenarios, three stream seeds, one model seed, and eight methods. The confirmation contains 4,000 runs: five datasets, ten scenarios, five stream seeds, two model seeds, and eight methods. Before archival release, the software tests and environment-compatibility checks must be repeated using the final released materials; this manuscript therefore does not assert a current test-pass count. Any numerical-computing compatibility warning must be resolved or documented before independent reproduction.
 
-\textbf{DASP configuration:} The adapter maximum rank is 32; fast and strong ranks are 4 and 32. The fast path uses one epoch and 128 replay samples; the strong path uses two epochs, 256 replay samples, and a five-window recovery horizon. Feature modulation scale is 0.5. The input adapter dimension is 16. Similarity replay uses a 512-flow query, temperature 0.10, confidence power 1, and an adaptive uniform mixture bounded by 0.75. Candidate commit fractions are 1 and 0.5. The guard history is 512; tolerances are 0 for macro-F1 and $-0.01$ for attack and minimum-class recall.
-
-\textbf{Detector:} Multilevel MMD uses 192 samples, scales $\{0.5,1,2\}$, threshold 0.15, emergency threshold 0.60, and persistence 2. The fast input gate threshold is 0.075. The performance trigger uses five reference windows, a four-observation minimum history, 0.08 macro-F1 and recall drops, and a cooldown of two.
-
-\textbf{Matrices and audits:} The confirmation manifest records one dataset, five scenarios, five stream seeds, two model seeds, eight methods, and 400/400 completed runs. The systems manifest records five scenarios, one stream seed, two model seeds, eight methods, and 80/80 completed runs. The clean systems audit reports zero duplicate keys, exact method and scenario counts, finite primary timings, and zero DASP global-update violations. The software suite passed 102/102 tests in the locked NumPy 1.26.4/PyTorch 2.3.1 environment after the construct, S5-control, and cluster-inference checks were added.
+\input{extended_appendices.tex}
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 
 \EOD
 \end{document}
+
+
+

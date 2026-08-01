@@ -1,0 +1,45 @@
+model:
+  architecture: modular
+  hidden_dims: [32, 16]
+  dropout: 0.0
+  n_modules: 4
+  module_dim: 16
+data:
+  source: synthetic
+  scenario: S4
+  window_size: 128
+  n_windows: 6
+  warmup_windows: 2
+  n_features: 16
+  random_seed: 42
+  stream_seed: 42
+  task: binary
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs_per_window: 1
+  label_delay: 1
+  device: cpu
+  num_threads: 1
+drift:
+  mmd_samples: 64
+  calibration_windows: 2
+  kappa: 2.0
+  z_max: 8.0
+  severity_threshold: 0.15
+  emergency_severity_threshold: 0.45
+  persistence: 1
+  top_k: 2
+dasp:
+  baseline: modular_dasp
+  eta_floor: 0.0
+  eta_ceiling: 2.0
+  conflict_weight: 1.0
+  memory_size: 128
+  memory_batch_size: 32
+  guard_ratio: 0.2
+output:
+  directory: outputs
+  run_name: modular_dasp_smoke
+  save_checkpoints: false

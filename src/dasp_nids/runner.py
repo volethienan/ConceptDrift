@@ -74,6 +74,7 @@ METHODS = {
     "global_dasp",
     "layer_dasp",
     "full_dasp",
+    "modular_dasp",
     "shift_only",
     "conflict_only",
     "utility_global",
@@ -346,7 +347,7 @@ PRIMARY_METHODS = [
     "ssf",
     "repshield",
     "cdda_md",
-    "dasp",
+    "modular_dasp",
 ]
 
 
@@ -436,6 +437,11 @@ def _representations(model: OnlineMLP, x: torch.Tensor, device: torch.device) ->
     with torch.no_grad():
         _, values = model(x.to(device), return_representations=True)
     return {name: value.detach().cpu() for name, value in values.items()}
+
+
+def _tensor_to_numpy(tensor: torch.Tensor, dtype: np.dtype | type | None = None) -> np.ndarray:
+    values = np.asarray(tensor.detach().cpu().tolist())
+    return values.astype(dtype, copy=False) if dtype is not None else values
 
 
 def _balanced_tensor_sample(
@@ -1803,6 +1809,42 @@ def _surprise_class_balanced_weights(
     return weights.clamp(min=1.0, max=max(1.0, maximum_weight))
 
 
+def _localized_rehearsal_batch(
+    current_x: torch.Tensor,
+    current_y: torch.Tensor,
+    memory: ReservoirMemory,
+    cfg: ExperimentConfig,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    replay = memory.sample_balanced(cfg.dasp.modular_replay_size, device)
+    current_x = current_x.to(device)
+    current_y = current_y.to(device)
+    if replay is None:
+        weights = torch.full(
+            (len(current_y),),
+            float(cfg.dasp.modular_new_sample_weight),
+            dtype=torch.float32,
+            device=device,
+        )
+        return current_x, current_y, weights
+    replay_x, replay_y = replay
+    rehearsal_x = torch.cat([current_x, replay_x], dim=0)
+    rehearsal_y = torch.cat([current_y, replay_y], dim=0)
+    weights = torch.cat(
+        [
+            torch.full(
+                (len(current_y),),
+                float(cfg.dasp.modular_new_sample_weight),
+                dtype=torch.float32,
+                device=device,
+            ),
+            torch.ones(len(replay_y), dtype=torch.float32, device=device),
+        ],
+        dim=0,
+    )
+    return rehearsal_x, rehearsal_y, weights
+
+
 def _train_dasp_stateful(
     model: OnlineMLP,
     optimizer: torch.optim.AdamW,
@@ -1899,13 +1941,13 @@ def _guard_classification(
     model.eval()
     with torch.no_grad():
         logits = model(batch[0].to(device))
-        predictions = logits.argmax(dim=1).cpu().numpy()
+        predictions = _tensor_to_numpy(logits.argmax(dim=1), np.int64)
     metrics = classification_metrics(
-        batch[1].detach().cpu().numpy(),
+        _tensor_to_numpy(batch[1], np.int64),
         predictions,
         int(logits.shape[1]),
     )
-    target = batch[1].detach().cpu().numpy()
+    target = _tensor_to_numpy(batch[1], np.int64)
     per_class_recall: list[float] = []
     result = {
         "macro_f1": float(metrics["macro_f1"]),
@@ -2572,12 +2614,12 @@ def _v3_checkpoint_score(
     ):
         return None
     metrics = classification_metrics(
-        labels.detach().cpu().numpy().astype(np.int64, copy=False),
+        _tensor_to_numpy(labels, np.int64),
         np.asarray(predictions, dtype=np.int64),
         n_classes,
     )
     recalls: list[float] = []
-    truth = labels.detach().cpu().numpy().astype(np.int64, copy=False)
+    truth = _tensor_to_numpy(labels, np.int64)
     predicted = np.asarray(predictions, dtype=np.int64)
     for label in range(n_classes):
         mask = truth == label
@@ -3509,7 +3551,7 @@ class StreamingExperiment:
     def _river_records(
         x: torch.Tensor, feature_names: list[str]
     ) -> list[dict[str, float]]:
-        values = x.detach().cpu().numpy()
+        values = _tensor_to_numpy(x)
         return [
             {name: float(value) for name, value in zip(feature_names, row)}
             for row in values
@@ -3704,9 +3746,7 @@ class StreamingExperiment:
         with torch.no_grad():
             probability_tensor = F.softmax(model(device_x), dim=1)
             predicted_tensor = probability_tensor.argmax(dim=1).cpu()
-            attack_score = (
-                1.0 - probability_tensor[:, 0]
-            ).detach().cpu().numpy()
+            attack_score = _tensor_to_numpy(1.0 - probability_tensor[:, 0])
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
         self._last_forward_seconds = time.perf_counter() - forward_started
@@ -4653,7 +4693,7 @@ class StreamingExperiment:
             old_probability = normal_probabilities(model, old_x, self.device)
             new_probability = normal_probabilities(model, train_x, self.device)
             statistic, p_value = ks_2samp(
-                old_probability.cpu().numpy(), new_probability.cpu().numpy()
+                _tensor_to_numpy(old_probability), _tensor_to_numpy(new_probability)
             )
             drift = bool(p_value < cfg.baselines.ssf_drift_p_value)
             old_scores, new_scores = ssf_masks(
@@ -7284,8 +7324,98 @@ class StreamingExperiment:
         else:
             should_adapt = item.decision.triggered or method in {"global_protection", "conflict_only"}
             if not should_adapt:
-                _train_online(model, train_x, train_y, cfg, self.device)
-                accepted = "online"
+                if method == "modular_dasp":
+                    calibration_performance = _guard_classification(
+                        model, (guard_x, guard_y), self.device
+                    )
+                    emergency_repair = bool(
+                        calibration_performance["macro_f1"]
+                        < cfg.dasp.v12_guard_min_macro_f1
+                    )
+                    if emergency_repair:
+                        ranked = sorted(
+                            conflicts.items(),
+                            key=lambda item: item[1],
+                            reverse=True,
+                        )
+                        active = [
+                            name
+                            for name, _ in ranked[: max(1, cfg.drift.top_k)]
+                        ]
+                        if not active:
+                            active = list(model.layer_names[: max(1, cfg.drift.top_k)])
+                        plasticities = {
+                            name: (
+                                min(1.0, max(cfg.dasp.v3_backbone_plasticity, conflicts.get(name, 0.0)))
+                                if name in active
+                                else 0.0
+                            )
+                            for name in model.layer_names
+                        }
+                        plasticities["classifier"] = 1.0
+                        row["selected_candidate"] = "semi_local_repair"
+                        row["localized_repair_modules"] = "|".join(active)
+                        row["localized_repair_module_count"] = len(active)
+                        repair_epochs = cfg.dasp.modular_emergency_epochs
+                    else:
+                        ranked = sorted(
+                            conflicts.items(),
+                            key=lambda item: item[1],
+                            reverse=True,
+                        )
+                        active = [
+                            name
+                            for name, _ in ranked[: max(1, cfg.drift.top_k)]
+                        ]
+                        if not active:
+                            active = list(model.layer_names[: max(1, cfg.drift.top_k)])
+                        plasticities = {
+                            name: (
+                                cfg.dasp.modular_background_plasticity
+                                if name in active
+                                else 0.0
+                            )
+                            for name in model.layer_names
+                        }
+                        plasticities["classifier"] = 1.0
+                        row["selected_candidate"] = "background_local_consolidation"
+                        row["localized_repair_modules"] = "|".join(active)
+                        row["localized_repair_module_count"] = len(active)
+                        repair_epochs = cfg.dasp.modular_repair_epochs
+                    row["modular_calibration_macro_f1"] = calibration_performance[
+                        "macro_f1"
+                    ]
+                    row["modular_calibration_attack_recall"] = calibration_performance[
+                        "attack_recall"
+                    ]
+                    for name, value in plasticities.items():
+                        row[f"plasticity_{name}"] = value
+                    rehearsal_x, rehearsal_y, rehearsal_weights = _localized_rehearsal_batch(
+                        train_x,
+                        train_y,
+                        memory,
+                        cfg,
+                        self.device,
+                    )
+                    row["localized_rehearsal_size"] = len(rehearsal_y)
+                    row["localized_replay_size"] = len(rehearsal_y) - len(train_y)
+                    row["gradient_evaluations"] = _train_dasp(
+                        model,
+                        rehearsal_x,
+                        rehearsal_y,
+                        plasticities,
+                        cfg,
+                        self.device,
+                        memory,
+                        strict_freeze=True,
+                        sample_weights=rehearsal_weights,
+                        epochs=repair_epochs,
+                        use_projection_memory=False,
+                    )
+                    accepted = "dasp"
+                else:
+                    _train_online(model, train_x, train_y, cfg, self.device)
+                    accepted = "online"
             else:
                 plasticities = _plasticities(
                     method,
@@ -7293,6 +7423,27 @@ class StreamingExperiment:
                     conflicts,
                     cfg.dasp.conflict_weight,
                 )
+                if method == "modular_dasp":
+                    ranked_positive = sorted(
+                        (
+                            (name, value)
+                            for name, value in plasticities.items()
+                            if value > 0.0
+                        ),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                    positive = dict(ranked_positive[: max(1, cfg.drift.top_k)])
+                    if not positive and plasticities:
+                        name, value = max(plasticities.items(), key=lambda item: item[1])
+                        positive = {name: value}
+                    plasticities = {
+                        name: float(positive.get(name, 0.0))
+                        for name in model.layer_names
+                    }
+                    plasticities["classifier"] = 1.0
+                    row["localized_repair_modules"] = "|".join(positive)
+                    row["localized_repair_module_count"] = len(positive)
                 for name, value in plasticities.items():
                     row[f"plasticity_{name}"] = value
                 if method == "full_dasp":
@@ -7316,7 +7467,38 @@ class StreamingExperiment:
                     model.load_state_dict(chosen.state_dict())
                     accepted = "dasp" if lcb > 0 else "online"
                 else:
-                    _train_dasp(model, train_x, train_y, plasticities, cfg, self.device, memory)
+                    if method == "modular_dasp":
+                        rehearsal_x, rehearsal_y, rehearsal_weights = _localized_rehearsal_batch(
+                            train_x,
+                            train_y,
+                            memory,
+                            cfg,
+                            self.device,
+                        )
+                        row["localized_rehearsal_size"] = len(rehearsal_y)
+                        row["localized_replay_size"] = len(rehearsal_y) - len(train_y)
+                        training_x, training_y = rehearsal_x, rehearsal_y
+                        training_weights = rehearsal_weights
+                        training_epochs = cfg.dasp.modular_repair_epochs
+                        projection_enabled = False
+                    else:
+                        training_x, training_y = train_x, train_y
+                        training_weights = None
+                        training_epochs = None
+                        projection_enabled = True
+                    row["gradient_evaluations"] = _train_dasp(
+                        model,
+                        training_x,
+                        training_y,
+                        plasticities,
+                        cfg,
+                        self.device,
+                        memory,
+                        strict_freeze=(method == "modular_dasp"),
+                        sample_weights=training_weights,
+                        epochs=training_epochs,
+                        use_projection_memory=projection_enabled,
+                    )
                     accepted = "dasp"
         if method in LIGHT_REFRESH_METHODS:
             historical = memory.tensors(self.device)

@@ -708,7 +708,7 @@ class ReservoirMemory:
         quota, remainder = divmod(count, len(classes))
         selected: list[int] = []
         for position, label in enumerate(classes):
-            candidates = torch.nonzero(self.y == label, as_tuple=False).flatten().numpy()
+            candidates = torch.nonzero(self.y == label, as_tuple=False).flatten().tolist()
             take = min(len(candidates), quota + int(position < remainder))
             if take:
                 selected.extend(

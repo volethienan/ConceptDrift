@@ -402,6 +402,7 @@ class ModularOnlineMLP(nn.Module):
             head.append(nn.Dropout(dropout))
         head.append(nn.Linear(fusion_dim, n_classes))
         self.classifier = nn.Sequential(*head)
+        self.classifier.out_features = n_classes
 
     @property
     def layer_names(self) -> list[str]:
