@@ -1,0 +1,83 @@
+{
+  "protocol_version": "1.1",
+  "locked_at": "2026-09-02T20:32:36.2243321+07:00",
+  "phase": "P1",
+  "components": {
+    "conditions": [
+      "B1",
+      "B2",
+      "B3",
+      "B4",
+      "B5"
+    ],
+    "datasets": 5,
+    "scenarios": [
+      "S1-Sudden",
+      "S2-Gradual",
+      "S7-Local-High"
+    ],
+    "stream_seeds": [
+      2001,
+      2002,
+      2003
+    ],
+    "model_seeds": [
+      91
+    ],
+    "expected_runs": 225,
+    "output": "outputs_revision_v1/p1_components_v1"
+  },
+  "feature_permutation": {
+    "methods": [
+      "A1",
+      "A6",
+      "A9"
+    ],
+    "permutation_seeds": [
+      3101,
+      3102,
+      3103
+    ],
+    "datasets": 5,
+    "scenarios": [
+      "S1-Sudden",
+      "S2-Gradual",
+      "S7-Local-High"
+    ],
+    "stream_seeds": [
+      2001,
+      2002,
+      2003
+    ],
+    "model_seeds": [
+      91
+    ],
+    "expected_runs": 405,
+    "output": "outputs_revision_v1/p1_feature_permutation_v1"
+  },
+  "natural_chronological": {
+    "dataset": "NF-ToN-IoT-v3",
+    "construction": "earliest 147456 valid rows under stable global timestamp ordering",
+    "methods": [
+      "A1",
+      "A10",
+      "experience_replay",
+      "online_mlp"
+    ],
+    "model_seeds": [
+      91,
+      92,
+      93
+    ],
+    "expected_runs": 12,
+    "output": "outputs_revision_v1/p1_natural_v1",
+    "stream_sha256": "ea970e87e6a9da60a51d9d0f2bf16df9825396b795d9d8ad6d1321fd8abe6085",
+    "manifest_sha256": "c355fea875a2e6ab3b269835e9fcbd1ef0f620578737311ad41b788eb6935b92"
+  },
+  "total_expected_runs": 642,
+  "commands": [
+    ".venv-revision/Scripts/python.exe tools/run_revision_p1.py --mode components --resume",
+    ".venv-revision/Scripts/python.exe tools/run_revision_p1.py --mode permutations --resume",
+    ".venv-revision/Scripts/python.exe tools/run_revision_p1.py --mode natural --resume"
+  ]
+}

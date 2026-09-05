@@ -8,7 +8,7 @@ Reproducible prequential experiments for binary network intrusion detection unde
 - Core idea: localize drift at module/subspace level, then repair only affected modules.
 - Architecture: `ModularOnlineMLP` with disjoint feature-group modules.
 - Evaluation: test-then-train with one-window label delay.
-- Main comparator: `ssf` under the same stream, label budget, and model family.
+- Main comparator: `ssf` on the same streams and seeds. The original matrix retains method-specific supervision semantics; the revision matrix adds a common total-label-access contract.
 
 ## Kept Experiment Scenarios
 

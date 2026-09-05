@@ -103,7 +103,9 @@ def academic_box(ax, x, y, w, h, text, fc=GRAY_1, fs=7.0, rounded=False, lw=0.9,
     return patch
 
 
-def academic_titled_box(ax, x, y, w, h, title, body, fc=GRAY_1, title_fs=9.2, body_fs=9.0, lw=0.9):
+def academic_titled_box(
+    ax, x, y, w, h, title, body, fc=GRAY_1, title_fs=9.2, body_fs=9.0, lw=0.9, title_top_pad=0.20
+):
     patch = FancyBboxPatch(
         (x, y),
         w,
@@ -116,7 +118,7 @@ def academic_titled_box(ax, x, y, w, h, title, body, fc=GRAY_1, title_fs=9.2, bo
     ax.add_patch(patch)
     ax.text(
         x + w / 2,
-        y + h - 0.20,
+        y + h - title_top_pad,
         title,
         ha="center",
         va="center",
@@ -626,69 +628,169 @@ def window_algorithm():
 
 
 def algorithm_flowchart():
-    fig, ax = plt.subplots(figsize=(10.0, 7.25))
-    ax.set_xlim(0, 20.0)
-    ax.set_ylim(0, 15.0)
+    fig, ax = plt.subplots(figsize=(11.2, 6.7))
+    ax.set_xlim(0, 24.0)
+    ax.set_ylim(0, 14.3)
     ax.axis("off")
 
-    ax.text(10.0, 14.62, "Delayed-label DASP algorithm flowchart", ha="center", va="center", fontsize=16.0, fontweight="bold", color=INK)
-    ax.plot([0.55, 1.35], [14.15, 14.15], color=LINE, linewidth=1.1)
-    ax.add_patch(FancyArrowPatch((1.08, 14.15), (1.35, 14.15), arrowstyle="-|>", mutation_scale=10, color=LINE, linewidth=1.1))
-    ax.text(1.55, 14.15, "current processing", ha="left", va="center", fontsize=12.0, color=INK)
-    ax.plot([11.20, 12.00], [14.15, 14.15], color=LINE, linewidth=1.0, linestyle=(0, (4, 2.5)))
-    ax.add_patch(FancyArrowPatch((11.73, 14.15), (12.00, 14.15), arrowstyle="-|>", mutation_scale=10, color=LINE, linewidth=1.0, linestyle=(0, (4, 2.5))))
-    ax.text(12.20, 14.15, "delayed or persistent-state link", ha="left", va="center", fontsize=12.0, color=INK)
+    edge = "#425466"
+    muted = "#6b7c8f"
+    band_edge = "#cbd5df"
+    process_fill = "#ffffff"
+    state_fill = "#edf4f8"
+    decision_fill = "#fff5df"
+    stage_fills = ("#f7fafc", "#f9fbfd", "#f7fafc")
 
-    ax.text(0.45, 13.55, "A. Pre-adaptation inference at iteration $t$", ha="left", va="center", fontsize=13.0, fontweight="bold", color=INK)
-    academic_ellipse(ax, 0.30, 12.20, 1.80, 0.88, "Current\n$W_t$", 12.2)
-    academic_titled_box(ax, 2.30, 12.08, 2.45, 1.12, "Predict", "before labels", GRAY_1, title_fs=12.5, body_fs=12.0)
-    academic_titled_box(ax, 4.95, 12.00, 3.25, 1.28, "Representations", "module-wise\ncurrent features", GRAY_1, title_fs=12.2, body_fs=11.7)
-    academic_titled_box(ax, 8.40, 12.00, 3.15, 1.28, "MMD evidence", "current vs frozen\nreference", GRAY_1, title_fs=12.2, body_fs=11.5)
-    academic_titled_box(ax, 11.75, 12.00, 3.45, 1.28, "PendingUpdate", r"store $W_t$ + $\mathcal{E}_t$" + "\nfor one-window delay", GRAY_2, title_fs=12.2, body_fs=11.3)
-    academic_titled_box(ax, 15.75, 12.00, 3.95, 1.28, "Reference snapshot", "final warm-up or\nlatest DASP repair", GRAY_1, title_fs=11.8, body_fs=11.2)
-    for x1, x2 in ((2.10, 2.30), (4.75, 4.95), (8.20, 8.40), (11.55, 11.75)):
-        poly_arrow(ax, [(x1, 12.64), (x2, 12.64)], lw=1.0)
-    poly_arrow(ax, [(15.75, 12.64), (15.45, 12.64), (15.45, 11.60), (9.98, 11.60), (9.98, 12.00)], dashed=True, lw=0.9)
+    def stage_band(y, h, letter, title, fill):
+        patch = FancyBboxPatch(
+            (0.35, y),
+            23.30,
+            h,
+            boxstyle="round,pad=0.018,rounding_size=0.12",
+            facecolor=fill,
+            edgecolor=band_edge,
+            linewidth=0.85,
+            zorder=0,
+        )
+        ax.add_patch(patch)
+        cy = y + h - 0.42
+        ax.add_patch(Circle((0.82, cy), 0.23, facecolor=BLUE, edgecolor=BLUE, linewidth=0.8, zorder=4))
+        ax.text(0.82, cy, letter, ha="center", va="center", fontsize=10.2, fontweight="bold", color="white", zorder=5)
+        ax.text(1.22, cy, title, ha="left", va="center", fontsize=11.3, fontweight="bold", color=DARK, zorder=5)
 
-    ax.text(0.45, 11.25, r"B. Delayed-label localized adaptation for $\tau=t-1$", ha="left", va="center", fontsize=13.0, fontweight="bold", color=INK)
-    academic_ellipse(ax, 0.30, 9.38, 1.85, 0.90, r"Labels" + "\n" + r"$Y_{\tau}$", 12.2)
-    academic_titled_box(ax, 2.35, 9.22, 3.05, 1.22, "Restore evidence", r"matching $W_{\tau}$" + "\n" + r"and $\mathcal{E}_{\tau}$", GRAY_2, title_fs=12.0, body_fs=11.4)
-    academic_titled_box(ax, 5.60, 9.14, 3.45, 1.38, "Training + holdout", "repair samples +\nperformance gate", GRAY_1, title_fs=11.8, body_fs=11.4)
-    academic_titled_box(ax, 9.25, 9.06, 3.65, 1.54, "Gradient conflict", "current-window vs\nreplay gradients", GRAY_1, title_fs=11.3, body_fs=11.2)
-    academic_diamond(ax, 13.10, 9.05, 3.05, 1.62, "MMD severity\ntriggered?", 11.5)
-    academic_diamond(ax, 16.75, 9.05, 3.05, 1.62, "Holdout F1\n$<0.80$?", 11.2)
-    for x1, x2 in ((2.15, 2.35), (5.40, 5.60), (9.05, 9.25), (12.90, 13.10)):
-        poly_arrow(ax, [(x1, 9.83), (x2, 9.83)], lw=1.0)
-    poly_arrow(ax, [(13.48, 12.00), (13.48, 10.82), (3.88, 10.82), (3.88, 10.44)], dashed=True, lw=0.95)
-    poly_arrow(ax, [(16.15, 9.86), (16.75, 9.86)], label="No", label_xy=(16.45, 10.10), lw=1.0)
+    def card(x, y, w, h, title, body, fill=process_fill, border=edge, title_fs=10.0, body_fs=9.4):
+        patch = FancyBboxPatch(
+            (x, y),
+            w,
+            h,
+            boxstyle="round,pad=0.018,rounding_size=0.12",
+            facecolor=fill,
+            edgecolor=border,
+            linewidth=0.95,
+            zorder=3,
+        )
+        ax.add_patch(patch)
+        divider_y = y + h - 0.39
+        ax.plot([x + 0.13, x + w - 0.13], [divider_y, divider_y], color=band_edge, linewidth=0.55, zorder=4)
+        ax.text(x + w / 2, y + h - 0.195, title, ha="center", va="center", fontsize=title_fs, fontweight="semibold", color=DARK, zorder=5)
+        ax.text(x + w / 2, y + (h - 0.39) / 2, body, ha="center", va="center", fontsize=body_fs, color=INK, linespacing=1.08, zorder=5)
+        return patch
 
-    academic_titled_box(ax, 0.30, 6.75, 6.20, 1.42, "Triggered attributed repair", "stronger adaptation of\nattributed modules", GRAY_3, title_fs=12.3, body_fs=11.9)
-    academic_titled_box(ax, 6.90, 6.75, 6.20, 1.42, "Emergency repair", "performance-gated;\nhigh-conflict modules", GRAY_3, title_fs=11.5, body_fs=11.9)
-    academic_titled_box(ax, 13.50, 6.75, 6.20, 1.42, "Background consolidation", "local rehearsal\nfor retention", GRAY_2, title_fs=11.8, body_fs=11.9)
-    poly_arrow(ax, [(14.63, 9.05), (14.63, 8.55), (3.40, 8.55), (3.40, 8.17)], label="Yes", label_xy=(13.82, 8.78), lw=1.0)
-    poly_arrow(ax, [(18.28, 9.05), (18.28, 8.55), (10.00, 8.55), (10.00, 8.17)], label="Yes", label_xy=(17.50, 8.78), lw=1.0)
-    poly_arrow(ax, [(19.80, 9.86), (19.88, 9.86), (19.88, 8.55), (16.60, 8.55), (16.60, 8.17)], label="No", label_xy=(19.52, 8.78), lw=1.0)
+    def terminal(x, y, w, h, text, fill="white"):
+        patch = Ellipse((x + w / 2, y + h / 2), w, h, facecolor=fill, edgecolor=edge, linewidth=0.95, zorder=3)
+        ax.add_patch(patch)
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=9.7, fontweight="bold", color=DARK, linespacing=1.02, zorder=5)
+        return patch
 
-    for center_x in (3.40, 10.00, 16.60):
-        ax.plot([center_x, center_x], [6.75, 6.40], color=LINE, linewidth=0.9)
-    ax.plot([3.40, 16.60], [6.40, 6.40], color=LINE, linewidth=0.9)
-    poly_arrow(ax, [(10.00, 6.40), (10.00, 5.28), (2.45, 5.28), (2.45, 5.06)], lw=1.0)
-    ax.text(0.45, 5.72, "C. Localized optimization and state update", ha="left", va="center", fontsize=13.0, fontweight="bold", color=INK)
+    def policy_diamond(x, y, w, h):
+        patch = plt.Polygon(
+            [[x + w / 2, y + h], [x + w, y + h / 2], [x + w / 2, y], [x, y + h / 2]],
+            facecolor=decision_fill,
+            edgecolor="#8a6d3b",
+            linewidth=1.0,
+            zorder=3,
+        )
+        ax.add_patch(patch)
+        ax.text(x + w / 2, y + h / 2 + 0.13, "Repair policy", ha="center", va="center", fontsize=9.7, fontweight="bold", color=DARK, zorder=5)
+        ax.text(x + w / 2, y + h / 2 - 0.22, "MMD + holdout F1", ha="center", va="center", fontsize=8.6, color=INK, zorder=5)
+        return patch
 
-    academic_titled_box(ax, 0.30, 3.72, 4.30, 1.34, "Localized rehearsal", "delayed current +\nbalanced replay", GRAY_1, title_fs=11.8, body_fs=11.5)
-    academic_titled_box(ax, 4.85, 3.62, 5.10, 1.54, "Selective optimizer update", "routed modules + classifier;\nfreeze others", GRAY_1, title_fs=11.8, body_fs=11.1)
-    academic_titled_box(ax, 10.20, 3.72, 3.65, 1.34, "Memory + audit", "append labels +\nrouting trace", GRAY_1, title_fs=12.0, body_fs=11.3)
-    academic_titled_box(ax, 14.10, 3.72, 3.95, 1.34, "Refresh reference", "after every applied\nDASP repair", GRAY_1, title_fs=12.0, body_fs=11.4)
-    academic_ellipse(ax, 18.30, 3.92, 1.40, 0.92, "Next\nwindow", 11.7)
-    poly_arrow(ax, [(4.60, 4.39), (4.85, 4.39)], lw=1.0)
-    poly_arrow(ax, [(9.95, 4.39), (10.20, 4.39)], lw=1.0)
-    poly_arrow(ax, [(13.85, 4.39), (14.10, 4.39)], lw=1.0)
-    poly_arrow(ax, [(18.05, 4.39), (18.30, 4.39)], lw=1.0)
+    def flow_arrow(points, dashed=False, label=None, label_xy=None, lw=1.0):
+        xs, ys = zip(*points)
+        linestyle = (0, (4.0, 2.8)) if dashed else "-"
+        if len(points) > 2:
+            ax.plot(xs[:-1], ys[:-1], color=muted if dashed else edge, linewidth=lw, linestyle=linestyle, solid_capstyle="round", zorder=2)
+        ax.add_patch(
+            FancyArrowPatch(
+                points[-2],
+                points[-1],
+                arrowstyle="-|>",
+                mutation_scale=9.5,
+                linewidth=lw,
+                linestyle=linestyle,
+                color=muted if dashed else edge,
+                shrinkA=0,
+                shrinkB=0,
+                zorder=2,
+            )
+        )
+        if label and label_xy:
+            ax.text(
+                *label_xy,
+                label,
+                ha="center",
+                va="center",
+                fontsize=8.0,
+                color=edge,
+                fontweight="semibold",
+                bbox=dict(boxstyle="round,pad=0.12", facecolor="white", edgecolor="none", alpha=0.96),
+                zorder=6,
+            )
 
-    academic_titled_box(ax, 10.00, 1.68, 4.20, 1.20, "Reservoir memory", "balanced replay +\nbounded storage", GRAY_2, title_fs=11.8, body_fs=11.2)
-    poly_arrow(ax, [(12.10, 2.88), (12.10, 3.72)], dashed=True, lw=0.9)
-    poly_arrow(ax, [(10.00, 2.28), (2.45, 2.28), (2.45, 3.72)], dashed=True, lw=0.9)
-    poly_arrow(ax, [(16.08, 5.06), (16.08, 5.42), (19.82, 5.42), (19.82, 12.64), (19.70, 12.64)], dashed=True, lw=0.9)
+    ax.text(12.0, 13.92, "Delayed-label DASP adaptation cycle", ha="center", va="center", fontsize=15.6, fontweight="bold", color=DARK)
+    flow_arrow([(0.85, 13.28), (1.75, 13.28)], lw=1.05)
+    ax.text(1.98, 13.28, "current processing", ha="left", va="center", fontsize=9.8, color=INK)
+    flow_arrow([(15.00, 13.28), (15.90, 13.28)], dashed=True, lw=1.0)
+    ax.text(16.13, 13.28, "delayed supervision or persistent state", ha="left", va="center", fontsize=9.8, color=INK)
+
+    stage_band(9.65, 3.15, "A", "Prediction and drift monitoring at iteration $t$", stage_fills[0])
+    stage_band(5.00, 4.30, "B", r"Delayed-label attribution and repair selection ($\tau=t-1$)", stage_fills[1])
+    stage_band(0.75, 3.90, "C", "Localized optimization and persistent-state update", stage_fills[2])
+
+    terminal(0.75, 10.32, 1.80, 1.00, "Current\n$W_t$")
+    card(2.95, 10.15, 2.30, 1.35, "Predict", "before labels")
+    card(5.70, 10.15, 3.00, 1.35, "Representations", "module-wise\ncurrent features", title_fs=9.6, body_fs=9.2)
+    card(9.15, 10.15, 3.00, 1.35, "MMD evidence", "current vs frozen\nreference", title_fs=9.8, body_fs=9.2)
+    card(12.60, 10.15, 3.20, 1.35, "Pending evidence", r"store $W_t$ + $\mathcal{E}_t$" + "\nfor one-window delay", fill=state_fill, title_fs=9.6, body_fs=9.0)
+    card(19.15, 10.15, 4.00, 1.35, "Reference snapshot", "final warm-up or\nlatest DASP repair", fill=state_fill, border="#647d8c", title_fs=9.7, body_fs=9.2)
+
+    flow_arrow([(2.55, 10.82), (2.95, 10.82)])
+    flow_arrow([(5.25, 10.82), (5.70, 10.82)])
+    flow_arrow([(8.70, 10.82), (9.15, 10.82)])
+    flow_arrow([(12.15, 10.82), (12.60, 10.82)])
+    flow_arrow([(19.15, 10.82), (18.55, 10.82), (18.55, 11.88), (10.65, 11.88), (10.65, 11.50)], dashed=True)
+
+    terminal(0.75, 7.12, 1.80, 1.00, "Labels\n$Y_{\tau}$")
+    card(2.95, 7.00, 2.60, 1.25, "Restore evidence", r"matching $W_{\tau}$" + "\n" + r"and $\mathcal{E}_{\tau}$", fill=state_fill, title_fs=9.5, body_fs=9.0)
+    card(5.95, 7.00, 2.70, 1.25, "Repair + holdout", "balanced repair pool\n+ performance gate", title_fs=9.3, body_fs=8.9)
+    card(9.05, 7.00, 2.70, 1.25, "Gradient conflict", "current-window vs\nreplay gradients", title_fs=9.3, body_fs=8.9)
+    policy_diamond(12.20, 6.88, 3.10, 1.50)
+
+    flow_arrow([(2.55, 7.62), (2.95, 7.62)])
+    flow_arrow([(5.55, 7.62), (5.95, 7.62)])
+    flow_arrow([(8.65, 7.62), (9.05, 7.62)])
+    flow_arrow([(11.75, 7.62), (12.20, 7.62)])
+    flow_arrow([(14.20, 10.15), (14.20, 8.55), (4.25, 8.55), (4.25, 8.25)], dashed=True)
+
+    card(3.20, 5.35, 4.30, 1.00, "Triggered attributed repair", "stronger update of attributed modules", fill="#e8f1f8", border="#4f7594", title_fs=9.2, body_fs=8.8)
+    card(9.00, 5.35, 4.30, 1.00, "Emergency repair", "performance-gated intensity", fill="#f8ecea", border="#9a625d", title_fs=9.4, body_fs=8.9)
+    card(14.80, 5.35, 4.30, 1.00, "Background consolidation", "local rehearsal for retention", fill="#edf3ee", border="#627f69", title_fs=9.1, body_fs=8.8)
+
+    ax.plot([13.75, 13.75], [6.88, 6.72], color=edge, linewidth=1.0, zorder=2)
+    ax.plot([5.35, 16.95], [6.72, 6.72], color=edge, linewidth=1.0, zorder=2)
+    flow_arrow([(5.35, 6.72), (5.35, 6.35)], label="MMD high", label_xy=(5.35, 6.53))
+    flow_arrow([(11.15, 6.72), (11.15, 6.35)], label="F1 < 0.80", label_xy=(11.15, 6.53))
+    flow_arrow([(16.95, 6.72), (16.95, 6.35)], label="otherwise", label_xy=(16.95, 6.53))
+
+    for center_x in (5.35, 11.15, 16.95):
+        ax.plot([center_x, center_x], [5.35, 4.88], color=edge, linewidth=0.95, zorder=2)
+    ax.plot([5.35, 16.95], [4.88, 4.88], color=edge, linewidth=0.95, zorder=2)
+    flow_arrow([(10.20, 4.88), (10.20, 4.08), (8.65, 4.08), (8.65, 4.00)])
+
+    card(7.00, 2.85, 3.30, 1.15, "Localized rehearsal", "delayed current +\nbalanced replay", title_fs=9.5, body_fs=9.0)
+    card(10.80, 2.85, 4.10, 1.15, "Selective optimizer update", "routed modules + classifier\nfreeze all others", title_fs=9.3, body_fs=9.0)
+    card(3.20, 1.15, 3.40, 1.15, "Reservoir memory", "class-balanced replay\nbounded storage", fill=state_fill, border="#647d8c", title_fs=9.5, body_fs=9.0)
+    card(10.80, 1.15, 3.20, 1.15, "Memory + audit", "append labels +\nrouting trace", title_fs=9.5, body_fs=9.0)
+    card(14.50, 1.15, 3.40, 1.15, "Refresh reference", "after every applied\nDASP repair", fill=state_fill, border="#647d8c", title_fs=9.4, body_fs=9.0)
+    terminal(18.40, 1.25, 1.80, 0.95, "Next\nwindow")
+
+    flow_arrow([(10.30, 3.42), (10.80, 3.42)])
+    flow_arrow([(12.85, 2.85), (12.85, 2.52), (12.40, 2.52), (12.40, 2.30)])
+    flow_arrow([(14.00, 1.72), (14.50, 1.72)])
+    flow_arrow([(17.90, 1.72), (18.40, 1.72)])
+    flow_arrow([(6.60, 1.72), (6.78, 1.72), (6.78, 3.42), (7.00, 3.42)], dashed=True)
+    flow_arrow([(10.80, 1.72), (6.60, 1.72)], dashed=True)
+    flow_arrow([(16.20, 2.30), (16.20, 2.55), (23.55, 2.55), (23.55, 10.82), (23.15, 10.82)], dashed=True)
 
     save_bundle(fig, "dasp_algorithm_flowchart")
 

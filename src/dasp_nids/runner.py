@@ -15,12 +15,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import psutil
+import scipy
 import sklearn
 import torch
 import torch.nn.functional as F
 import yaml
-from river import forest, linear_model, optim, tree
 from scipy.stats import ks_2samp
+
+try:
+    from river import forest, linear_model, optim, tree
+except ImportError:
+    forest = linear_model = optim = tree = None
 
 from .baselines import (
     ErrorRateDriftDetector,
@@ -60,6 +65,18 @@ from .model import (
     FusedAdapterInferenceMLP,
     ModularOnlineMLP,
     OnlineMLP,
+)
+from .revision import (
+    REVISION_CONDITIONS,
+    REVISION_METHODS,
+    equal_label_pools,
+    index_digest,
+    locality_diagnostics,
+    parameter_snapshot,
+    routing_jaccard,
+    select_routing,
+    select_training_indices,
+    stable_seed,
 )
 
 
@@ -139,6 +156,9 @@ METHODS = {
     "river_hat",
     "river_arf",
 }
+METHODS.update(REVISION_METHODS)
+
+REVISION_ROUTING_METHODS = REVISION_METHODS - {"revision_a10_ssf"}
 
 V3_METHODS = {
     "stateful_online",
@@ -2822,6 +2842,15 @@ class StreamingExperiment:
     def __init__(self, config: ExperimentConfig):
         if config.dasp.baseline not in METHODS:
             raise ValueError(f"Unknown method {config.dasp.baseline!r}; choose from {sorted(METHODS)}")
+        if config.dasp.baseline in REVISION_METHODS:
+            required_architecture = REVISION_CONDITIONS[
+                config.dasp.baseline
+            ].required_architecture
+            if config.model.architecture != required_architecture:
+                raise ValueError(
+                    f"{config.dasp.baseline} requires "
+                    f"model.architecture={required_architecture!r}"
+                )
         self.config = config
         self.device = torch.device(config.training.device)
         self._stateful_optimizer: torch.optim.AdamW | None = None
@@ -2850,6 +2879,9 @@ class StreamingExperiment:
         self._last_forward_seconds = 0.0
         self._last_metric_seconds = 0.0
         self._last_predictions = np.empty(0, dtype=np.int64)
+        self._revision_previous_route: tuple[str, ...] = ()
+        self._revision_event_pending: list[dict[str, object]] = []
+        self._revision_feature_permutation_digest: str | None = None
         self._process = psutil.Process()
         self._run_start_rss_bytes = int(self._process.memory_info().rss)
 
@@ -2893,6 +2925,57 @@ class StreamingExperiment:
                 cfg.chunksize,
             )
         raise ValueError(f"Unknown data source: {cfg.source}")
+
+    def _apply_revision_feature_permutation(
+        self,
+        stream: PreparedStream,
+    ) -> PreparedStream:
+        permutation_seed = self.config.revision.feature_permutation_seed
+        if permutation_seed is None:
+            order = torch.arange(len(stream.feature_names), dtype=torch.long)
+        else:
+            generator = torch.Generator().manual_seed(
+                stable_seed(
+                    self.config.revision.feature_permutation_namespace,
+                    self._revision_dataset_key(),
+                    int(permutation_seed),
+                )
+            )
+            order = torch.randperm(len(stream.feature_names), generator=generator)
+        self._revision_feature_permutation_digest = index_digest(order)
+        if permutation_seed is None:
+            return stream
+        indices = order.tolist()
+        windows = [
+            StreamWindow(
+                x=window.x[:, order],
+                y=window.y,
+                index=window.index,
+                phase=window.phase,
+                subtypes=window.subtypes,
+                source_ids=window.source_ids,
+                start_time=window.start_time,
+                end_time=window.end_time,
+            )
+            for window in stream.windows
+        ]
+        return PreparedStream(
+            windows,
+            [stream.feature_names[index] for index in indices],
+            list(stream.class_names),
+        )
+
+    def _drift_representations(
+        self,
+        model: OnlineMLP | ModularOnlineMLP,
+        x: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        representations = _representations(model, x, self.device)
+        condition = REVISION_CONDITIONS.get(self.config.dasp.baseline)
+        if condition is not None and condition.final_representation_only:
+            final_name = model.layer_names[-1]
+            return {final_name: representations[final_name]}
+        return representations
 
     def _build_model(
         self, input_dim: int, n_classes: int
@@ -2960,7 +3043,7 @@ class StreamingExperiment:
             torch.cuda.reset_peak_memory_stats(self.device)
             torch.cuda.synchronize(self.device)
         self._run_start_rss_bytes = int(self._process.memory_info().rss)
-        stream = self._load_stream()
+        stream = self._apply_revision_feature_permutation(self._load_stream())
         if cfg.dasp.baseline in RIVER_METHODS:
             return self._run_river_stream(stream)
         model = self._build_model(len(stream.feature_names), len(stream.class_names)).to(
@@ -3056,7 +3139,12 @@ class StreamingExperiment:
             if cfg.dasp.baseline in FAST_DASP_METHODS:
                 self._refresh_fast_inference_model(model)
 
-        if cfg.dasp.baseline in {"ssf", "ssf_budget", "ssf_faithful"}:
+        if cfg.dasp.baseline in {
+            "ssf",
+            "ssf_budget",
+            "ssf_faithful",
+            "revision_a10_ssf",
+        }:
             self._ssf_teacher = clone_teacher(model)
         if cfg.dasp.baseline == "cdda_md":
             warmup_errors: list[float] = []
@@ -3090,14 +3178,14 @@ class StreamingExperiment:
         reference_model = copy.deepcopy(model).eval()
         self._anchor_model = copy.deepcopy(model).eval()
         warmup = stream.windows[: cfg.data.warmup_windows]
-        reference_repr = _representations(reference_model, warmup[-1].x, self.device)
+        reference_repr = self._drift_representations(reference_model, warmup[-1].x)
         calibration_windows = warmup[-max(1, cfg.drift.calibration_windows) :]
         calibration_repr = [
-            _representations(reference_model, window.x, self.device)
+            self._drift_representations(reference_model, window.x)
             for window in calibration_windows
         ]
         monitor = LayerDriftMonitor(
-            model.layer_names,
+            list(reference_repr),
             cfg.drift.kappa,
             cfg.drift.z_max,
             cfg.drift.severity_threshold,
@@ -3189,8 +3277,8 @@ class StreamingExperiment:
                     >= cfg.dasp.fast_warning_severity
                 )
                 if fast_gate_warning:
-                    current_repr = _representations(
-                        reference_model, window.x, self.device
+                    current_repr = self._drift_representations(
+                        reference_model, window.x
                     )
                     decision = monitor.evaluate(
                         reference_repr, current_repr
@@ -3207,8 +3295,8 @@ class StreamingExperiment:
                         False,
                     )
             else:
-                current_repr = _representations(
-                    reference_model, window.x, self.device
+                current_repr = self._drift_representations(
+                    reference_model, window.x
                 )
                 decision = monitor.evaluate(reference_repr, current_repr)
             if cooldown_remaining > 0:
@@ -3367,13 +3455,17 @@ class StreamingExperiment:
                     and cfg.dasp.baseline not in V6_METHODS
                 ):
                     reference_model = copy.deepcopy(model).eval()
-                    reference_repr = _representations(reference_model, item.window.x, self.device)
+                    reference_repr = self._drift_representations(
+                        reference_model, item.window.x
+                    )
                     start = max(0, item.window.index - cfg.drift.calibration_windows + 1)
                     recent = stream.windows[start : item.window.index + 1]
                     monitor.calibrate(
                         reference_repr,
                         [
-                            _representations(reference_model, recent_window.x, self.device)
+                            self._drift_representations(
+                                reference_model, recent_window.x
+                            )
                             for recent_window in recent
                         ],
                     )
@@ -3434,8 +3526,16 @@ class StreamingExperiment:
             "model_seed": model_seed,
             "n_features": len(stream.feature_names),
             "n_classes": len(stream.class_names),
+            "feature_permutation_seed": cfg.revision.feature_permutation_seed,
+            "feature_permutation_digest": self._revision_feature_permutation_digest,
             "total_update_seconds": float(sum(float(row.get("update_seconds", 0.0)) for row in rows)),
             "total_gradient_evaluations": int(sum(int(row.get("gradient_evaluations", 0)) for row in rows)),
+            "total_parameter_gradient_element_evaluations": int(
+                sum(
+                    int(row.get("parameter_gradient_element_evaluations", 0))
+                    for row in rows
+                )
+            ),
             "reference_resets": int(sum(bool(row.get("reference_reset", False)) for row in rows)),
             "total_sample_updates": int(sum(int(row.get("sample_updates", 0)) for row in rows)),
             "total_ground_truth_update_labels": int(
@@ -3443,6 +3543,15 @@ class StreamingExperiment:
                     int(row.get("ground_truth_update_labels", 0))
                     for row in rows
                 )
+            ),
+            "total_labels_exposed": int(
+                sum(int(row.get("labels_exposed_total", 0)) for row in rows)
+            ),
+            "total_new_training_labels_used": int(
+                sum(int(row.get("new_training_labels_used", 0)) for row in rows)
+            ),
+            "revision_repair_count": int(
+                sum(bool(row.get("revision_repair_applied", False)) for row in rows)
             ),
             "global_update_count": int(
                 sum(bool(row.get("global_update", False)) for row in rows)
@@ -3490,6 +3599,9 @@ class StreamingExperiment:
                     for parameter in model.parameters()
                 )
             ),
+            "model_parameter_count": int(
+                sum(parameter.numel() for parameter in model.parameters())
+            ),
             "memory_payload_bytes": int(
                 len(memory)
                 * (
@@ -3517,6 +3629,9 @@ class StreamingExperiment:
                 "numpy": np.__version__,
                 "pandas": pd.__version__,
                 "scikit_learn": sklearn.__version__,
+                "scipy": scipy.__version__,
+                "pyyaml": yaml.__version__,
+                "psutil": psutil.__version__,
                 "device": str(self.device),
                 "torch_threads": torch.get_num_threads(),
             },
@@ -3525,6 +3640,11 @@ class StreamingExperiment:
         return ExperimentResult(output_dir, summary, pd.DataFrame(rows).sort_values("window"))
 
     def _build_river_model(self):
+        if any(module is None for module in (forest, linear_model, optim, tree)):
+            raise RuntimeError(
+                "River baselines require the optional dependency set: "
+                "pip install -e .[river]"
+            )
         method = self.config.dasp.baseline
         model_seed = (
             self.config.data.random_seed
@@ -3847,6 +3967,8 @@ class StreamingExperiment:
             "warmup": warmup,
             "attack_rate": attack_rate,
             "n_samples": len(window.x),
+            "feature_permutation_seed": self.config.revision.feature_permutation_seed,
+            "feature_permutation_digest": self._revision_feature_permutation_digest,
             "rss_bytes": int(self._process.memory_info().rss),
             "preprocessing_seconds": self._last_preprocessing_seconds,
             "forward_seconds": self._last_forward_seconds,
@@ -3902,6 +4024,475 @@ class StreamingExperiment:
         for name, value in decision.requirements.items():
             row[f"requirement_{name}"] = value
 
+    def _revision_dataset_key(self) -> str:
+        cfg = self.config
+        if cfg.revision.dataset_key:
+            return cfg.revision.dataset_key
+        if cfg.data.path:
+            return Path(cfg.data.path).stem
+        return cfg.data.source
+
+    def _complete_revision_event_diagnostics(self, item: PendingUpdate) -> None:
+        remaining: list[dict[str, object]] = []
+        for event in self._revision_event_pending:
+            if int(event["target_window"]) != item.window.index:
+                remaining.append(event)
+                continue
+            source_row = event["source_row"]
+            assert isinstance(source_row, dict)
+            branch_metrics: dict[str, dict[str, float]] = {}
+            branches = event["branches"]
+            assert isinstance(branches, dict)
+            for identifier, branch in branches.items():
+                assert isinstance(branch, torch.nn.Module)
+                metrics = _guard_classification(
+                    branch,
+                    (item.window.x, item.window.y),
+                    self.device,
+                )
+                branch.eval()
+                with torch.no_grad():
+                    loss = float(
+                        F.cross_entropy(
+                            branch(item.window.x.to(self.device)),
+                            item.window.y.to(self.device),
+                        ).item()
+                    )
+                branch_metrics[str(identifier)] = {
+                    "macro_f1": float(metrics["macro_f1"]),
+                    "attack_recall": float(metrics["attack_recall"]),
+                    "loss": loss,
+                }
+            reference = branch_metrics["A1"]
+            for identifier, metrics in branch_metrics.items():
+                prefix = f"event_matched_{identifier}"
+                for metric_name, value in metrics.items():
+                    source_row[f"{prefix}_next_{metric_name}"] = value
+                    source_row[f"{prefix}_delta_{metric_name}"] = (
+                        value - reference[metric_name]
+                    )
+            source_row["event_matched_next_window"] = item.window.index
+            source_row["event_matched_complete"] = True
+        self._revision_event_pending = remaining
+
+    def _queue_revision_event_diagnostics(
+        self,
+        model_before: OnlineMLP,
+        model_after: OnlineMLP,
+        item: PendingUpdate,
+        row: dict[str, object],
+        requirements: dict[str, float],
+        conflicts: dict[str, float],
+        training_x: torch.Tensor,
+        training_y: torch.Tensor,
+        training_weights: torch.Tensor,
+        epochs: int,
+        random_seed: int,
+    ) -> None:
+        cfg = self.config
+        if not cfg.revision.event_matched_diagnostics:
+            return
+        branches: dict[str, torch.nn.Module] = {"A1": copy.deepcopy(model_after)}
+        condition_by_id = {
+            condition.identifier: condition
+            for condition in REVISION_CONDITIONS.values()
+        }
+        for identifier in cfg.revision.event_matched_controls:
+            condition = condition_by_id[identifier]
+            branch = copy.deepcopy(model_before).to(self.device)
+            selection = select_routing(
+                condition.routing_policy,
+                list(branch.layer_names),
+                requirements,
+                conflicts,
+                condition.routing_k,
+                cfg.dasp.conflict_weight,
+                cfg.revision.representation_plasticity,
+                cfg.revision.classifier_plasticity,
+                cfg.revision.fixed_modules,
+                random_seed=random_seed,
+            )
+            before = parameter_snapshot(branch)
+            branch_started = time.perf_counter()
+            evaluations = _train_dasp(
+                branch,
+                training_x,
+                training_y,
+                selection.plasticities,
+                cfg,
+                self.device,
+                ReservoirMemory(1, 0),
+                strict_freeze=True,
+                sample_weights=training_weights,
+                epochs=epochs,
+                use_projection_memory=False,
+            )
+            elapsed = time.perf_counter() - branch_started
+            locality = locality_diagnostics(
+                branch,
+                before,
+                selection.active_modules,
+                evaluations,
+                cfg.revision.change_tolerance,
+            )
+            row[f"event_matched_{identifier}_update_seconds"] = elapsed
+            row[f"event_matched_{identifier}_changed_parameter_fraction"] = locality[
+                "changed_parameter_fraction"
+            ]
+            branches[identifier] = branch
+        row["event_matched_A1_update_seconds"] = row["revision_training_seconds"]
+        row["event_matched_A1_changed_parameter_fraction"] = row[
+            "changed_parameter_fraction"
+        ]
+        row["event_matched_complete"] = False
+        self._revision_event_pending.append(
+            {
+                "target_window": item.window.index + 1,
+                "source_row": row,
+                "branches": branches,
+            }
+        )
+
+    def _update_revision(
+        self,
+        model: OnlineMLP,
+        memory: ReservoirMemory,
+        item: PendingUpdate,
+        row: dict[str, object],
+        started: float,
+    ) -> str:
+        cfg = self.config
+        if not cfg.revision.enabled:
+            raise RuntimeError("revision methods require revision.enabled=true")
+        condition = REVISION_CONDITIONS[cfg.dasp.baseline]
+        self._complete_revision_event_diagnostics(item)
+        pools = equal_label_pools(
+            len(item.window.x),
+            cfg.revision.label_budget,
+            cfg.revision.repair_candidate_size,
+            cfg.revision.gate_size,
+            self._revision_dataset_key(),
+            cfg.data.scenario,
+            cfg.data.random_seed if cfg.data.stream_seed is None else cfg.data.stream_seed,
+            item.window.index,
+            cfg.revision.protocol_version,
+        )
+        if len(pools.query) != min(len(item.window.x), cfg.revision.label_budget):
+            raise RuntimeError("equal-label query did not satisfy the exposure budget")
+        if set(pools.repair_candidates.tolist()) & set(pools.gate.tolist()):
+            raise RuntimeError("repair and gate pools must be disjoint")
+        performance_gate_enabled = (
+            cfg.revision.performance_gate_enabled
+            if condition.performance_gate_enabled is None
+            else condition.performance_gate_enabled
+        )
+        effective_new_sample_weight = (
+            cfg.dasp.modular_new_sample_weight
+            if condition.new_sample_weight is None
+            else condition.new_sample_weight
+        )
+        row.update(
+            {
+                "revision_condition": condition.identifier,
+                "label_contract_version": cfg.revision.protocol_version,
+                "labels_exposed_total": len(pools.query),
+                "repair_candidate_labels_exposed": len(pools.repair_candidates),
+                "gate_labels_exposed": len(pools.gate),
+                "labels_used_for_selection": len(pools.repair_candidates),
+                "labels_used_for_gating": (
+                    len(pools.gate)
+                    if condition.identifier != "A10" and performance_gate_enabled
+                    else 0
+                ),
+                "pseudo_labels_used": 0,
+                "query_index_digest": index_digest(pools.query),
+                "repair_candidate_index_digest": index_digest(pools.repair_candidates),
+                "gate_index_digest": index_digest(pools.gate),
+                "label_query_seed": pools.query_seed,
+                "training_selection_seed": pools.selection_seed,
+                "ground_truth_update_labels": len(pools.query),
+                "revision_selection_policy": (
+                    "class_balanced"
+                    if condition.label_balanced_selection
+                    else "uniform_label_blind"
+                ),
+                "revision_replay_enabled": condition.replay_enabled,
+                "revision_new_sample_weight": effective_new_sample_weight,
+                "revision_performance_gate_enabled": performance_gate_enabled,
+            }
+        )
+        candidate_x = item.window.x[pools.repair_candidates]
+        candidate_y = item.window.y[pools.repair_candidates]
+        gate_x = item.window.x[pools.gate]
+        gate_y = item.window.y[pools.gate]
+
+        if condition.identifier == "A10":
+            assert self._ssf_teacher is not None
+            historical = memory.tensors(self.device)
+            if historical is None:
+                raise RuntimeError("revision SSF requires warm-up memory")
+            old_x, old_y = historical
+            old_probability = normal_probabilities(model, old_x, self.device)
+            new_probability = normal_probabilities(model, candidate_x, self.device)
+            statistic, p_value = ks_2samp(
+                _tensor_to_numpy(old_probability),
+                _tensor_to_numpy(new_probability),
+            )
+            drift = bool(p_value < cfg.baselines.ssf_drift_p_value)
+            old_scores, new_scores = ssf_masks(
+                old_probability,
+                new_probability,
+                cfg.baselines.ssf_mask_steps,
+                cfg.baselines.ssf_mask_bins,
+            )
+            selected_count = min(
+                cfg.revision.optimization_size,
+                len(candidate_x),
+                cfg.dasp.memory_size,
+                len(old_x),
+            )
+            selected_positions = torch.argsort(new_scores, descending=True)[:selected_count]
+            selected_global = pools.repair_candidates[selected_positions.detach().cpu()]
+            row["training_index_digest"] = index_digest(selected_global)
+            (
+                buffer_x,
+                buffer_y,
+                new_mask,
+                forgotten,
+                inserted,
+                ground_truth_inserted,
+                pseudo_inserted,
+            ) = select_ssf_buffer(
+                old_x,
+                old_y,
+                candidate_x.to(self.device),
+                candidate_y.to(self.device),
+                old_scores,
+                new_scores,
+                cfg.dasp.memory_size,
+                cfg.revision.optimization_size,
+                drift,
+                allow_pseudo_labels=False,
+            )
+            evaluations = train_ssf(
+                model,
+                self._ssf_teacher,
+                buffer_x,
+                buffer_y,
+                new_mask,
+                drift,
+                cfg,
+                self.device,
+                item.window.index,
+            )
+            self._ssf_teacher = clone_teacher(model)
+            memory.replace(buffer_x, buffer_y)
+            row.update(
+                {
+                    "new_training_labels_used": ground_truth_inserted,
+                    "gradient_evaluations": evaluations,
+                    "parameter_gradient_element_evaluations": evaluations
+                    * sum(parameter.numel() for parameter in model.parameters()),
+                    "triggered": drift,
+                    "ssf_ks_statistic": float(statistic),
+                    "ssf_ks_p_value": float(p_value),
+                    "buffer_forgotten": forgotten,
+                    "buffer_inserted": inserted,
+                    "ssf_ground_truth_inserted": ground_truth_inserted,
+                    "ssf_pseudo_inserted": pseudo_inserted,
+                    "buffer_size": len(memory),
+                    "selected_candidate": "revision_a10_ssf",
+                    "accepted": "online",
+                    "update_seconds": time.perf_counter() - started,
+                }
+            )
+            return "online"
+
+        training_indices = select_training_indices(
+            item.window.y,
+            pools.repair_candidates,
+            cfg.revision.optimization_size,
+            pools.selection_seed,
+            label_balanced=condition.label_balanced_selection,
+        )
+        train_x = item.window.x[training_indices]
+        train_y = item.window.y[training_indices]
+        row["training_index_digest"] = index_digest(training_indices)
+        row["new_training_labels_used"] = len(training_indices)
+        if performance_gate_enabled:
+            gate_metrics = _guard_classification(
+                model,
+                (gate_x, gate_y),
+                self.device,
+            )
+            row["revision_gate_macro_f1"] = gate_metrics["macro_f1"]
+            row["revision_gate_attack_recall"] = gate_metrics["attack_recall"]
+            gate_repair = bool(
+                gate_metrics["macro_f1"] < cfg.dasp.v12_guard_min_macro_f1
+            )
+        else:
+            row["revision_gate_macro_f1"] = np.nan
+            row["revision_gate_attack_recall"] = np.nan
+            gate_repair = False
+        repair = bool(item.decision.triggered or gate_repair)
+        row["revision_gate_repair"] = gate_repair
+        row["revision_repair_applied"] = repair
+        if not repair:
+            memory.add(train_x, train_y)
+            row.update(
+                {
+                    "gradient_evaluations": 0,
+                    "parameter_gradient_element_evaluations": 0,
+                    "selected_candidate": "none",
+                    "accepted": "none",
+                    "update_seconds": time.perf_counter() - started,
+                }
+            )
+            return "none"
+
+        historical = memory.tensors(torch.device("cpu"))
+        replay_indices = torch.empty(0, dtype=torch.long)
+        replay_x = torch.empty((0, train_x.shape[1]), dtype=train_x.dtype)
+        replay_y = torch.empty(0, dtype=train_y.dtype)
+        if (
+            condition.replay_enabled
+            and historical is not None
+            and cfg.revision.replay_size > 0
+        ):
+            replay_seed = stable_seed(
+                "revision-replay",
+                self._revision_dataset_key(),
+                cfg.data.scenario,
+                cfg.data.random_seed if cfg.data.stream_seed is None else cfg.data.stream_seed,
+                item.window.index,
+                cfg.revision.protocol_version,
+            )
+            replay_indices = select_training_indices(
+                historical[1],
+                torch.arange(len(historical[1])),
+                cfg.revision.replay_size,
+                replay_seed,
+                label_balanced=True,
+            )
+            replay_x = historical[0][replay_indices]
+            replay_y = historical[1][replay_indices]
+        row["replay_index_digest"] = index_digest(replay_indices)
+        row["revision_replay_size"] = len(replay_indices)
+        conflict_memory = (
+            replay_x[: cfg.dasp.memory_batch_size].to(self.device),
+            replay_y[: cfg.dasp.memory_batch_size].to(self.device),
+        ) if len(replay_y) else None
+        conflicts = _gradient_conflicts(
+            model,
+            train_x[: cfg.dasp.memory_batch_size],
+            train_y[: cfg.dasp.memory_batch_size],
+            conflict_memory,
+            self.device,
+        )
+        routing_seed = stable_seed(
+            cfg.revision.routing_namespace,
+            self._revision_dataset_key(),
+            cfg.data.scenario,
+            cfg.data.random_seed if cfg.data.stream_seed is None else cfg.data.stream_seed,
+            item.window.index,
+            cfg.revision.protocol_version,
+        )
+        selection = select_routing(
+            condition.routing_policy,
+            list(model.layer_names),
+            item.decision.requirements,
+            conflicts,
+            condition.routing_k,
+            cfg.dasp.conflict_weight,
+            cfg.revision.representation_plasticity,
+            cfg.revision.classifier_plasticity,
+            cfg.revision.fixed_modules,
+            random_seed=routing_seed,
+        )
+        for name, value in conflicts.items():
+            row[f"conflict_{name}"] = value
+        for name, value in selection.scores.items():
+            row[f"routing_score_{name}"] = value
+        row["routing_policy"] = condition.routing_policy
+        row["routing_k"] = condition.routing_k
+        row["routing_seed"] = routing_seed
+        row["routing_jaccard_previous"] = routing_jaccard(
+            self._revision_previous_route,
+            selection.active_modules,
+        )
+        self._revision_previous_route = selection.active_modules
+        training_x = torch.cat([train_x, replay_x], dim=0).to(self.device)
+        training_y = torch.cat([train_y, replay_y], dim=0).to(self.device)
+        training_weights = torch.cat(
+            [
+                torch.full(
+                    (len(train_y),),
+                    float(effective_new_sample_weight),
+                    dtype=torch.float32,
+                ),
+                torch.ones(len(replay_y), dtype=torch.float32),
+            ]
+        ).to(self.device)
+        epochs = (
+            cfg.dasp.modular_emergency_epochs
+            if gate_repair and not item.decision.triggered
+            else cfg.dasp.modular_repair_epochs
+        )
+        before_model = copy.deepcopy(model)
+        before = parameter_snapshot(model)
+        training_started = time.perf_counter()
+        evaluations = _train_dasp(
+            model,
+            training_x,
+            training_y,
+            selection.plasticities,
+            cfg,
+            self.device,
+            memory,
+            strict_freeze=True,
+            sample_weights=training_weights,
+            epochs=epochs,
+            use_projection_memory=False,
+        )
+        training_seconds = time.perf_counter() - training_started
+        locality = locality_diagnostics(
+            model,
+            before,
+            selection.active_modules,
+            evaluations,
+            cfg.revision.change_tolerance,
+        )
+        row.update(locality)
+        if float(locality["inactive_module_max_abs_change"]) != 0.0:
+            raise RuntimeError("revision strict-freeze invariant was violated")
+        row.update(
+            {
+                "gradient_evaluations": evaluations,
+                "revision_training_seconds": training_seconds,
+                "selected_candidate": condition.identifier,
+                "accepted": "dasp",
+                "localized_repair_modules": "|".join(selection.active_modules),
+                "localized_repair_module_count": len(selection.active_modules),
+                "update_seconds": time.perf_counter() - started,
+            }
+        )
+        memory.add(train_x, train_y)
+        if condition.identifier == "A1":
+            self._queue_revision_event_diagnostics(
+                before_model,
+                model,
+                item,
+                row,
+                item.decision.requirements,
+                conflicts,
+                training_x,
+                training_y,
+                training_weights,
+                epochs,
+                routing_seed,
+            )
+        return "dasp"
+
     def _update(
         self,
         model: OnlineMLP,
@@ -3916,6 +4507,8 @@ class StreamingExperiment:
             row["ground_truth_update_labels"] = 0
             row["update_seconds"] = time.perf_counter() - started
             return "none"
+        if method in REVISION_METHODS:
+            return self._update_revision(model, memory, item, row, started)
         if method in FAST_DASP_METHODS:
             event_decision = item.current_decision or item.decision
             warning_event = bool(
@@ -4586,6 +5179,62 @@ class StreamingExperiment:
                     "historical_class_supported_fallback"
                 )
                 row["v18_guard_size"] = len(guard_y)
+        elif (
+            cfg.revision.enabled
+            and cfg.revision.common_label_exposure_baselines
+            and method in {"online_mlp", "experience_replay"}
+        ):
+            pools = equal_label_pools(
+                len(item.window.x),
+                cfg.revision.label_budget,
+                cfg.revision.repair_candidate_size,
+                cfg.revision.gate_size,
+                self._revision_dataset_key(),
+                cfg.data.scenario,
+                cfg.data.random_seed
+                if cfg.data.stream_seed is None
+                else cfg.data.stream_seed,
+                item.window.index,
+                cfg.revision.protocol_version,
+            )
+            training_indices = select_training_indices(
+                item.window.y,
+                pools.repair_candidates,
+                cfg.revision.optimization_size,
+                pools.selection_seed,
+                label_balanced=False,
+            )
+            train_x = item.window.x[training_indices]
+            train_y = item.window.y[training_indices]
+            guard_pair = memory_guard or memory_probe
+            if guard_pair is None:
+                guard_x, guard_y = train_x, train_y
+            else:
+                guard_x, guard_y = guard_pair
+            row.update(
+                {
+                    "label_contract_version": cfg.revision.protocol_version,
+                    "labels_exposed_total": len(pools.query),
+                    "repair_candidate_labels_exposed": len(
+                        pools.repair_candidates
+                    ),
+                    "gate_labels_exposed": len(pools.gate),
+                    "labels_used_for_selection": 0,
+                    "labels_used_for_gating": 0,
+                    "pseudo_labels_used": 0,
+                    "query_index_digest": index_digest(pools.query),
+                    "repair_candidate_index_digest": index_digest(
+                        pools.repair_candidates
+                    ),
+                    "gate_index_digest": index_digest(pools.gate),
+                    "training_index_digest": index_digest(training_indices),
+                    "label_query_seed": pools.query_seed,
+                    "training_selection_seed": pools.selection_seed,
+                    "ground_truth_update_labels": len(pools.query),
+                    "new_training_labels_used": len(training_indices),
+                    "label_query_policy": "common_512_uniform_128",
+                }
+            )
         elif method in BUDGET_MATCHED_BASELINES:
             query_indices = _label_blind_uniform_query_indices(
                 len(item.window.x),

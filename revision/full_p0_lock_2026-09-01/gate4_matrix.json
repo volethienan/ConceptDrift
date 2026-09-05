@@ -1,0 +1,49 @@
+{
+  "protocol_version": "1.1",
+  "datasets": [
+    "cic-ids2017",
+    "nf-bot-iot-v3",
+    "nf-cse-cic-ids2018-v3",
+    "nf-ton-iot-v3",
+    "nf-unsw-nb15-v3"
+  ],
+  "scenarios": [
+    "S0",
+    "S1-Sudden",
+    "S2-Gradual",
+    "S3-Incremental",
+    "S4-Recurrent",
+    "S5-Blip",
+    "S6-Combined",
+    "S7-Local-Low",
+    "S7-Local-Medium",
+    "S7-Local-High"
+  ],
+  "stream_seeds": [
+    2001,
+    2002,
+    2003,
+    2101,
+    2102
+  ],
+  "model_seeds": [
+    91,
+    92
+  ],
+  "conditions": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "A7",
+    "A8",
+    "A9",
+    "A10"
+  ],
+  "paired_cells": 500,
+  "expected_runs": 5000,
+  "output": "outputs_revision_v1/full_p0_v1",
+  "command": ".venv-revision/Scripts/python.exe tools/run_revision_experiments.py --mode full_p0 --resume"
+}

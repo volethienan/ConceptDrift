@@ -269,6 +269,32 @@ class BaselineConfig:
     cdda_min_error_increase: float = 0.01
     periodic_ft_interval: int = 4
 
+@dataclass
+class RevisionConfig:
+    enabled: bool = False
+    protocol_version: str = "1.1"
+    dataset_key: str | None = None
+    label_budget: int = 512
+    repair_candidate_size: int = 384
+    gate_size: int = 128
+    optimization_size: int = 128
+    replay_size: int = 512
+    fixed_modules: list[str] = field(
+        default_factory=lambda: ["module_1", "module_2", "module_3"]
+    )
+    routing_namespace: str = "revision-routing-primary-v1"
+    representation_plasticity: float = 1.0
+    classifier_plasticity: float = 1.0
+    change_tolerance: float = 1e-12
+    performance_gate_enabled: bool = True
+    common_label_exposure_baselines: bool = False
+    feature_permutation_seed: int | None = None
+    feature_permutation_namespace: str = "revision-feature-order-v1"
+    event_matched_diagnostics: bool = False
+    event_matched_controls: list[str] = field(
+        default_factory=lambda: ["A2", "A3", "A4", "A5", "A6", "A9"]
+    )
+
 
 @dataclass
 class OutputConfig:
@@ -285,6 +311,7 @@ class ExperimentConfig:
     drift: DriftConfig = field(default_factory=DriftConfig)
     dasp: DASPConfig = field(default_factory=DASPConfig)
     baselines: BaselineConfig = field(default_factory=BaselineConfig)
+    revision: RevisionConfig = field(default_factory=RevisionConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
 
     def to_dict(self) -> dict[str, Any]:
@@ -305,5 +332,6 @@ def load_config(path: str | Path) -> ExperimentConfig:
         drift=_construct(DriftConfig, raw.get("drift")),
         dasp=_construct(DASPConfig, raw.get("dasp")),
         baselines=_construct(BaselineConfig, raw.get("baselines")),
+        revision=_construct(RevisionConfig, raw.get("revision")),
         output=_construct(OutputConfig, raw.get("output")),
     )

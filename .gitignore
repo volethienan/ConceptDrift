@@ -13,9 +13,13 @@ outputs*/
 !outputs_full_v6_10scenario_pilot/**
 !outputs_confirmation_v6_10scenario/
 !outputs_confirmation_v6_10scenario/**
+!outputs_revision_v1/
+outputs_revision_v1/*
+!outputs_revision_v1/README.md
 *.backup_*.docx
 
 .venv-cpu/
+.venv-revision/
 data/
 artifacts/
 logs/
