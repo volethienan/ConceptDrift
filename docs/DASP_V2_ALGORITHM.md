@@ -42,3 +42,23 @@ Gồm: query indices; trạng thái gate, số mẫu và cận Wilson của từ
 | `logit_adjustment_tau` (C3) | 0, 1 |
 
 2 × 3 × 2 × 2 = 24 cấu hình. Cố định: `gate_buffer_windows` 2, `utility_probe_epochs` 1, `background` classifier, `repair_epochs` 2. Quy tắc chọn: mean-window Macro-F1 trung bình trên 60 cell dev (2 dataset × 10 kịch bản × 3 seed, model seed 91). Hòa trong phạm vi 0,002 thì chọn cấu hình có ít gradient element hơn.
+
+## Pha dev: chạy và chọn cấu hình
+
+Lưới đã duyệt ngày 18/10/2026 (xem mục 5 của kế hoạch): **mỗi phương pháp đúng 24 cấu hình**. Có 7 phương pháp (DASP-v2, Online MLP, ER, A-GEM, EWC-v2, SSF-budget, CDDA-v2) trên 60 cell dev (NF-BoT, NF-UNSW × 10 kịch bản × seed 2001–2003, model seed 91), tổng **10.080 run**. Mọi phương pháp dùng đúng 128 nhãn truy vấn mỗi cửa sổ. Runner từ chối dataset hoặc seed xác nhận.
+
+Thời gian đo trên một cell thật (NF-BoT S1-Sudden, CPU, 1 luồng): DASP-v2 khoảng 20 s (do probe routing), SSF khoảng 17 s, các phương pháp khác 5–7 s. Trung bình khoảng 9 s/run, tức khoảng 25 giờ-CPU; chia shard trên server 16–32 nhân thì mất khoảng 1–2 giờ.
+
+```bash
+mkdir -p results
+for k in $(seq 1 16); do
+  python tools/run_dasp_v2.py --stage dev --prepared-root prepared_streams_v2 \
+      --output-root results/dasp_v2_dev --execute --resume --shard $k/16 \
+      > results/dasp_v2_dev_shard$k.log 2>&1 &
+done; wait
+python tools/analyze_dasp_v2.py --output-root results/dasp_v2_dev
+```
+
+`analyze_dasp_v2.py` ghi `dev_runs.csv`, `dev_configurations.csv` (24 cấu hình của mỗi phương pháp) và `dev_selection.json`: cấu hình được chọn theo quy tắc khai báo trước (Macro-F1 trung bình cao nhất; hòa trong phạm vi 0,002 thì chọn cấu hình ít lượt gradient hơn). Sau bước này **khóa**: commit `dev_selection.json` cùng code, ghi hash vào mục 9 của kế hoạch, rồi mới chạy pha xác nhận.
+
+Thống kê cho pha xác nhận đã có trong cùng module và đã có test: chênh lệch được lấy trung bình theo cell dataset × kịch bản; bootstrap phân cấp (lấy mẫu lại dataset, rồi kịch bản trong dataset); Wilcoxon hai phía trên cell; Holm trong từng họ; phân tích độ nhạy trên các cell đạt construct theo validator.

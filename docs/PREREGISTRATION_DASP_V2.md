@@ -67,7 +67,21 @@ Baseline, đều dưới hợp đồng ở mục 3:
 - RepShield: chỉ train khi alarm bật, đúng theo mô tả gốc. Nếu không đủ nguồn để tái hiện thì bỏ hẳn.
 - ARF (River): baseline streaming chuẩn, cùng 128 nhãn.
 
-Chỉnh tham số công bằng: mỗi baseline được tối đa 24 cấu hình trên cùng phần dev, cùng quy tắc chọn như DASP-v2. Không tuyên bố tái hiện SOTA gốc. Mọi bản cài đặt đều là "adapted".
+Chỉnh tham số công bằng: mỗi phương pháp được đúng 24 cấu hình trên cùng phần dev, cùng quy tắc chọn. Lưới đã duyệt (18/10/2026), cài trong `tools/run_dasp_v2.py`:
+
+| Phương pháp | Lưới (24 cấu hình) |
+|---|---|
+| DASP-v2 | head {tuyến tính, 16} × (gate_min_support, gate_threshold) {(20; 0,80), (20; 0,70), (40; 0,80)} × routing_top_k {1, 2} × τ {0, 1} |
+| Online MLP | learning_rate {2,5e-4; 5e-4; 1e-3; 2e-3} × epochs {1, 2, 4} × weight_decay {1e-4; 1e-3} |
+| Experience Replay | learning_rate {5e-4; 1e-3; 2e-3} × memory_batch_size {64, 128, 256, 512} × epochs {1, 2} |
+| A-GEM | learning_rate {5e-4; 1e-3; 2e-3} × memory_batch_size {64, 128, 256, 512} × epochs {1, 2} |
+| Online EWC (v2) | ewc_lambda {1, 10, 100, 1000} × ewc_anchor_interval {2, 4, 8} × learning_rate {5e-4; 1e-3} |
+| SSF (budget) | ssf_lwf_lambda {0,1; 0,3; 0,5; 1,0} × ssf_new_sample_weight {1, 3, 5} × learning_rate {5e-4; 1e-3} |
+| CDDA-MD (v2) | cdda_error_z {1, 2, 3} × cdda_warning_patience {1, 2, 3, 4} × learning_rate {5e-4; 1e-3} |
+
+ARF chưa nằm trong pha dev vì môi trường chưa có `river` và đường chạy River chưa được audit. Nếu bổ sung sau, ARF cũng nhận lưới 24 cấu hình trên cùng phần dev trước khi khóa.
+
+Quy tắc chọn: mean-window Macro-F1 trung bình trên 60 cell dev. Hòa trong phạm vi 0,002 thì chọn cấu hình có ít lượt gradient hơn (DASP-v2 tính cả probe routing). Không tuyên bố tái hiện SOTA gốc. Mọi bản cài đặt đều là "adapted".
 
 Đối chứng nội bộ, dùng cùng lịch sự kiện (event-matched) với DASP-v2:
 - all-module, classifier-only, random top-k, fixed top-k.
@@ -99,7 +113,7 @@ Quy tắc viết bài:
 - Phân tích độ nhạy theo dataset. Với chỉ 5 dataset, kiểm định theo dataset có p nhỏ nhất là 0,0625, nên chỉ dùng để mô tả.
 - Báo cáo đầy đủ: mean-window và cumulative Macro-F1, attack recall, FNR, benign FPR (tách theo-run và gộp), thời gian, bộ nhớ.
 - Thiếu cặp thì dừng và báo cáo, không âm thầm bỏ cặp.
-- **Đề xuất bổ sung, chờ duyệt (18/10/2026, trước mọi kết quả mô hình):** validator chỉ thấy tác động lên ranh giới quyết định ở khoảng 19/45 cặp dataset × kịch bản drift (xem V2_INFRA_STATUS mục 8). Kịch bản giữ nguyên. Phân tích chính vẫn trên mọi cell. Thêm phân tích độ nhạy chỉ trên các cell đạt construct. Bài chỉ dùng thuật ngữ "concept drift" cho kịch bản đạt; các kịch bản khác gọi là "distribution shift".
+- **Bổ sung đã duyệt (18/10/2026, trước mọi kết quả mô hình):** validator chỉ thấy tác động lên ranh giới quyết định ở khoảng 19/45 cặp dataset × kịch bản drift (xem V2_INFRA_STATUS mục 8). Kịch bản giữ nguyên. Phân tích chính vẫn trên mọi cell. Thêm phân tích độ nhạy chỉ trên các cell đạt construct. Bài chỉ dùng thuật ngữ "concept drift" cho kịch bản đạt; các kịch bản khác gọi là "distribution shift".
 
 ## 8. Thứ tự thực hiện
 
