@@ -29,8 +29,10 @@ except ImportError:
 
 from .baselines import (
     ErrorRateDriftDetector,
+    RecalibratingErrorRateDetector,
     build_gpm_subspaces,
     clone_teacher,
+    estimate_empirical_fisher,
     normal_probabilities,
     pca_variance_distance,
     select_ssf_buffer,
@@ -113,6 +115,8 @@ METHODS = {
     "ssf_faithful",
     "repshield",
     "cdda_md",
+    "online_ewc_v2",
+    "cdda_md_v2",
     "dasp",
     "dasp_v7",
     "dasp_v8",
@@ -307,6 +311,8 @@ BUDGET_MATCHED_BASELINES = {
     "ssf_budget",
     "repshield",
     "cdda_md",
+    "online_ewc_v2",
+    "cdda_md_v2",
 }
 
 V11_METHODS = {"dasp_v11_novelty", "dasp_v11", "dasp_v11_1", *V12_METHODS}
@@ -357,6 +363,8 @@ LAYER_DETECTOR_FREE_METHODS = {
     "ssf_faithful",
     "repshield",
     "cdda_md",
+    "online_ewc_v2",
+    "cdda_md_v2",
     "dasp_v16_no_detector",
 }
 
@@ -516,6 +524,22 @@ def _label_blind_uniform_query_indices(
         return torch.empty(0, dtype=torch.long)
     generator = torch.Generator().manual_seed(int(seed))
     return torch.randperm(int(n_samples), generator=generator)[:count]
+
+
+def _labelled_error_rate(
+    model: OnlineMLP,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    device: torch.device,
+) -> float:
+    """Error of the current model on labels the method has actually acquired."""
+
+    if not len(y):
+        raise ValueError("an error rate needs at least one acquired label")
+    model.eval()
+    with torch.no_grad():
+        prediction = model(x.to(device)).argmax(dim=1).cpu()
+    return float((prediction != y.cpu()).float().mean().item())
 
 
 def _v18_split_query_train_guard(
@@ -2863,6 +2887,7 @@ class StreamingExperiment:
         self._stateful_optimizer: torch.optim.AdamW | None = None
         self._ewc_reference: dict[str, torch.Tensor] | None = None
         self._ewc_fisher: dict[str, torch.Tensor] | None = None
+        self._ewc_windows_since_anchor = 0
         self._anchor_model: OnlineMLP | None = None
         self._ssf_teacher: torch.nn.Module | None = None
         self._cdda_detector: ErrorRateDriftDetector | None = None
@@ -3180,13 +3205,44 @@ class StreamingExperiment:
                 cfg.baselines.cdda_min_error_increase,
             )
 
-        if cfg.dasp.baseline == "online_ewc":
+        if cfg.dasp.baseline == "cdda_md_v2":
+            # Calibrate on the same label-blind 128-query contract used after
+            # warm-up so the threshold reflects the noise of a 128-label error.
+            warmup_errors = []
+            for calibration_window in stream.windows[: cfg.data.warmup_windows]:
+                indices = _label_blind_uniform_query_indices(
+                    len(calibration_window.x),
+                    cfg.baselines.update_label_budget,
+                    cfg.data.random_seed + calibration_window.index * 104729 + 17,
+                )
+                warmup_errors.append(
+                    _labelled_error_rate(
+                        model,
+                        calibration_window.x[indices],
+                        calibration_window.y[indices],
+                        self.device,
+                    )
+                )
+            self._cdda_detector = RecalibratingErrorRateDetector.from_warmup(
+                warmup_errors,
+                cfg.baselines.cdda_error_z,
+                cfg.baselines.cdda_warning_patience,
+                cfg.baselines.cdda_min_error_increase,
+                cfg.baselines.cdda_recalibration_windows,
+            )
+
+        if cfg.dasp.baseline in {"online_ewc", "online_ewc_v2"}:
             fisher_batch = memory.sample(cfg.dasp.memory_batch_size, self.device)
             self._ewc_reference = {
                 name: parameter.detach().clone()
                 for name, parameter in model.named_parameters()
             }
-            self._ewc_fisher = _estimate_fisher(model, fisher_batch, self.device)
+            estimator = (
+                estimate_empirical_fisher
+                if cfg.dasp.baseline == "online_ewc_v2"
+                else _estimate_fisher
+            )
+            self._ewc_fisher = estimator(model, fisher_batch, self.device)
 
         reference_model = copy.deepcopy(model).eval()
         self._anchor_model = copy.deepcopy(model).eval()
@@ -5356,11 +5412,13 @@ class StreamingExperiment:
             "replay",
             "experience_replay",
             "online_ewc",
+            "online_ewc_v2",
             "ssf",
             "ssf_budget",
             "ssf_faithful",
             "repshield",
             "cdda_md",
+            "cdda_md_v2",
             *ADAPTER_METHODS,
         }:
             conflicts = _gradient_conflicts(
@@ -5510,6 +5568,38 @@ class StreamingExperiment:
                 "cdda_error_threshold": self._cdda_detector.threshold,
                 "cdda_warning": warning,
                 "cdda_consecutive_warnings": self._cdda_detector.consecutive_warnings,
+            })
+            if drift:
+                update_x = torch.cat([value[0] for value in self._cdda_warning_data])
+                update_y = torch.cat([value[1] for value in self._cdda_warning_data])
+                row["gradient_evaluations"] = train_cdda(
+                    model, update_x, update_y, cfg, self.device, item.window.index
+                )
+                self._cdda_warning_data.clear()
+                row["selected_candidate"] = "cdda_incremental"
+                accepted = "online"
+            else:
+                row["selected_candidate"] = "no_update"
+                accepted = "none"
+        elif method == "cdda_md_v2":
+            assert isinstance(self._cdda_detector, RecalibratingErrorRateDetector)
+            # Only the queried delayed labels enter the decision; the legacy
+            # path read accuracy measured on the whole evaluation window.
+            error_rate = _labelled_error_rate(model, train_x, train_y, self.device)
+            warning, drift, severity = self._cdda_detector.update(error_rate)
+            if warning:
+                self._cdda_warning_data.append((train_x, train_y))
+            else:
+                self._cdda_warning_data.clear()
+            row.update({
+                "triggered": drift,
+                "severity": severity,
+                "cdda_error_rate": error_rate,
+                "cdda_error_threshold": self._cdda_detector.threshold,
+                "cdda_warning": warning,
+                "cdda_consecutive_warnings": self._cdda_detector.consecutive_warnings,
+                "cdda_recalibrating": self._cdda_detector.recalibrating,
+                "cdda_error_label_source": "queried_update_labels",
             })
             if drift:
                 update_x = torch.cat([value[0] for value in self._cdda_warning_data])
@@ -7866,7 +7956,7 @@ class StreamingExperiment:
                     "guard_recent_mean_delta"
                 ]
                 row["gradient_evaluations"] = gradient_evaluations
-        elif method == "online_ewc":
+        elif method in {"online_ewc", "online_ewc_v2"}:
             assert self._ewc_reference is not None
             assert self._ewc_fisher is not None
             row["gradient_evaluations"] = _train_online_ewc(
@@ -7879,28 +7969,47 @@ class StreamingExperiment:
                 self.device,
                 item.window.index,
             )
-            current_batch: tuple[torch.Tensor, torch.Tensor] = (
-                train_x[: cfg.dasp.memory_batch_size].to(self.device),
-                train_y[: cfg.dasp.memory_batch_size].to(self.device),
+            # online_ewc_v2 consolidates every ewc_anchor_interval windows. With
+            # an anchor reset after every window the first optimizer step starts
+            # at the anchor, where the quadratic penalty has zero gradient, so
+            # the legacy per-window anchor could barely constrain anything.
+            self._ewc_windows_since_anchor += 1
+            interval = (
+                max(1, int(cfg.dasp.ewc_anchor_interval))
+                if method == "online_ewc_v2"
+                else 1
             )
-            if memory_probe is None:
-                fisher_batch = current_batch
-            else:
-                fisher_batch = (
-                    torch.cat([memory_probe[0], current_batch[0]]),
-                    torch.cat([memory_probe[1], current_batch[1]]),
+            refresh_anchor = self._ewc_windows_since_anchor >= interval
+            row["ewc_anchor_refreshed"] = refresh_anchor
+            if refresh_anchor:
+                self._ewc_windows_since_anchor = 0
+                current_batch: tuple[torch.Tensor, torch.Tensor] = (
+                    train_x[: cfg.dasp.memory_batch_size].to(self.device),
+                    train_y[: cfg.dasp.memory_batch_size].to(self.device),
                 )
-            new_fisher = _estimate_fisher(model, fisher_batch, self.device)
-            decay = float(np.clip(cfg.dasp.ewc_decay, 0.0, 1.0))
-            self._ewc_fisher = {
-                name: decay * self._ewc_fisher[name] + (1.0 - decay) * value
-                for name, value in new_fisher.items()
-            }
-            self._ewc_reference = {
-                name: parameter.detach().clone()
-                for name, parameter in model.named_parameters()
-            }
-            row["selected_candidate"] = "online_ewc"
+                if memory_probe is None:
+                    fisher_batch = current_batch
+                else:
+                    fisher_batch = (
+                        torch.cat([memory_probe[0], current_batch[0]]),
+                        torch.cat([memory_probe[1], current_batch[1]]),
+                    )
+                estimator = (
+                    estimate_empirical_fisher
+                    if method == "online_ewc_v2"
+                    else _estimate_fisher
+                )
+                new_fisher = estimator(model, fisher_batch, self.device)
+                decay = float(np.clip(cfg.dasp.ewc_decay, 0.0, 1.0))
+                self._ewc_fisher = {
+                    name: decay * self._ewc_fisher[name] + (1.0 - decay) * value
+                    for name, value in new_fisher.items()
+                }
+                self._ewc_reference = {
+                    name: parameter.detach().clone()
+                    for name, parameter in model.named_parameters()
+                }
+            row["selected_candidate"] = method
             accepted = "online"
         elif method == "agem":
             row["gradient_evaluations"] = train_agem(

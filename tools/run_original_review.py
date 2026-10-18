@@ -86,6 +86,7 @@ def configure(args, job):
     cfg.data.n_windows, cfg.data.window_size, cfg.data.n_features = (
         metadata[k] for k in ('n_windows','window_size','n_features'))
     cfg.training.model_seed, cfg.training.device = job['model_seed'],args.device
+    cfg.training.num_threads = args.threads
     if args.stage == 'smoke':
         cfg.data.warmup_windows = 3
         cfg.drift.calibration_windows = 3
@@ -186,6 +187,65 @@ def jobs_for(args):
     return jobs
 
 
+def parse_shard(value):
+    """'K/N' with 1 <= K <= N; None runs every planned job in this process."""
+    if value is None:
+        return None
+    index, separator, count = value.partition('/')
+    try:
+        index, count = int(index), int(count)
+    except ValueError:
+        raise ValueError('--shard must look like K/N, for example 2/8') from None
+    if not separator or count < 1 or not 1 <= index <= count:
+        raise ValueError('--shard must satisfy 1 <= K <= N')
+    return index, count
+
+
+def cell_key(job):
+    return job['dataset'], job['scenario'], job['stream_seed'], job['model_seed']
+
+
+def shard_jobs(jobs, shard):
+    """Assign whole paired cells to shards, preserving the planned job order.
+
+    Event-matched controls read the native schedule written earlier in the
+    same cell, so a cell is never split across processes.
+    """
+    if shard is None:
+        return list(jobs)
+    index, count = shard
+    cells = list(dict.fromkeys(cell_key(job) for job in jobs))
+    assigned = {cell for position, cell in enumerate(cells) if position % count == index-1}
+    selected = [job for job in jobs if cell_key(job) in assigned]
+    seen = set()
+    for job in selected:
+        if job['condition']=='native' and job['method']=='modular_dasp':
+            seen.add(cell_key(job))
+        elif job.get('event_schedule') and cell_key(job) not in seen:
+            raise ValueError('an event-matched control precedes its native reference')
+    return selected
+
+
+def completed_paths(root, stage):
+    return [root/f'{stage}_completed.json', *sorted(root.glob(f'{stage}_completed.shard*of*.json'))]
+
+
+def write_plan(root, stage, plan):
+    """Write the shared plan atomically; every shard must see the same jobs."""
+    plan_file = root/f'{stage}_plan.json'
+    if plan_file.is_file():
+        old = json.loads(plan_file.read_text(encoding='utf-8'))
+        if old['jobs'] != plan['jobs']:
+            if any(path.is_file() for path in completed_paths(root, stage)):
+                raise ValueError('cannot change a plan with existing completed runs; use a fresh output root')
+        elif old.get('planned_runs') == plan['planned_runs']:
+            return plan_file
+    temporary = root/f'{stage}_plan.{os.getpid()}.tmp'
+    temporary.write_text(json.dumps(plan,indent=2),encoding='utf-8')
+    os.replace(temporary,plan_file)
+    return plan_file
+
+
 def _write_schedule(path,frame,cfg):
     events = {}
     for _,row in frame[~frame.warmup.astype(bool)].iterrows():
@@ -201,6 +261,7 @@ def run(args):
     if args.device.startswith('cuda') and args.execute and not torch.cuda.is_available():
         raise RuntimeError('CUDA requested but unavailable; install a matching CUDA-enabled torch build')
     jobs = jobs_for(args)
+    shard = parse_shard(args.shard)
     root = Path(args.output_root)
     root.mkdir(parents=True,exist_ok=True)
     plan = {'version':VERSION, 'stage':args.stage, 'planned_runs':len(jobs),
@@ -209,25 +270,27 @@ def run(args):
         'jobs':jobs, 'python':platform.python_version(), 'torch':str(torch.__version__),
         'cuda_build':torch.version.cuda,'cuda_available':torch.cuda.is_available(),
         'counts_are_not_evidence_of_superiority':True}
-    plan_file = root/f'{args.stage}_plan.json'
-    if plan_file.is_file() and (root/f'{args.stage}_completed.json').is_file():
-        old = json.loads(plan_file.read_text(encoding='utf-8'))
-        if old['jobs'] != jobs:
-            raise ValueError('cannot change a plan with existing completed runs; use a fresh output root')
-    plan_file.write_text(json.dumps(plan,indent=2),encoding='utf-8')
+    plan_file = write_plan(root, args.stage, plan)
+    selected = shard_jobs(jobs, shard)
+    completed_file = (root/f'{args.stage}_completed.json' if shard is None
+        else root/f'{args.stage}_completed.shard{shard[0]}of{shard[1]}.json')
     print(f'{len(jobs)} planned runs; {plan_file}',flush=True)
+    if shard is not None:
+        print(f'shard {shard[0]}/{shard[1]}: {len(selected)} runs -> {completed_file.name}',flush=True)
     if args.preflight:
         artifacts = {}
-        for job in jobs:
+        for job in selected:
             if job['stream'] not in artifacts:
                 artifacts[job['stream']] = inspect_prepared(job['stream'],job['stage']=='natural')
         if args.stage=='natural' and len({v['sha256'] for v in artifacts.values()}) != len(artifacts):
             raise ValueError('the same capture cannot count as multiple natural datasets')
-        (root/f'{args.stage}_preflight.json').write_text(json.dumps(artifacts,indent=2),encoding='utf-8')
+        preflight_name = (f'{args.stage}_preflight.json' if shard is None
+            else f'{args.stage}_preflight.shard{shard[0]}of{shard[1]}.json')
+        (root/preflight_name).write_text(json.dumps(artifacts,indent=2),encoding='utf-8')
         print(f'{len(artifacts)} prepared inputs passed preflight',flush=True)
     if not args.execute: return
     completed = []
-    for index,job in enumerate(jobs,1):
+    for index,job in enumerate(selected,1):
         cfg = configure(args,job)
         destination = Path(cfg.output.directory)/cfg.output.run_name
         provenance = identity(cfg)
@@ -259,11 +322,11 @@ def run(args):
         completed.append({**job,**summary})
         # Avoid rewriting a growing 4000-run aggregate on every single cell.
         # Receipts preserve every completed run; resume rebuilds this index.
-        if index % 20 == 0 or index == len(jobs):
-            temporary = root/f'{args.stage}_completed.tmp'
+        if index % 20 == 0 or index == len(selected):
+            temporary = completed_file.with_suffix(f'.{os.getpid()}.tmp')
             temporary.write_text(json.dumps(completed,indent=2),encoding='utf-8')
-            os.replace(temporary,root/f'{args.stage}_completed.json')
-        print(f"[{index}/{len(jobs)}] {job['condition']} {job['dataset']}/{job['scenario']} F1={summary['mean_macro_f1']:.6f}",flush=True)
+            os.replace(temporary,completed_file)
+        print(f"[{index}/{len(selected)}] {job['condition']} {job['dataset']}/{job['scenario']} F1={summary['mean_macro_f1']:.6f}",flush=True)
 
 
 def parser():
@@ -272,7 +335,9 @@ def parser():
     p.add_argument('--config',type=Path,default=ROOT/'configs/modular_dasp_main.yaml')
     p.add_argument('--prepared-root',type=Path,default=Path('prepared_streams_final'))
     p.add_argument('--output-root',type=Path,default=Path('outputs_original_review_v1'))
-    p.add_argument('--device',default='cpu')
+    p.add_argument('--device',default='cpu',help='cpu is recommended: the models are ~20k parameters and CPU runs are bitwise reproducible')
+    p.add_argument('--threads',type=int,default=1,help='torch threads per process; keep 1 and run shards in parallel')
+    p.add_argument('--shard',help='K/N: run only paired cells assigned to shard K of N (1-based)')
     p.add_argument('--datasets',nargs='+',choices=DATASETS)
     p.add_argument('--scenarios',nargs='+',choices=PRIMARY_SCENARIOS)
     p.add_argument('--stream-seeds',nargs='+',type=int)

@@ -89,6 +89,8 @@ class DASPConfig:
     compute_match_epochs: int = 3
     ewc_lambda: float = 10.0
     ewc_decay: float = 0.9
+    # online_ewc_v2 only: windows between Fisher/anchor consolidations.
+    ewc_anchor_interval: int = 4
     v7_balanced_replay: bool = False
     v7_replay_size: int = 512
     v7_rehearsal_candidates: bool = True
@@ -267,6 +269,8 @@ class BaselineConfig:
     cdda_error_z: float = 2.0
     cdda_warning_patience: int = 3
     cdda_min_error_increase: float = 0.01
+    # cdda_md_v2 only: windows used to re-estimate the threshold after a drift.
+    cdda_recalibration_windows: int = 3
     periodic_ft_interval: int = 4
 
 @dataclass

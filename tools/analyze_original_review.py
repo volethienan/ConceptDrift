@@ -69,10 +69,27 @@ def holm(contrasts,key):
         contrasts[index][key]['holm_adjusted_p'] = running
 
 
+def load_completed(root,stage):
+    """Merge the single-process index or every shard index, never both."""
+    single = root/f'{stage}_completed.json'
+    shards = sorted(root.glob(f'{stage}_completed.shard*of*.json'))
+    if single.is_file() and shards:
+        raise ValueError('both unsharded and sharded completion indexes exist; keep one layout per output root')
+    if not shards:
+        return json.loads(single.read_text(encoding='utf-8'))
+    counts = {path.name.rsplit('of',1)[1].split('.')[0] for path in shards}
+    if len(counts) != 1:
+        raise ValueError(f'shard indexes from different shard counts: {sorted(counts)}')
+    expected = int(counts.pop())
+    if len(shards) != expected:
+        raise ValueError(f'{len(shards)}/{expected} shard indexes present')
+    return [record for path in shards for record in json.loads(path.read_text(encoding='utf-8'))]
+
+
 def analyze(root,stage,allow_incomplete=False):
     root = Path(root)
     plan = json.loads((root/f'{stage}_plan.json').read_text(encoding='utf-8'))
-    completed = json.loads((root/f'{stage}_completed.json').read_text(encoding='utf-8'))
+    completed = load_completed(root,stage)
     complete = len(completed)==plan['planned_runs']
     if not complete and not allow_incomplete:
         raise ValueError(f"stage incomplete: {len(completed)}/{plan['planned_runs']}")

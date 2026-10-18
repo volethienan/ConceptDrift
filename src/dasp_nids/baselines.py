@@ -417,6 +417,99 @@ class ErrorRateDriftDetector:
         return warning, drift, severity
 
 
+@dataclass
+class RecalibratingErrorRateDetector:
+    """Error-rate detector that re-estimates its threshold after each drift.
+
+    The legacy detector moved its threshold to ``error + min_increase`` after a
+    drift and never lowered it again, so once the threshold reached a high
+    error level later degradations could not raise an alarm. Here, as in the
+    DDM family, statistics are reset after a drift: the next
+    ``recalibration_windows`` errors re-estimate the threshold and no warning
+    is raised while recalibrating. Severity is measured before any reset.
+    """
+
+    z: float
+    patience: int
+    min_increase: float
+    recalibration_windows: int
+    threshold: float = 1.0
+    consecutive_warnings: int = 0
+    recalibration_errors: list[float] | None = None
+
+    @classmethod
+    def from_warmup(
+        cls,
+        errors: list[float],
+        z: float,
+        patience: int,
+        min_increase: float,
+        recalibration_windows: int,
+    ) -> "RecalibratingErrorRateDetector":
+        detector = cls(
+            float(z), max(1, int(patience)), float(min_increase), max(1, int(recalibration_windows))
+        )
+        detector.threshold = detector._threshold(errors)
+        return detector
+
+    def _threshold(self, errors: list[float]) -> float:
+        values = np.asarray(errors, dtype=float)
+        if not len(values):
+            raise ValueError("at least one calibration error is required")
+        spread = float(values.std(ddof=1)) if len(values) > 1 else 0.0
+        return float(min(1.0, values.mean() + self.z * max(spread, self.min_increase)))
+
+    @property
+    def recalibrating(self) -> bool:
+        return self.recalibration_errors is not None
+
+    def update(self, error: float) -> tuple[bool, bool, float]:
+        if self.recalibration_errors is not None:
+            self.recalibration_errors.append(float(error))
+            if len(self.recalibration_errors) >= self.recalibration_windows:
+                self.threshold = self._threshold(self.recalibration_errors)
+                self.recalibration_errors = None
+            return False, False, 0.0
+        severity = max(0.0, float(error) - self.threshold)
+        warning = bool(severity >= self.min_increase)
+        self.consecutive_warnings = self.consecutive_warnings + 1 if warning else 0
+        drift = self.consecutive_warnings >= self.patience
+        if drift:
+            self.consecutive_warnings = 0
+            self.recalibration_errors = []
+        return warning, drift, severity
+
+
+def estimate_empirical_fisher(
+    model: nn.Module,
+    batch: tuple[torch.Tensor, torch.Tensor] | None,
+    device: torch.device,
+) -> dict[str, torch.Tensor]:
+    """Diagonal empirical Fisher: the mean of per-example squared gradients.
+
+    The legacy estimator squared the gradient of the batch-mean loss. Near a
+    minimum the per-example gradients cancel in that mean, so the penalty
+    vanished and online EWC behaved like plain fine-tuning.
+    """
+
+    from torch.func import functional_call, grad, vmap
+
+    parameters = {name: value.detach() for name, value in model.named_parameters()}
+    if batch is None or not len(batch[0]):
+        return {name: torch.zeros_like(value) for name, value in parameters.items()}
+    buffers = {name: value.detach() for name, value in model.named_buffers()}
+    model.train()
+
+    def loss(params, x, y):
+        logits = functional_call(model, (params, buffers), (x.unsqueeze(0),))
+        return F.cross_entropy(logits, y.unsqueeze(0))
+
+    per_example = vmap(grad(loss), in_dims=(None, 0, 0))(
+        parameters, batch[0].to(device), batch[1].to(device)
+    )
+    return {name: value.square().mean(dim=0) for name, value in per_example.items()}
+
+
 def train_cdda(
     model: nn.Module,
     x: torch.Tensor,
