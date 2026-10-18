@@ -304,6 +304,28 @@ class OutputConfig:
 
 
 @dataclass
+class OriginalReviewConfig:
+    """Corrections to original modular_dasp and explicitly optional experiments.
+
+    Defaults preserve its architecture, memory, native routing/plasticities,
+    replay, weighting, background updates and original label-access protocol.
+    """
+    enabled: bool = True
+    gate_policy: str = "supported_classes"
+    routing: str = "native"
+    routing_k: int | None = None
+    replay_enabled: bool = True
+    weighting_enabled: bool = True
+    performance_gate_enabled: bool = True
+    balanced_selection: bool = True
+    label_mode: str = "original"
+    event_schedule: str | None = None
+    # The historical helper actually used 1.0, despite YAML eta_ceiling=2.
+    effective_eta_ceiling: float = 1.0
+    verify_locality: bool = True
+
+
+@dataclass
 class ExperimentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
@@ -313,6 +335,7 @@ class ExperimentConfig:
     baselines: BaselineConfig = field(default_factory=BaselineConfig)
     revision: RevisionConfig = field(default_factory=RevisionConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    original_review: OriginalReviewConfig = field(default_factory=OriginalReviewConfig)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -334,4 +357,5 @@ def load_config(path: str | Path) -> ExperimentConfig:
         baselines=_construct(BaselineConfig, raw.get("baselines")),
         revision=_construct(RevisionConfig, raw.get("revision")),
         output=_construct(OutputConfig, raw.get("output")),
+        original_review=_construct(OriginalReviewConfig, raw.get("original_review")),
     )

@@ -1,5 +1,10 @@
 # DASP-NIDS
 
+**Current review branch:** the improved original DASP and separate reviewer
+experiments are documented in [docs/DASP_ORIGINAL_REVIEW.md](docs/DASP_ORIGINAL_REVIEW.md).
+The primary five-dataset/ten-scenario/eight-method design is unchanged.
+Historical results below are not validation of the revised implementation.
+
 Reproducible prequential experiments for binary network intrusion detection under concept drift.
 
 ## Current Research Task

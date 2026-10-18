@@ -1,0 +1,23 @@
+{
+  "origin_skill": "academic-research-suite/experiment-agent",
+  "origin_mode": "original-method-correction-and-reviewer-experiment-validation",
+  "origin_date": "2026-10-18T08:08:31Z",
+  "verification_status": "UNVERIFIED",
+  "version_label": "original_review_v1.0",
+  "repro_lock": null,
+  "slr_lineage": false,
+  "local_validation": "169 pytest cases passed; 23 CUDA smoke runs and completed-run resume validated; two actual-data gate diagnostics",
+  "unverified_scope": [
+    "Linux target execution",
+    "full 4000-run comparison",
+    "complete reviewer supplementary matrices",
+    "external untouched chronological validation",
+    "native SOTA reproduction fidelity",
+    "predictive superiority and Q1 publication suitability"
+  ],
+  "upstream_dependencies": [
+    "ORIGINAL_DESIGN_LOCK.json",
+    "REVIEWER_ROUND1_TRACEABILITY.md",
+    "VALIDATION_ORIGINAL_REVIEW.md"
+  ]
+}

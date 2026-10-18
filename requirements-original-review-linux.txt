@@ -1,0 +1,9 @@
+# CPU-independent dependencies. Install a driver-compatible CUDA torch wheel
+# separately before this file. Exact GPU environment must be frozen on server.
+numpy==1.26.4
+pandas==2.3.3
+PyYAML==6.0.2
+scikit-learn==1.7.2
+scipy==1.16.2
+psutil==7.1.0
+pytest==8.4.2

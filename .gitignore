@@ -25,3 +25,4 @@ artifacts/
 logs/
 prepared_*/
 ACCESS_latex_template_20260513/
+dist/
