@@ -75,4 +75,28 @@ Test: `tests/test_cic_builder.py`, 6 test, gồm dedup, loại nhãn mâu thuẫ
 
 ## 8. Tái sinh toàn bộ stream DASP-v2
 
-_(điền sau khi chạy)_
+Lệnh: `python tools/regenerate_v2_streams.py --output-dir prepared_streams_v2`, chạy từ thư mục chứa `data/`. Đầu ra gồm 280 stream (khoảng 17 GB), `BUILD_PROVENANCE.json` (commit, hash builder, môi trường, lệnh, thời gian theo từng dataset) và báo cáo validator cho từng dataset.
+
+| Dataset | Seed | Stream | Validator | Commit builder | Thời gian |
+|---|---|---:|---|---|---:|
+| NF-BoT-IoT-v3 | 2001–2003, 3001–3005 | 80 | đạt, 0 lỗi | 5321c281 | 882 s |
+| NF-UNSW-NB15-v3 | 2001–2003, 3001–3002 | 50 | đạt, 0 lỗi | 5688b8c2 | 446 s |
+| NF-CSE-CIC-IDS2018-v3 | 3001–3005 | 50 | đạt, 0 lỗi | 5321c281 | 644 s |
+| NF-ToN-IoT-v3 | 3001–3005 | 50 | đạt, 0 lỗi | 5321c281 | 752 s |
+| CIC-IDS2017 | 3001–3005 | 50 | đạt, 0 lỗi | 5321c281 | 264 s |
+
+Lần đầu dựng NF-UNSW với 8 seed thất bại: họ `generic` chỉ có 380/768 flow ở đoạn cuối của S1-Sudden. Log được giữ ở `logs/nf-unsw-nb15-v3.failed-8-seeds.log`. Builder giữa hai commit chỉ khác danh sách seed của NF-UNSW trong script tái sinh.
+
+### Kiểm tra construct drift (validator, probe hồi quy logistic)
+
+Kịch bản "đạt" khi Macro-F1 của probe giảm ≥ 0,02 từ concept A sang B ở ≥ 80% số stream. MMD dương nhưng probe không giảm nghĩa là có dịch chuyển phân phối mà chưa có bằng chứng tác động lên ranh giới quyết định.
+
+| Dataset | Kịch bản đạt (ngoài S0) | Ghi chú |
+|---|---|---|
+| CIC-IDS2017 | 8/9 | Probe giảm 0,23–0,25 ở các kịch bản thời gian; trượt S7-Local-Low |
+| NF-CSE-CIC-IDS2018-v3 | 8/9 | Probe giảm khoảng 0,29; trượt S7-Local-Low |
+| NF-BoT-IoT-v3 | 2/9 | S1, S2, S6 có probe giảm mạnh nhưng S3/S4/S5 không ổn định; ba S7-Local làm probe **tốt lên** |
+| NF-ToN-IoT-v3 | 1/9 | MMD 0,13–0,15 nhưng probe hầu như không giảm |
+| NF-UNSW-NB15-v3 | 0/9 | Attack chỉ khoảng 5%; probe giảm ≤ 0,02 ở mọi kịch bản |
+
+Hệ quả: chỉ khoảng 19/45 cặp dataset × kịch bản drift có bằng chứng tác động lên ranh giới quyết định. Phát hiện này dựa trên một probe độc lập, không dùng bất kỳ kết quả nào của DASP hay baseline, nên có thể dùng để điều chỉnh kế hoạch trước khi khóa.

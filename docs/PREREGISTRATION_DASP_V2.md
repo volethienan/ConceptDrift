@@ -99,6 +99,7 @@ Quy tắc viết bài:
 - Phân tích độ nhạy theo dataset. Với chỉ 5 dataset, kiểm định theo dataset có p nhỏ nhất là 0,0625, nên chỉ dùng để mô tả.
 - Báo cáo đầy đủ: mean-window và cumulative Macro-F1, attack recall, FNR, benign FPR (tách theo-run và gộp), thời gian, bộ nhớ.
 - Thiếu cặp thì dừng và báo cáo, không âm thầm bỏ cặp.
+- **Đề xuất bổ sung, chờ duyệt (18/10/2026, trước mọi kết quả mô hình):** validator chỉ thấy tác động lên ranh giới quyết định ở khoảng 19/45 cặp dataset × kịch bản drift (xem V2_INFRA_STATUS mục 8). Kịch bản giữ nguyên. Phân tích chính vẫn trên mọi cell. Thêm phân tích độ nhạy chỉ trên các cell đạt construct. Bài chỉ dùng thuật ngữ "concept drift" cho kịch bản đạt; các kịch bản khác gọi là "distribution shift".
 
 ## 8. Thứ tự thực hiện
 
