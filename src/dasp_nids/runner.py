@@ -44,7 +44,7 @@ from .baselines import (
     train_ssf,
 )
 from .config import ExperimentConfig
-from . import original_review
+from . import dasp_v2, original_review
 from .data import (
     PreparedStream,
     StreamWindow,
@@ -95,6 +95,7 @@ METHODS = {
     "layer_dasp",
     "full_dasp",
     "modular_dasp",
+    "modular_dasp_v2",
     "shift_only",
     "conflict_only",
     "utility_global",
@@ -524,6 +525,15 @@ def _label_blind_uniform_query_indices(
         return torch.empty(0, dtype=torch.long)
     generator = torch.Generator().manual_seed(int(seed))
     return torch.randperm(int(n_samples), generator=generator)[:count]
+
+
+def _review_runtime(cfg: ExperimentConfig) -> bool:
+    """Methods using the review runtime: full-cycle timing, provenance,
+    run-identity guard and real checkpoints."""
+
+    return cfg.dasp.baseline == "modular_dasp_v2" or (
+        cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled
+    )
 
 
 def _labelled_error_rate(
@@ -1713,7 +1723,7 @@ def _train_dasp(
         if parameter_groups is None
         else parameter_groups
     )
-    if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled and strict_freeze:
+    if strict_freeze and (cfg.dasp.baseline == "modular_dasp_v2" or (cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled)):
         # Original DASP correction: exclude frozen groups from differentiation
         # as well as AdamW. Other methods retain their historical behavior.
         groups = {name: params for name, params in groups.items()
@@ -3039,6 +3049,7 @@ class StreamingExperiment:
                 cfg.dropout,
                 cfg.n_modules,
                 cfg.module_dim,
+                cfg.modular_head_dim,
             )
         raise ValueError("model.architecture must be 'sequential' or 'modular'")
 
@@ -3062,7 +3073,7 @@ class StreamingExperiment:
 
     def run(self) -> ExperimentResult:
         cfg = self.config
-        if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+        if _review_runtime(cfg):
             run_name = cfg.output.run_name or f"{cfg.data.source}_{cfg.data.scenario}_{cfg.dasp.baseline}_seed{cfg.data.random_seed}"
             if (Path(cfg.output.directory) / run_name / "summary.json").exists():
                 raise FileExistsError("Use the review runner --resume or choose a new output run_name; archived runs are never overwritten")
@@ -3073,7 +3084,7 @@ class StreamingExperiment:
         )
         # Configure deterministic execution before the first CUDA runtime call.
         set_deterministic_seed(model_seed, cfg.training.num_threads)
-        if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+        if _review_runtime(cfg):
             self._original_provenance = original_review.identity(cfg)
         gc.collect()
         if self.device.type == "cuda":
@@ -3581,14 +3592,14 @@ class StreamingExperiment:
 
             original_review.synchronize(self.device)
             row["full_cycle_seconds"] = time.perf_counter() - original_cycle_started
-            if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+            if _review_runtime(cfg):
                 row["original_full_cycle_seconds"] = time.perf_counter() - original_cycle_started
 
         # Labels eventually arrive even when no later test window remains.
         for item in pending:
             original_review.synchronize(self.device)
             terminal_started = time.perf_counter()
-            if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+            if _review_runtime(cfg):
                 row_lookup[item.window.index]["original_terminal_update"] = True
             self._update(model, memory, item, row_lookup[item.window.index])
             original_review.synchronize(self.device)
@@ -3719,7 +3730,7 @@ class StreamingExperiment:
                 "torch_threads": torch.get_num_threads(),
             },
         })
-        if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+        if _review_runtime(cfg):
             self._original_checkpoint = {
                 "format_version": 1, "completed_run": True,
                 "automatic_midstream_resume_supported": False,
@@ -4597,6 +4608,8 @@ class StreamingExperiment:
     ) -> str:
         cfg = self.config
         method = cfg.dasp.baseline
+        if method == "modular_dasp_v2":
+            return dasp_v2.update(self, model, memory, item, row)
         if method == "modular_dasp" and cfg.original_review.enabled:
             return original_review.update_original(self, model, memory, item, row)
         started = time.perf_counter()
@@ -8405,7 +8418,8 @@ class StreamingExperiment:
             summary["terminal_update_seconds"] = sum(float(row.get("terminal_update_seconds", 0.)) for row in rows)
             summary["full_cycle_scope"] = "online prediction+metrics+drift+delayed update+reference refresh; warmup and terminal updates reported separately"
         original_review.annotate_outputs(self, rows, summary)
-        if cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled:
+        dasp_v2.annotate_outputs(self, rows, summary)
+        if _review_runtime(cfg):
             (output_dir / "provenance.json").write_text(
                 json.dumps(self._original_provenance, indent=2), encoding="utf-8")
             if cfg.output.save_checkpoints:
@@ -8420,6 +8434,6 @@ class StreamingExperiment:
         (output_dir / "config.yaml").write_text(
             yaml.safe_dump(cfg.to_dict(), sort_keys=False, allow_unicode=True), encoding="utf-8"
         )
-        if cfg.output.save_checkpoints and not (cfg.dasp.baseline == "modular_dasp" and cfg.original_review.enabled):
+        if cfg.output.save_checkpoints and not _review_runtime(cfg):
             torch.save({"method": cfg.dasp.baseline}, output_dir / "metadata.pt")
         return output_dir

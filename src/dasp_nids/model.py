@@ -378,6 +378,7 @@ class ModularOnlineMLP(nn.Module):
         dropout: float = 0.0,
         n_modules: int = 4,
         module_dim: int = 64,
+        head_dim: int | None = None,
     ):
         super().__init__()
         if n_modules < 2 or n_modules > input_dim:
@@ -392,15 +393,26 @@ class ModularOnlineMLP(nn.Module):
             AdaptationBlock(stop - start, module_dim, dropout)
             for start, stop in self.feature_slices
         )
-        fusion_dim = int(hidden_dims[-1]) if hidden_dims else module_dim
-        head: list[nn.Module] = [
-            nn.Linear(n_modules * module_dim, fusion_dim),
-            nn.LayerNorm(fusion_dim),
-            nn.ReLU(),
-        ]
-        if dropout > 0:
-            head.append(nn.Dropout(dropout))
-        head.append(nn.Linear(fusion_dim, n_classes))
+        if head_dim is not None and head_dim < 0:
+            raise ValueError("head_dim must be None, 0 (linear) or positive")
+        if head_dim == 0:
+            # A linear head keeps most parameters inside the modules, so
+            # module-level locality also bounds most of the parameter change.
+            head: list[nn.Module] = [nn.Linear(n_modules * module_dim, n_classes)]
+        else:
+            fusion_dim = (
+                int(head_dim)
+                if head_dim is not None
+                else int(hidden_dims[-1]) if hidden_dims else module_dim
+            )
+            head = [
+                nn.Linear(n_modules * module_dim, fusion_dim),
+                nn.LayerNorm(fusion_dim),
+                nn.ReLU(),
+            ]
+            if dropout > 0:
+                head.append(nn.Dropout(dropout))
+            head.append(nn.Linear(fusion_dim, n_classes))
         self.classifier = nn.Sequential(*head)
         self.classifier.out_features = n_classes
 

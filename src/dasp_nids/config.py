@@ -14,6 +14,9 @@ class ModelConfig:
     architecture: str = "sequential"
     n_modules: int = 4
     module_dim: int = 64
+    # Modular head width. None keeps the historical hidden_dims[-1] fusion
+    # layer; 0 is a linear head on the concatenated module outputs.
+    modular_head_dim: int | None = None
 
 
 @dataclass
@@ -330,6 +333,42 @@ class OriginalReviewConfig:
 
 
 @dataclass
+class DaspV2Config:
+    """DASP-v2 (modular_dasp_v2). Pre-registration section 4, components C1-C3.
+
+    Every component has a switch for ablation. All decisions use only the
+    labels queried under the common label-blind budget and labels that
+    arrived in earlier windows.
+    """
+    # Label contract: label-blind uniform query of baselines.update_label_budget,
+    # split into training and gate roles.
+    gate_fraction: float = 0.25
+    # C1: evidence gate. A class is assessed only with >= gate_min_support
+    # labels; health is certified when the Wilson lower bound of its recall
+    # is >= gate_threshold. gate_policy: wilson | point | off.
+    gate_policy: str = "wilson"
+    gate_min_support: int = 20
+    gate_threshold: float = 0.80
+    gate_z: float = 1.96
+    # Gate labels from the most recent windows pooled with the current ones.
+    gate_buffer_windows: int = 2
+    # C2: routing for repairs. utility | native | all | classifier.
+    routing: str = "utility"
+    routing_top_k: int = 2
+    utility_probe_epochs: int = 1
+    utility_min_gain: float = 0.0
+    # Updates without drift or gate degradation: classifier | native | none.
+    background: str = "classifier"
+    background_plasticity: float = 0.25
+    repair_epochs: int = 2
+    # C3: logit-adjusted loss (Menon et al., ICLR 2021); 0 disables.
+    logit_adjustment_tau: float = 1.0
+    replay_enabled: bool = True
+    new_sample_weight: float = 3.0
+    verify_locality: bool = True
+
+
+@dataclass
 class ExperimentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
@@ -340,6 +379,7 @@ class ExperimentConfig:
     revision: RevisionConfig = field(default_factory=RevisionConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     original_review: OriginalReviewConfig = field(default_factory=OriginalReviewConfig)
+    dasp_v2: DaspV2Config = field(default_factory=DaspV2Config)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -362,4 +402,5 @@ def load_config(path: str | Path) -> ExperimentConfig:
         revision=_construct(RevisionConfig, raw.get("revision")),
         output=_construct(OutputConfig, raw.get("output")),
         original_review=_construct(OriginalReviewConfig, raw.get("original_review")),
+        dasp_v2=_construct(DaspV2Config, raw.get("dasp_v2")),
     )
