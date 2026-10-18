@@ -29,21 +29,53 @@ sys.path.insert(0, str(ROOT))
 from tools.analyze_original_review import load_completed  # noqa: E402
 
 TIE_MARGIN = 0.002
+# Windows where the attack concept changes (stream builder recipes).
+CHANGE_POINTS = {'S1-Sudden': (12,), 'S2-Gradual': (12,), 'S3-Incremental': (12,),
+                 'S4-Recurrent': (12, 24), 'S5-Blip': (12, 14), 'S6-Combined': (12, 16, 24, 28),
+                 'S7-Local-Low': (12,), 'S7-Local-Medium': (12,), 'S7-Local-High': (12,)}
+# First window at which an earlier concept returns.
+RECURRENCE_START = {'S4-Recurrent': 24, 'S5-Blip': 14, 'S6-Combined': 28}
+RESPONSE_WINDOWS = 4
+
+
+def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
+    """Adaptation speed after concept changes and retention when a concept returns."""
+
+    f1 = windows.set_index('window').macro_f1
+
+    def mean_from(start):
+        values = f1.reindex(range(start, start + RESPONSE_WINDOWS)).dropna()
+        return float(values.mean()) if len(values) else np.nan
+
+    points = CHANGE_POINTS.get(scenario, ())
+    post = [mean_from(point) for point in points]
+    return {'post_change_f1': float(np.nanmean(post)) if post else np.nan,
+            'recurrence_f1': mean_from(RECURRENCE_START[scenario]) if scenario in RECURRENCE_START else np.nan}
 CELL = ['dataset', 'scenario']
 PAIR = ['dataset', 'scenario', 'stream_seed', 'model_seed']
 
 
-def runs_frame(records: list[dict]) -> pd.DataFrame:
+def run_directory(root: Path, record: dict) -> Path:
+    return (Path(root) / record['stage'] / record['dataset'] / record['scenario']
+            / f"{record['condition']}_stream{record['stream_seed']}_model{record['model_seed']}")
+
+
+def runs_frame(records: list[dict], root: Path | None = None) -> pd.DataFrame:
     rows = []
     for record in records:
         summary = record['summary']
+        phases = ({} if root is None else
+                  phase_metrics(pd.read_csv(run_directory(root, record) / 'windows.csv',
+                                            usecols=['window', 'macro_f1']), record['scenario']))
         cost = summary.get('total_overall_gradient_evaluations', summary.get('total_gradient_evaluations'))
         rows.append({key: record[key] for key in (*PAIR, 'method', 'condition')}
                     | {'overrides': json.dumps(record['overrides'], sort_keys=True),
                        'mean_macro_f1': float(summary['mean_macro_f1']),
                        'gradient_cost': float(cost) if cost is not None else np.nan,
                        'cumulative_benign_fpr': summary.get('cumulative_benign_fpr', np.nan),
-                       'cumulative_attack_recall': summary.get('cumulative_attack_recall', np.nan)})
+                       'cumulative_attack_recall': summary.get('cumulative_attack_recall', np.nan),
+                       'total_update_seconds': summary.get('total_update_seconds', np.nan),
+                       'repairs': summary.get('repairs', np.nan)} | phases)
     frame = pd.DataFrame(rows)
     if frame.duplicated([*PAIR, 'condition']).any():
         raise ValueError('duplicate run records')
@@ -138,13 +170,15 @@ def construct_eligible_cells(prepared_root: Path) -> set[tuple[str, str]]:
 
 
 def compare_family(frame: pd.DataFrame, reference: str, conditions: list[str],
-                   eligible: set[tuple[str, str]] | None = None, replicates: int = 10000) -> list[dict]:
+                   eligible: set[tuple[str, str]] | None = None, replicates: int = 10000,
+                   column: str = 'mean_macro_f1') -> list[dict]:
     """One Holm family: every condition against the same reference."""
 
+    frame = frame[frame[column].notna()]
     results = []
     for condition in conditions:
-        cells = cell_differences(frame, reference, condition)
-        entry = {'reference': reference, 'condition': condition,
+        cells = cell_differences(frame, reference, condition, column)
+        entry = {'reference': reference, 'condition': condition, 'metric': column,
                  'positive_difference_means': 'condition better than reference',
                  'all_cells': contrast(cells, replicates)}
         if eligible is not None:
@@ -182,9 +216,48 @@ def analyze_dev(output_root: Path, allow_incomplete: bool = False) -> dict:
     return result
 
 
+def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_linear',
+                   replicates: int = 5000) -> dict:
+    """Development screen: where each condition stands, and paired contrasts."""
+
+    records = load_completed(output_root, 'screen')
+    plan = json.loads((output_root / 'screen_plan.json').read_text(encoding='utf-8'))
+    frame = runs_frame(records, output_root)
+    frame.to_csv(output_root / 'screen_runs.csv', index=False)
+    frame['rank'] = frame.groupby(PAIR).mean_macro_f1.rank(ascending=False, method='average')
+    by_dataset = frame.pivot_table(index='condition', columns='dataset', values='mean_macro_f1', aggfunc='mean')
+    table = frame.groupby('condition').agg(
+        runs=('mean_macro_f1', 'size'), mean_macro_f1=('mean_macro_f1', 'mean'),
+        mean_rank=('rank', 'mean'), cumulative_attack_recall=('cumulative_attack_recall', 'mean'),
+        cumulative_benign_fpr=('cumulative_benign_fpr', 'mean'), gradient_cost=('gradient_cost', 'mean'),
+        update_seconds=('total_update_seconds', 'mean'), repairs=('repairs', 'mean'),
+        post_change_f1=('post_change_f1', 'mean'), recurrence_f1=('recurrence_f1', 'mean'))
+    table = table.join(by_dataset).sort_values('mean_macro_f1', ascending=False)
+    table.to_csv(output_root / 'screen_table.csv')
+    frame.pivot_table(index=['dataset', 'scenario'], columns='condition', values='mean_macro_f1',
+                      aggfunc='mean').to_csv(output_root / 'screen_by_scenario.csv')
+    eligible = {cell for cell in construct_eligible_cells(prepared_root) if cell[0] in set(frame.dataset)}
+    others = [condition for condition in table.index if condition != reference]
+    contrasts = {metric: compare_family(frame, reference, others, eligible, replicates, metric)
+                 for metric in ('mean_macro_f1', 'post_change_f1', 'recurrence_f1')}
+    result = {'stage': 'screen', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
+              'reference': reference, 'construct_eligible_dev_cells': sorted(map(list, eligible)),
+              'table': json.loads(table.reset_index().to_json(orient='records')),
+              'contrasts': contrasts, 'note': 'development data only; descriptive screen'}
+    (output_root / 'screen_analysis.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--stage', choices=('dev', 'screen'), default='dev')
     parser.add_argument('--output-root', type=Path, required=True)
+    parser.add_argument('--prepared-root', type=Path, default=Path('prepared_streams_v2'))
+    parser.add_argument('--reference', default='v2_linear')
     parser.add_argument('--allow-incomplete', action='store_true')
     arguments = parser.parse_args()
-    print(json.dumps(analyze_dev(arguments.output_root, arguments.allow_incomplete), indent=2))
+    if arguments.stage == 'screen':
+        report = analyze_screen(arguments.output_root, arguments.prepared_root, arguments.reference)
+        print(pd.DataFrame(report['table']).to_string(index=False, float_format=lambda v: f'{v:.4f}'))
+    else:
+        print(json.dumps(analyze_dev(arguments.output_root, arguments.allow_incomplete), indent=2))

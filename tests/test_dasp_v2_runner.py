@@ -115,3 +115,13 @@ def test_family_comparison_holm_and_construct_subset(tmp_path):
 
 def test_holm_matches_reference():
     assert holm([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
+
+
+def test_phase_metrics_measure_response_and_recurrence():
+    from tools.analyze_dasp_v2 import phase_metrics
+    windows = pd.DataFrame({'window': range(4, 36), 'macro_f1': [0.9] * 8 + [0.5] * 4 + [0.8] * 8 + [0.6] * 4 + [0.9] * 8})
+    recurrent = phase_metrics(windows, 'S4-Recurrent')
+    assert recurrent['post_change_f1'] == pytest.approx((0.5 + 0.6) / 2)
+    assert recurrent['recurrence_f1'] == pytest.approx(0.6)
+    stationary = phase_metrics(windows, 'S0')
+    assert np.isnan(stationary['post_change_f1']) and np.isnan(stationary['recurrence_f1'])

@@ -36,7 +36,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'smoke')
+STAGES = ('dev', 'screen', 'smoke')
 
 
 def _grid(**axes):
@@ -73,6 +73,28 @@ GRIDS = {
 }
 
 
+# Fast iteration screen on development data: one default configuration per
+# method, a no-update lower bound, and DASP-v2 variants that switch one
+# component at a time (route_native = the old MMD+conflict routing inside v2).
+_V2_LINEAR = {'model.modular_head_dim': 0}
+SCREEN = {
+    'static': ('static', {}),
+    'online_mlp': ('online_mlp', {}),
+    'experience_replay': ('experience_replay', {}),
+    'agem': ('agem', {}),
+    'online_ewc_v2': ('online_ewc_v2', {}),
+    'ssf_budget': ('ssf_budget', {}),
+    'cdda_md_v2': ('cdda_md_v2', {}),
+    'v2_default_head': ('modular_dasp_v2', {}),
+    'v2_linear': ('modular_dasp_v2', dict(_V2_LINEAR)),
+    'v2_linear_route_all': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.routing': 'all'}),
+    'v2_linear_route_head': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.routing': 'classifier'}),
+    'v2_linear_route_native': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.routing': 'native'}),
+    'v2_linear_gate_off': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.gate_policy': 'off'}),
+    'v2_linear_tau0': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.logit_adjustment_tau': 0.0}),
+}
+
+
 def config_id(method, overrides):
     text = json.dumps(overrides, sort_keys=True)
     return f"{method}-{hashlib.sha256(text.encode()).hexdigest()[:10]}"
@@ -105,14 +127,18 @@ def jobs_for(args):
         cells = [(d, s, seed, model, str(Path(args.prepared_root) / d / s / f'stream_seed{seed}.npz'))
                  for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
         grids = {method: grid for method, grid in GRIDS.items() if not args.methods or method in args.methods}
+    if args.stage == 'screen':
+        conditions = [(name, method, overrides) for name, (method, overrides) in SCREEN.items()
+                      if not args.methods or name in args.methods]
+    else:
+        conditions = [(config_id(method, overrides), method, overrides)
+                      for method, grid in grids.items() for overrides in grid]
     jobs = []
     for dataset, scenario, stream_seed, model_seed, stream in cells:
-        for method, grid in grids.items():
-            for overrides in grid:
-                jobs.append(dict(stage=args.stage, dataset=dataset, scenario=scenario,
-                                 stream_seed=stream_seed, model_seed=model_seed, method=method,
-                                 condition=config_id(method, overrides), overrides=overrides,
-                                 stream=stream))
+        for condition, method, overrides in conditions:
+            jobs.append(dict(stage=args.stage, dataset=dataset, scenario=scenario,
+                             stream_seed=stream_seed, model_seed=model_seed, method=method,
+                             condition=condition, overrides=overrides, stream=stream))
     return jobs
 
 
@@ -209,7 +235,8 @@ def parser():
     p.add_argument('--datasets', nargs='+')
     p.add_argument('--scenarios', nargs='+', choices=PRIMARY_SCENARIOS)
     p.add_argument('--stream-seeds', nargs='+', type=int)
-    p.add_argument('--methods', nargs='+', choices=sorted(GRIDS))
+    p.add_argument('--methods', nargs='+', choices=sorted(set(GRIDS) | set(SCREEN)),
+                   help='dev: method names; screen: condition names')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--resume', action='store_true')
     p.add_argument('--preflight', action='store_true')
