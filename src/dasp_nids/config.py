@@ -17,6 +17,9 @@ class ModelConfig:
     # Modular head width. None keeps the historical hidden_dims[-1] fusion
     # layer; 0 is a linear head on the concatenated module outputs.
     modular_head_dim: int | None = None
+    # contiguous: modules see equal contiguous column blocks (historical);
+    # semantic: one module per documented feature group (feature_groups.py).
+    feature_grouping: str = "contiguous"
 
 
 @dataclass

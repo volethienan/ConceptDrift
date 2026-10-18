@@ -379,19 +379,32 @@ class ModularOnlineMLP(nn.Module):
         n_modules: int = 4,
         module_dim: int = 64,
         head_dim: int | None = None,
+        feature_groups: list[list[int]] | None = None,
     ):
         super().__init__()
-        if n_modules < 2 or n_modules > input_dim:
-            raise ValueError("n_modules must be between 2 and input_dim")
         if module_dim < 1:
             raise ValueError("module_dim must be positive")
-        boundaries = torch.linspace(0, input_dim, n_modules + 1).round().int().tolist()
-        self.feature_slices = [
-            (boundaries[i], boundaries[i + 1]) for i in range(n_modules)
-        ]
+        if feature_groups is None:
+            if n_modules < 2 or n_modules > input_dim:
+                raise ValueError("n_modules must be between 2 and input_dim")
+            boundaries = torch.linspace(0, input_dim, n_modules + 1).round().int().tolist()
+            self.feature_slices = [
+                (boundaries[i], boundaries[i + 1]) for i in range(n_modules)
+            ]
+            self.feature_groups = None
+            widths = [stop - start for start, stop in self.feature_slices]
+        else:
+            flat = [index for group in feature_groups for index in group]
+            if sorted(flat) != list(range(input_dim)) or any(not group for group in feature_groups):
+                raise ValueError("feature_groups must partition every input column")
+            n_modules = len(feature_groups)
+            self.feature_slices = []
+            self.feature_groups = [list(group) for group in feature_groups]
+            for index, group in enumerate(self.feature_groups):
+                self.register_buffer(f"feature_index_{index}", torch.tensor(group, dtype=torch.long))
+            widths = [len(group) for group in self.feature_groups]
         self.modules_list = nn.ModuleList(
-            AdaptationBlock(stop - start, module_dim, dropout)
-            for start, stop in self.feature_slices
+            AdaptationBlock(width, module_dim, dropout) for width in widths
         )
         if head_dim is not None and head_dim < 0:
             raise ValueError("head_dim must be None, 0 (linear) or positive")
@@ -425,10 +438,13 @@ class ModularOnlineMLP(nn.Module):
     ) -> torch.Tensor | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         representations: dict[str, torch.Tensor] = {}
         values: list[torch.Tensor] = []
-        for name, module, (start, stop) in zip(
-            self.layer_names, self.modules_list, self.feature_slices
-        ):
-            value = module(x[:, start:stop])
+        for index, (name, module) in enumerate(zip(self.layer_names, self.modules_list)):
+            if self.feature_groups is None:
+                start, stop = self.feature_slices[index]
+                inputs = x[:, start:stop]
+            else:
+                inputs = x.index_select(1, getattr(self, f"feature_index_{index}"))
+            value = module(inputs)
             representations[name] = value
             values.append(value)
         logits = self.classifier(torch.cat(values, dim=1))

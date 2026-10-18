@@ -124,6 +124,24 @@ SCREEN = {
                                              'dasp_v2.prior_correction': 'em', 'dasp_v2.prior_strength': 1.0,
                                              'dasp_v2.prior_source': 'current'}),
 }
+# Round 6: semantic feature-group modules on feature-local drift. Base recipe
+# = batch-prior logit adjustment + ACC prior correction (lambda 0.5).
+_V2_RECIPE = {'dasp_v2.logit_adjustment_prior': 'batch', 'dasp_v2.prior_correction': 'acc',
+              'dasp_v2.prior_strength': 0.5}
+_SEMANTIC = _V2_RECIPE | {'model.feature_grouping': 'semantic'}
+SCREEN.update({
+    'v2_contig_utility': ('modular_dasp_v2', dict(_V2_RECIPE)),
+    'v2_sem_utility': ('modular_dasp_v2', dict(_SEMANTIC)),
+    'v2_sem_utility_k1': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing_top_k': 1}),
+    'v2_sem_native': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'native'}),
+    'v2_sem_native_k1': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'native', 'dasp_v2.routing_top_k': 1}),
+    'v2_sem_all': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all'}),
+    'v2_sem_head': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'classifier'}),
+    'v2_sem_full_every_window': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all',
+                                                                 'dasp_v2.background': 'all'}),
+})
+FEATURE_SHIFT_SCENARIOS = tuple(f'{kind}-{group}' for kind in ('FS', 'FR')
+                                for group in ('volume', 'timing', 'tcp', 'protocol'))
 # Development datasets with a usable whole-capture chronological stream.
 NATURAL_DEV_DATASETS = ('nf-unsw-nb15-v3',)
 NATURAL_SCENARIO = 'Natural-Chronological'
@@ -166,6 +184,11 @@ def jobs_for(args):
             cells = [(d, NATURAL_SCENARIO, seed, model,
                       str(Path(args.prepared_root) / 'natural' / d / NATURAL_SCENARIO / f'stream_seed{seed}.npz'))
                      for d in natural for seed in seeds for model in DEV_MODEL_SEEDS]
+        if args.feature_shift:
+            cells = [(d, s, seed, model,
+                      str(Path(args.prepared_root) / 'feature_shift' / d / s / f'stream_seed{seed}.npz'))
+                     for d in datasets for s in FEATURE_SHIFT_SCENARIOS for seed in seeds
+                     for model in DEV_MODEL_SEEDS]
         if args.label_shift:
             cells = [(d, s, seed, model,
                       str(Path(args.prepared_root) / 'label_shift' / d / s / f'stream_seed{seed}.npz'))
@@ -284,6 +307,8 @@ def parser():
                    help='dev: method names; screen: condition names')
     p.add_argument('--natural', action='store_true',
                    help='use whole-capture chronological development streams instead of controlled scenarios')
+    p.add_argument('--feature-shift', action='store_true',
+                   help='use feature-group-local drift development streams (FS/FR scenarios)')
     p.add_argument('--label-shift', action='store_true',
                    help='use controlled label-shift development streams (prevalence changes, families fixed)')
     p.add_argument('--execute', action='store_true')

@@ -45,6 +45,7 @@ from .baselines import (
 )
 from .config import ExperimentConfig
 from . import dasp_v2, original_review
+from .feature_groups import semantic_groups
 from .data import (
     PreparedStream,
     StreamWindow,
@@ -3042,6 +3043,14 @@ class StreamingExperiment:
         if cfg.architecture == "sequential":
             return OnlineMLP(input_dim, n_classes, cfg.hidden_dims, cfg.dropout)
         if cfg.architecture == "modular":
+            if cfg.feature_grouping not in ("contiguous", "semantic"):
+                raise ValueError("model.feature_grouping must be contiguous or semantic")
+            groups = None
+            if cfg.feature_grouping == "semantic":
+                names = getattr(self, "_feature_names", None)
+                if names is None or len(names) != input_dim:
+                    raise ValueError("semantic feature grouping needs the stream feature names")
+                groups = semantic_groups(names)
             return ModularOnlineMLP(
                 input_dim,
                 n_classes,
@@ -3050,6 +3059,7 @@ class StreamingExperiment:
                 cfg.n_modules,
                 cfg.module_dim,
                 cfg.modular_head_dim,
+                groups,
             )
         raise ValueError("model.architecture must be 'sequential' or 'modular'")
 
@@ -3095,6 +3105,7 @@ class StreamingExperiment:
         stream = self._apply_revision_feature_permutation(self._load_stream())
         if cfg.dasp.baseline in RIVER_METHODS:
             return self._run_river_stream(stream)
+        self._feature_names = list(stream.feature_names)
         model = self._build_model(len(stream.feature_names), len(stream.class_names)).to(
             self.device
         )
