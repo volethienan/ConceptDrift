@@ -362,6 +362,18 @@ class AdapterOnlineMLP(OnlineMLP):
         return fused.eval()
 
 
+class BiasHead(nn.Module):
+    """Shared class bias of an additive modular head."""
+
+    def __init__(self, n_classes: int):
+        super().__init__()
+        self.bias = nn.Parameter(torch.zeros(n_classes))
+        self.out_features = n_classes
+
+    def forward(self, batch: int) -> torch.Tensor:
+        return self.bias.expand(batch, -1)
+
+
 class ModularOnlineMLP(nn.Module):
     """Parallel feature-group MLP with independently adaptable modules.
 
@@ -380,8 +392,13 @@ class ModularOnlineMLP(nn.Module):
         module_dim: int = 64,
         head_dim: int | None = None,
         feature_groups: list[list[int]] | None = None,
+        head_type: str = "shared",
+        additive_head_dim: int = 16,
     ):
         super().__init__()
+        if head_type not in ("shared", "additive"):
+            raise ValueError("head_type must be shared or additive")
+        self.head_type = head_type
         if module_dim < 1:
             raise ValueError("module_dim must be positive")
         if feature_groups is None:
@@ -426,8 +443,27 @@ class ModularOnlineMLP(nn.Module):
             if dropout > 0:
                 head.append(nn.Dropout(dropout))
             head.append(nn.Linear(fusion_dim, n_classes))
-        self.classifier = nn.Sequential(*head)
-        self.classifier.out_features = n_classes
+        if head_type == "additive":
+            # logits = sum_m h_m(z_m) + b: each module owns its contribution to
+            # the decision, so repairing one module leaves the others' output
+            # contributions exactly unchanged.
+            def module_head() -> nn.Module:
+                if additive_head_dim <= 0:
+                    return nn.Linear(module_dim, n_classes)
+                return nn.Sequential(nn.Linear(module_dim, additive_head_dim), nn.ReLU(),
+                                     nn.Linear(additive_head_dim, n_classes))
+            self.module_heads = nn.ModuleList(module_head() for _ in self.modules_list)
+            self.classifier = BiasHead(n_classes)
+        else:
+            self.classifier = nn.Sequential(*head)
+            self.classifier.out_features = n_classes
+
+    def logits_from_representations(self, representations: dict[str, torch.Tensor]) -> torch.Tensor:
+        values = [representations[name] for name in self.layer_names]
+        if self.head_type == "additive":
+            logits = sum(head(value) for head, value in zip(self.module_heads, values))
+            return logits + self.classifier(values[0].shape[0])
+        return self.classifier(torch.cat(values, dim=1))
 
     @property
     def layer_names(self) -> list[str]:
@@ -447,7 +483,7 @@ class ModularOnlineMLP(nn.Module):
             value = module(inputs)
             representations[name] = value
             values.append(value)
-        logits = self.classifier(torch.cat(values, dim=1))
+        logits = self.logits_from_representations(representations)
         if return_representations:
             return logits, representations
         return logits
@@ -457,6 +493,9 @@ class ModularOnlineMLP(nn.Module):
             name: list(module.parameters())
             for name, module in zip(self.layer_names, self.modules_list)
         }
+        if self.head_type == "additive":
+            for name, head in zip(self.layer_names, self.module_heads):
+                groups[name] += list(head.parameters())
         groups["classifier"] = list(self.classifier.parameters())
         return groups
 

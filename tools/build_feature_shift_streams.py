@@ -53,10 +53,30 @@ TRANSFORMS = {
 }
 
 
-def shifted(arrays: dict[str, np.ndarray], group: str, revert: bool) -> tuple[dict[str, np.ndarray], dict]:
+# Severe variants: exporter or middlebox faults rather than gradual changes.
+SEVERE = {
+    'netflow_v3': {
+        'volume': ('mul', 0.01, TRANSFORMS['netflow_v3']['volume'][2]),
+        'timing': ('mul', 20.0, TRANSFORMS['netflow_v3']['timing'][2]),
+        'tcp': ('mul', 0.0, ('TCP_WIN_MAX_IN', 'TCP_WIN_MAX_OUT')),
+        'protocol': ('add', -48.0, ('MIN_TTL', 'MAX_TTL')),
+    },
+    'cicflowmeter': {
+        'volume': ('mul', 0.01, TRANSFORMS['cicflowmeter']['volume'][2]),
+        'timing': ('mul', 20.0, TRANSFORMS['cicflowmeter']['timing'][2]),
+        'tcp': ('mul', 0.0, ('Init_Win_bytes_forward', 'Init_Win_bytes_backward')),
+        'protocol': ('mul', 3.0, TRANSFORMS['cicflowmeter']['protocol'][2]),
+    },
+}
+SEVERITY_PREFIX = {'moderate': ('FS', 'FR'), 'severe': ('XS', 'XR')}
+
+
+def shifted(arrays: dict[str, np.ndarray], group: str, revert: bool,
+            severity: str = 'moderate') -> tuple[dict[str, np.ndarray], dict]:
     names = arrays['feature_names'].astype(str).tolist()
     schema = schema_for(names)
-    operation, value, features = TRANSFORMS[schema][group]
+    table = TRANSFORMS if severity == 'moderate' else SEVERE
+    operation, value, features = table[schema][group]
     if not set(features) <= set(SCHEMAS[schema][group]):
         raise ValueError(f'{group}: transform touches features outside the group')
     columns = [names.index(feature) for feature in features]
@@ -71,7 +91,7 @@ def shifted(arrays: dict[str, np.ndarray], group: str, revert: bool) -> tuple[di
     phases = arrays['phases'].astype(str).copy()
     phases[START:stop] = [f'{phase}|{group}_shift' for phase in phases[START:stop]]
     result['phases'] = phases.astype('<U48')
-    detail = {'schema': schema, 'group': group, 'operation': operation, 'value': value,
+    detail = {'schema': schema, 'group': group, 'severity': severity, 'operation': operation, 'value': value,
               'features': list(features), 'start_window': START, 'stop_window': stop}
     return result, detail
 
@@ -86,9 +106,11 @@ def build(args) -> None:
                 arrays = {key: np.asarray(loaded[key]) for key in loaded.files}
             base_manifest = json.loads(source.with_suffix('.manifest.json').read_text(encoding='utf-8'))
             for group in GROUP_NAMES:
-                for prefix, revert in (('FS', False), ('FR', True)):
+                for severity in args.severities.split(','):
+                  persistent, recurrent = SEVERITY_PREFIX[severity]
+                  for prefix, revert in ((persistent, False), (recurrent, True)):
                     scenario = f'{prefix}-{group}'
-                    stream, detail = shifted(arrays, group, revert)
+                    stream, detail = shifted(arrays, group, revert, severity)
                     destination = Path(args.output_dir) / dataset / scenario / f'stream_seed{seed}.npz'
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     np.savez(destination, **stream)
@@ -110,6 +132,7 @@ def main() -> None:
     parser.add_argument('--datasets', required=True)
     parser.add_argument('--stream-seeds', default='2001,2002,2003')
     parser.add_argument('--output-dir', default='prepared_streams_v2/feature_shift')
+    parser.add_argument('--severities', default='moderate', help='comma list of moderate,severe')
     build(parser.parse_args())
 
 

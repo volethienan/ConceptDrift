@@ -20,6 +20,10 @@ class ModelConfig:
     # contiguous: modules see equal contiguous column blocks (historical);
     # semantic: one module per documented feature group (feature_groups.py).
     feature_grouping: str = "contiguous"
+    # shared: one head on concatenated module outputs (historical); additive:
+    # logits = sum of per-module heads + bias (repairs stay output-local).
+    modular_head_type: str = "shared"
+    additive_head_dim: int = 16
 
 
 @dataclass
@@ -379,6 +383,12 @@ class DaspV2Config:
     # decisions); current: from the window being predicted (batch-transductive).
     prior_source: str = "previous"
     prior_clip: float = 0.001
+    # Inference-time quarantine: a module whose current representation is far
+    # (robust z >= quarantine_z) from its trusted reference is replaced by its
+    # reference mean when predicting, until a labeled repair refreshes it.
+    quarantine: bool = False
+    quarantine_z: float = 6.0
+    quarantine_samples: int = 512
     replay_enabled: bool = True
     # False draws replay uniformly from memory instead of class-balanced.
     balanced_replay: bool = True

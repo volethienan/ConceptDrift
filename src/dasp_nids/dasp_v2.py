@@ -20,7 +20,7 @@ from . import original_review
 
 VERSION = "modular-dasp-v2-20261018-r0"
 GATE_POLICIES = ("wilson", "point", "off")
-ROUTINGS = ("utility", "native", "all", "classifier")
+ROUTINGS = ("utility", "native", "all", "classifier", "random", "quarantine")
 BACKGROUNDS = ("classifier", "native", "all", "none")
 PRIOR_CORRECTIONS = ("none", "em", "acc")
 
@@ -58,12 +58,24 @@ def acc_prior(predicted_attack_rate: float, tpr: float, fpr: float, clip: float)
 
 
 def prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
-    """Raw logits plus the label-shift correction, and diagnostics for the row."""
+    """Raw logits plus quarantine and label-shift corrections, and row diagnostics."""
 
-    raw = model(x)
     v2 = experiment.config.dasp_v2
-    if experiment.config.dasp.baseline != "modular_dasp_v2" or v2.prior_correction == "none":
-        return raw, {}
+    is_v2 = experiment.config.dasp.baseline == "modular_dasp_v2"
+    quarantine_diagnostics = {}
+    raw = None
+    if is_v2 and v2.quarantine:
+        raw, quarantine_diagnostics = quarantine_logits(experiment, model, x)
+    if raw is None:
+        raw = model(x)
+    if not is_v2 or v2.prior_correction == "none":
+        return raw, quarantine_diagnostics
+    raw_logits, prior_diagnostics = _prior_corrected(experiment, raw)
+    return raw_logits, quarantine_diagnostics | prior_diagnostics
+
+
+def _prior_corrected(experiment, raw: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+    v2 = experiment.config.dasp_v2
     if v2.prior_correction not in PRIOR_CORRECTIONS or v2.prior_source not in ("previous", "current"):
         raise ValueError("unknown DASP-v2 prior correction settings")
     state = experiment.__dict__.setdefault("_dasp_v2_prior", {})
@@ -80,6 +92,94 @@ def prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor,
         return raw, {"prior_attack_estimate": float("nan")}
     offset = v2.prior_strength * torch.log(estimate.to(raw.device, raw.dtype))
     return raw + offset, {"prior_attack_estimate": float(estimate[-1])}
+
+
+def _module_representations(model, x: torch.Tensor) -> dict[str, torch.Tensor]:
+    model.eval()
+    with torch.no_grad():
+        return model(x, return_representations=True)[1]
+
+
+def _subsample(values: torch.Tensor, count: int, generator: torch.Generator) -> torch.Tensor:
+    if len(values) <= count:
+        return values
+    return values[torch.randperm(len(values), generator=generator)[:count]]
+
+
+def _calibrate_module(state, name: str, representation: torch.Tensor, samples: int, seed: int) -> None:
+    """Trusted reference for one module plus a robust null of window-vs-reference MMD."""
+
+    from .drift import multiscale_mmd
+
+    generator = torch.Generator().manual_seed(seed)
+    order = torch.randperm(len(representation), generator=generator)
+    half = max(2, len(order) // 2)
+    reference, pool = representation[order[:half]], representation[order[half:]]
+    null = [float(multiscale_mmd(reference, _subsample(pool, max(2, samples // 2), generator),
+                                 samples, [0.5, 1.0, 2.0])) for _ in range(8)]
+    median = float(np.median(null))
+    state['reference'][name] = reference
+    state['neutral'][name] = reference.mean(dim=0, keepdim=True)
+    state['median'][name] = median
+    state['mad'][name] = max(float(np.median(np.abs(np.asarray(null) - median))), 1e-6)
+
+
+def initialise_trust(experiment, model, memory) -> None:
+    """Trusted references from labeled history before the first post-warm-up update."""
+
+    v2 = experiment.config.dasp_v2
+    state = experiment.__dict__.setdefault('_dasp_v2_trust', {})
+    if state.get('reference') or not v2.quarantine:
+        return
+    stored = memory.tensors(experiment.device)
+    if stored is None:
+        return
+    state.update({'reference': {}, 'neutral': {}, 'median': {}, 'mad': {}, 'quarantined': set()})
+    representations = _module_representations(model, stored[0])
+    for index, name in enumerate(model.layer_names):
+        _calibrate_module(state, name, representations[name], v2.quarantine_samples,
+                          experiment.config.data.random_seed + 7919 * (index + 1))
+
+
+def refresh_trust(experiment, model, x: torch.Tensor, modules: list[str]) -> None:
+    """After a labeled repair, the repaired modules get a new trusted reference."""
+
+    state = experiment.__dict__.get('_dasp_v2_trust', {})
+    if not state.get('reference') or not modules:
+        return
+    representations = _module_representations(model, x.to(experiment.device))
+    for name in modules:
+        _calibrate_module(state, name, representations[name], experiment.config.dasp_v2.quarantine_samples,
+                          experiment.config.data.random_seed + 104729 + len(name))
+
+
+def quarantine_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor | None, dict]:
+    """Replace far-from-reference modules by their reference mean when predicting."""
+
+    from .drift import multiscale_mmd
+
+    state = experiment.__dict__.get('_dasp_v2_trust', {})
+    if not state.get('reference'):
+        return None, {}
+    v2 = experiment.config.dasp_v2
+    _, representations = model(x, return_representations=True)
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed)
+    quarantined, scores = set(), {}
+    for name in model.layer_names:
+        current = _subsample(representations[name].detach(), v2.quarantine_samples, generator)
+        distance = float(multiscale_mmd(state['reference'][name], current, v2.quarantine_samples, [0.5, 1.0, 2.0]))
+        z = max(0.0, (distance - state['median'][name]) / (1.4826 * state['mad'][name]))
+        scores[name] = z
+        if z >= v2.quarantine_z:
+            quarantined.add(name)
+    state['quarantined'] = quarantined
+    if len(quarantined) == len(model.layer_names):
+        quarantined = set(sorted(quarantined, key=lambda n: -scores[n])[:-1])  # keep the least shifted
+    adjusted = {name: (state['neutral'][name].expand_as(value) if name in quarantined else value)
+                for name, value in representations.items()}
+    return model.logits_from_representations(adjusted), {
+        'quarantined_modules': '|'.join(sorted(quarantined)),
+        **{f'quarantine_z_{name}': round(value, 4) for name, value in scores.items()}}
 
 
 def record_operating_rates(experiment, model, x: torch.Tensor, y: torch.Tensor) -> None:
@@ -245,7 +345,9 @@ def update(experiment, model, memory, item, row) -> str:
     gate = gate_assessment(pool_y, pool_prediction, n_classes, v2.gate_policy,
                            v2.gate_min_support, v2.gate_threshold, v2.gate_z)
     drift = bool(item.decision.triggered)
-    repair = drift or gate["degraded"]
+    initialise_trust(experiment, model, memory)
+    quarantined = sorted(experiment.__dict__.get("_dasp_v2_trust", {}).get("quarantined", set()))
+    repair = drift or gate["degraded"] or bool(quarantined)
 
     training_cfg = copy.deepcopy(cfg)
     training_cfg.dasp.modular_new_sample_weight = v2.new_sample_weight
@@ -286,6 +388,16 @@ def update(experiment, model, memory, item, row) -> str:
             active = [name for name, value in sorted(raw.items(), key=lambda pair: -pair[1]) if value > 0][:v2.routing_top_k]
         elif v2.routing == "all":
             active = list(names)
+        elif v2.routing == "random":
+            generator = torch.Generator().manual_seed(cfg.data.random_seed * 1009 + item.window.index)
+            active = [names[i] for i in torch.randperm(len(names), generator=generator)[:v2.routing_top_k].tolist()]
+        elif v2.routing == "quarantine":
+            # Repair what inference had to quarantine; otherwise the MMD attribution.
+            if quarantined:
+                active = quarantined[:max(1, v2.routing_top_k)]
+            else:
+                ranked = sorted(item.decision.requirements.items(), key=lambda pair: -pair[1])
+                active = [name for name, value in ranked if value > 0][:v2.routing_top_k]
         else:
             active = []
         plasticities = {name: float(name in active) for name in names}
@@ -315,6 +427,8 @@ def update(experiment, model, memory, item, row) -> str:
                                   epochs=epochs, use_projection_memory=False,
                                   logit_adjustment=adjustment)
     memory.add(tx, ty)
+    if v2.quarantine:
+        refresh_trust(experiment, model, torch.cat([tx, gx]), [n for n in names if plasticities[n] > 0])
     if v2.prior_correction == "acc":
         record_operating_rates(experiment, model, pool_x, pool_y)
     experiment._dasp_v2_gate_history = [*history, (gx, gy)][-max(1, v2.gate_buffer_windows):]
@@ -342,6 +456,7 @@ def update(experiment, model, memory, item, row) -> str:
         "overall_gradient_evaluations": sum(c["calls"] for c in counters.values()),
         "parameter_gradient_element_evaluations": sum(c["requested_elements"] for c in counters.values()),
         "gradient_phases": json.dumps(counters, sort_keys=True),
+        "quarantined_at_update": "|".join(quarantined),
         "global_update": False,
         "rss_bytes": int(experiment._process.memory_info().rss),
         "query_indices": json.dumps(query.tolist()),

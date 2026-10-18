@@ -3060,6 +3060,8 @@ class StreamingExperiment:
                 cfg.module_dim,
                 cfg.modular_head_dim,
                 groups,
+                cfg.modular_head_type,
+                cfg.additive_head_dim,
             )
         raise ValueError("model.architecture must be 'sequential' or 'modular'")
 

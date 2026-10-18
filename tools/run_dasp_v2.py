@@ -141,8 +141,24 @@ SCREEN.update({
     'v2_sem_full_every_window': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all',
                                                                  'dasp_v2.background': 'all'}),
 })
-FEATURE_SHIFT_SCENARIOS = tuple(f'{kind}-{group}' for kind in ('FS', 'FR')
+FEATURE_SHIFT_SCENARIOS = tuple(f'{kind}-{group}' for kind in ('FS', 'FR', 'XS', 'XR')
                                 for group in ('volume', 'timing', 'tcp', 'protocol'))
+# Round 8: output-local repairs (additive heads) and inference-time quarantine.
+_ADDITIVE = _SEMANTIC | {'model.modular_head_type': 'additive', 'dasp_v2.routing': 'native',
+                         'dasp_v2.routing_top_k': 1}
+SCREEN.update({
+    'add_native': ('modular_dasp_v2', dict(_ADDITIVE)),
+    'add_random': ('modular_dasp_v2', _ADDITIVE | {'dasp_v2.routing': 'random'}),
+    'add_all': ('modular_dasp_v2', _ADDITIVE | {'dasp_v2.routing': 'all'}),
+    'add_bg_all': ('modular_dasp_v2', _ADDITIVE | {'dasp_v2.routing': 'all', 'dasp_v2.background': 'all'}),
+    'add_quarantine': ('modular_dasp_v2', _ADDITIVE | {'dasp_v2.quarantine': True,
+                                                       'dasp_v2.routing': 'quarantine'}),
+    'add_quarantine_random': ('modular_dasp_v2', _ADDITIVE | {'dasp_v2.quarantine': True,
+                                                              'dasp_v2.routing': 'random'}),
+    'shared_quarantine': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.quarantine': True,
+                                                          'dasp_v2.routing': 'quarantine',
+                                                          'dasp_v2.routing_top_k': 1}),
+})
 # Development datasets with a usable whole-capture chronological stream.
 NATURAL_DEV_DATASETS = ('nf-unsw-nb15-v3',)
 NATURAL_SCENARIO = 'Natural-Chronological'

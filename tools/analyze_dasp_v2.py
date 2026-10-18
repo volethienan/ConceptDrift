@@ -37,9 +37,10 @@ CHANGE_POINTS = {'S1-Sudden': (12,), 'S2-Gradual': (12,), 'S3-Incremental': (12,
 RECURRENCE_START = {'S4-Recurrent': 24, 'S5-Blip': 14, 'S6-Combined': 28}
 RESPONSE_WINDOWS = 4
 for _group in ('volume', 'timing', 'tcp', 'protocol'):
-    CHANGE_POINTS[f'FS-{_group}'] = (12,)
-    CHANGE_POINTS[f'FR-{_group}'] = (12, 24)
-    RECURRENCE_START[f'FR-{_group}'] = 24
+    for _persistent, _recurrent in (('FS', 'FR'), ('XS', 'XR')):
+        CHANGE_POINTS[f'{_persistent}-{_group}'] = (12,)
+        CHANGE_POINTS[f'{_recurrent}-{_group}'] = (12, 24)
+        RECURRENCE_START[f'{_recurrent}-{_group}'] = 24
 
 
 def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
