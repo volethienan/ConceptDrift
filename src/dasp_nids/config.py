@@ -357,13 +357,15 @@ class DaspV2Config:
     routing_top_k: int = 2
     utility_probe_epochs: int = 1
     utility_min_gain: float = 0.0
-    # Updates without drift or gate degradation: classifier | native | none.
+    # Updates without drift or gate degradation: classifier | native | all | none.
     background: str = "classifier"
     background_plasticity: float = 0.25
     repair_epochs: int = 2
     # C3: logit-adjusted loss (Menon et al., ICLR 2021); 0 disables.
     logit_adjustment_tau: float = 1.0
     replay_enabled: bool = True
+    # False draws replay uniformly from memory instead of class-balanced.
+    balanced_replay: bool = True
     new_sample_weight: float = 3.0
     verify_locality: bool = True
 

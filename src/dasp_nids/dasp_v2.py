@@ -21,7 +21,7 @@ from . import original_review
 VERSION = "modular-dasp-v2-20261018-r0"
 GATE_POLICIES = ("wilson", "point", "off")
 ROUTINGS = ("utility", "native", "all", "classifier")
-BACKGROUNDS = ("classifier", "native", "none")
+BACKGROUNDS = ("classifier", "native", "all", "none")
 
 
 def wilson_lower_bound(successes: int, total: int, z: float) -> float:
@@ -173,7 +173,15 @@ def update(experiment, model, memory, item, row) -> str:
     training_cfg.dasp.modular_new_sample_weight = v2.new_sample_weight
     if not v2.replay_enabled:
         training_cfg.dasp.modular_replay_size = 0
-    batch = r._localized_rehearsal_batch(tx, ty, memory, training_cfg, device)
+    if v2.balanced_replay or not v2.replay_enabled:
+        batch = r._localized_rehearsal_batch(tx, ty, memory, training_cfg, device)
+    else:
+        replay = memory.sample(training_cfg.dasp.modular_replay_size, device)
+        new_x, new_y = tx.to(device), ty.to(device)
+        new_w = torch.full((len(ty),), float(v2.new_sample_weight), device=device)
+        batch = ((new_x, new_y, new_w) if replay is None else
+                 (torch.cat([new_x, replay[0]]), torch.cat([new_y, replay[1]]),
+                  torch.cat([new_w, torch.ones(len(replay[1]), device=device)])))
 
     counters: dict[str, dict[str, int]] = {}
     gains: dict[str, float] = {}
@@ -208,6 +216,8 @@ def update(experiment, model, memory, item, row) -> str:
                                                   ty[:cfg.dasp.memory_batch_size], memory_probe, device)
             active = sorted(names, key=lambda name: -conflicts.get(name, 0.0))[:v2.routing_top_k]
             plasticities = {name: (v2.background_plasticity if name in active else 0.0) for name in names}
+        elif v2.background == "all":
+            plasticities = {name: 1.0 for name in names}
         else:
             plasticities = {name: 0.0 for name in names}
         plasticities["classifier"] = 0.0 if v2.background == "none" else 1.0

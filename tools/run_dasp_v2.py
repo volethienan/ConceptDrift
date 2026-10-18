@@ -92,6 +92,24 @@ SCREEN = {
     'v2_linear_route_native': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.routing': 'native'}),
     'v2_linear_gate_off': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.gate_policy': 'off'}),
     'v2_linear_tau0': ('modular_dasp_v2', _V2_LINEAR | {'dasp_v2.logit_adjustment_tau': 0.0}),
+    # Round 2: one-component ablations on the historical head, the round-1 leader.
+    'v2_route_all': ('modular_dasp_v2', {'dasp_v2.routing': 'all'}),
+    'v2_route_head': ('modular_dasp_v2', {'dasp_v2.routing': 'classifier'}),
+    'v2_route_native': ('modular_dasp_v2', {'dasp_v2.routing': 'native'}),
+    'v2_gate_off': ('modular_dasp_v2', {'dasp_v2.gate_policy': 'off'}),
+    'v2_tau0': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_tau': 0.0}),
+    'v2_head16': ('modular_dasp_v2', {'model.modular_head_dim': 16}),
+    'v2_head32': ('modular_dasp_v2', {'model.modular_head_dim': 32}),
+    'v2_k1': ('modular_dasp_v2', {'dasp_v2.routing_top_k': 1}),
+    'v2_k3': ('modular_dasp_v2', {'dasp_v2.routing_top_k': 3}),
+    # Round 3: which training ingredient carries the gain over replay baselines.
+    'v2_no_replay': ('modular_dasp_v2', {'dasp_v2.replay_enabled': False}),
+    'v2_uniform_replay': ('modular_dasp_v2', {'dasp_v2.balanced_replay': False}),
+    'v2_weight1': ('modular_dasp_v2', {'dasp_v2.new_sample_weight': 1.0}),
+    'v2_bg_none': ('modular_dasp_v2', {'dasp_v2.background': 'none'}),
+    'v2_bg_all': ('modular_dasp_v2', {'dasp_v2.background': 'all', 'dasp_v2.routing': 'all'}),
+    'v2_bg_all_tau0': ('modular_dasp_v2', {'dasp_v2.background': 'all', 'dasp_v2.routing': 'all',
+                                           'dasp_v2.logit_adjustment_tau': 0.0}),
 }
 
 

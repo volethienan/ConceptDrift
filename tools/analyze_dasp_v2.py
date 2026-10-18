@@ -39,9 +39,16 @@ RESPONSE_WINDOWS = 4
 
 
 def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
-    """Adaptation speed after concept changes and retention when a concept returns."""
+    """Adaptation speed after concept changes, retention when a concept returns,
+    and cumulative operational error rates over the evaluated windows."""
 
-    f1 = windows.set_index('window').macro_f1
+    evaluated = windows[~windows.warmup.astype(bool)] if 'warmup' in windows else windows
+    counts = {}
+    if {'attack_tp', 'attack_fn', 'attack_fp', 'attack_tn'} <= set(evaluated):
+        tp, fn, fp, tn = (int(evaluated[k].sum()) for k in ('attack_tp', 'attack_fn', 'attack_fp', 'attack_tn'))
+        counts = {'cumulative_attack_recall': tp / (tp + fn) if tp + fn else np.nan,
+                  'cumulative_benign_fpr': fp / (fp + tn) if fp + tn else np.nan}
+    f1 = evaluated.set_index('window').macro_f1
 
     def mean_from(start):
         values = f1.reindex(range(start, start + RESPONSE_WINDOWS)).dropna()
@@ -49,8 +56,8 @@ def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
 
     points = CHANGE_POINTS.get(scenario, ())
     post = [mean_from(point) for point in points]
-    return {'post_change_f1': float(np.nanmean(post)) if post else np.nan,
-            'recurrence_f1': mean_from(RECURRENCE_START[scenario]) if scenario in RECURRENCE_START else np.nan}
+    return counts | {'post_change_f1': float(np.nanmean(post)) if post else np.nan,
+                     'recurrence_f1': mean_from(RECURRENCE_START[scenario]) if scenario in RECURRENCE_START else np.nan}
 CELL = ['dataset', 'scenario']
 PAIR = ['dataset', 'scenario', 'stream_seed', 'model_seed']
 
@@ -66,7 +73,9 @@ def runs_frame(records: list[dict], root: Path | None = None) -> pd.DataFrame:
         summary = record['summary']
         phases = ({} if root is None else
                   phase_metrics(pd.read_csv(run_directory(root, record) / 'windows.csv',
-                                            usecols=['window', 'macro_f1']), record['scenario']))
+                                            usecols=['window', 'warmup', 'macro_f1', 'attack_tp',
+                                                     'attack_fn', 'attack_fp', 'attack_tn']),
+                                record['scenario']))
         cost = summary.get('total_overall_gradient_evaluations', summary.get('total_gradient_evaluations'))
         rows.append({key: record[key] for key in (*PAIR, 'method', 'condition')}
                     | {'overrides': json.dumps(record['overrides'], sort_keys=True),
