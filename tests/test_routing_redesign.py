@@ -34,40 +34,41 @@ def test_additive_head_groups_own_their_heads_and_repairs_stay_output_local():
     assert all(torch.equal(before[k], after[k]) for k in (0, 2, 3))
 
 
-def experiment_with_trust(tmp_path, model):
+def quarantine_experiment(tmp_path):
     cfg = load_config('configs/modular_dasp_smoke.yaml')
     cfg.output.directory, cfg.output.run_name = str(tmp_path), 'q'
     cfg.dasp.baseline = 'modular_dasp_v2'
+    cfg.data.warmup_windows = 4
     cfg.dasp_v2.quarantine = True
-    cfg.dasp_v2.quarantine_samples = 128
-    experiment = StreamingExperiment(cfg)
-    memory = ReservoirMemory(512, 1)
-    memory.add(torch.randn(512, 16), torch.arange(512) % 2)
-    dasp_v2.initialise_trust(experiment, model, memory)
-    return experiment
+    cfg.dasp_v2.quarantine_samples = 256
+    return StreamingExperiment(cfg)
 
 
-def test_quarantine_isolates_only_the_shifted_feature_group(tmp_path):
+def test_quarantine_needs_a_persistent_input_shift_in_one_group(tmp_path):
+    torch.manual_seed(3)
     model = additive(1)
-    experiment = experiment_with_trust(tmp_path, model)
-    clean = torch.randn(256, 16)
+    experiment = quarantine_experiment(tmp_path)
     with torch.no_grad():
-        logits, diagnostics = dasp_v2.quarantine_logits(experiment, model, clean)
-    assert diagnostics['quarantined_modules'] == ''
-    assert torch.allclose(logits, model(clean))
-    shifted = clean.clone()
-    shifted[:, 4:8] = shifted[:, 4:8] * 6 + 10  # feature block of module_2
-    with torch.no_grad():
-        logits, diagnostics = dasp_v2.quarantine_logits(experiment, model, shifted)
+        for _ in range(4):  # warm-up windows only build the trusted reference
+            logits, diagnostics = dasp_v2.quarantine_logits(experiment, model, torch.randn(256, 16))
+            assert logits is None
+        for _ in range(3):  # clean windows: no false quarantine
+            _, diagnostics = dasp_v2.quarantine_logits(experiment, model, torch.randn(256, 16))
+            assert diagnostics['quarantined_modules'] == ''
+        shifted = torch.randn(256, 16)
+        shifted[:, 4:8] = shifted[:, 4:8] * 6 + 10  # feature block of module_2
+        _, first = dasp_v2.quarantine_logits(experiment, model, shifted)
+        assert first['quarantined_modules'] == ''  # one window is not enough
+        logits, second = dasp_v2.quarantine_logits(experiment, model, shifted)
+        assert second['quarantined_modules'] == 'module_2'
         _, reps = model(shifted, return_representations=True)
-        reps['module_2'] = experiment._dasp_v2_trust['neutral']['module_2'].expand_as(reps['module_2'])
-        expected = model.logits_from_representations(reps)
-    assert diagnostics['quarantined_modules'] == 'module_2'
-    assert torch.allclose(logits, expected)
+        _, reference = model(experiment._dasp_v2_trust['reference']['module_2'], return_representations=True)
+        reps['module_2'] = reference['module_2'].mean(0, keepdim=True).expand_as(reps['module_2'])
+        assert torch.allclose(logits, model.logits_from_representations(reps))
     dasp_v2.refresh_trust(experiment, model, shifted, ['module_2'])
     with torch.no_grad():
-        _, diagnostics = dasp_v2.quarantine_logits(experiment, model, shifted)
-    assert diagnostics['quarantined_modules'] == ''
+        _, after = dasp_v2.quarantine_logits(experiment, model, shifted)
+    assert after['quarantined_modules'] == ''
 
 
 @pytest.mark.parametrize('routing', ['quarantine', 'random'])

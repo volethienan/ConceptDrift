@@ -158,6 +158,11 @@ SCREEN.update({
     'shared_quarantine': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.quarantine': True,
                                                           'dasp_v2.routing': 'quarantine',
                                                           'dasp_v2.routing_top_k': 1}),
+    # Round 9: recalibrated input-space quarantine as a safety net for severe faults only.
+    'shared_quarantine_z40': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.quarantine': True, 'dasp_v2.quarantine_z': 40.0,
+                                                              'dasp_v2.routing': 'quarantine', 'dasp_v2.routing_top_k': 1}),
+    'shared_quarantine_z80': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.quarantine': True, 'dasp_v2.quarantine_z': 80.0,
+                                                              'dasp_v2.routing': 'quarantine', 'dasp_v2.routing_top_k': 1}),
 })
 # Development datasets with a usable whole-capture chronological stream.
 NATURAL_DEV_DATASETS = ('nf-unsw-nb15-v3',)

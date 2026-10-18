@@ -94,92 +94,97 @@ def _prior_corrected(experiment, raw: torch.Tensor) -> tuple[torch.Tensor, dict[
     return raw + offset, {"prior_attack_estimate": float(estimate[-1])}
 
 
-def _module_representations(model, x: torch.Tensor) -> dict[str, torch.Tensor]:
-    model.eval()
-    with torch.no_grad():
-        return model(x, return_representations=True)[1]
-
-
 def _subsample(values: torch.Tensor, count: int, generator: torch.Generator) -> torch.Tensor:
     if len(values) <= count:
         return values
     return values[torch.randperm(len(values), generator=generator)[:count]]
 
 
-def _calibrate_module(state, name: str, representation: torch.Tensor, samples: int, seed: int) -> None:
-    """Trusted reference for one module plus a robust null of window-vs-reference MMD."""
+def _group_columns(model) -> list[torch.Tensor]:
+    """Input columns read by each module (semantic groups or contiguous slices)."""
 
+    if getattr(model, "feature_groups", None):
+        return [torch.tensor(group, dtype=torch.long) for group in model.feature_groups]
+    return [torch.arange(start, stop) for start, stop in model.feature_slices]
+
+
+def _group_distance(reference: torch.Tensor, current: torch.Tensor, columns: torch.Tensor, samples: int) -> float:
     from .drift import multiscale_mmd
 
-    generator = torch.Generator().manual_seed(seed)
-    order = torch.randperm(len(representation), generator=generator)
-    half = max(2, len(order) // 2)
-    reference, pool = representation[order[:half]], representation[order[half:]]
-    null = [float(multiscale_mmd(reference, _subsample(pool, max(2, samples // 2), generator),
-                                 samples, [0.5, 1.0, 2.0])) for _ in range(8)]
-    median = float(np.median(null))
-    state['reference'][name] = reference
-    state['neutral'][name] = reference.mean(dim=0, keepdim=True)
-    state['median'][name] = median
-    state['mad'][name] = max(float(np.median(np.abs(np.asarray(null) - median))), 1e-6)
+    return float(multiscale_mmd(reference[:, columns], current[:, columns], samples, [0.5, 1.0, 2.0]))
 
 
-def initialise_trust(experiment, model, memory) -> None:
-    """Trusted references from labeled history before the first post-warm-up update."""
+def _establish_trust(experiment, model, state) -> None:
+    """Reference = pooled warm-up inputs; null = distance to each warm-up window.
+
+    Warm-up windows are unlabeled here, so the null reflects real
+    window-to-window variability, including class-mix fluctuation.
+    """
 
     v2 = experiment.config.dasp_v2
-    state = experiment.__dict__.setdefault('_dasp_v2_trust', {})
-    if state.get('reference') or not v2.quarantine:
-        return
-    stored = memory.tensors(experiment.device)
-    if stored is None:
-        return
-    state.update({'reference': {}, 'neutral': {}, 'median': {}, 'mad': {}, 'quarantined': set()})
-    representations = _module_representations(model, stored[0])
-    for index, name in enumerate(model.layer_names):
-        _calibrate_module(state, name, representations[name], v2.quarantine_samples,
-                          experiment.config.data.random_seed + 7919 * (index + 1))
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed + 31337)
+    windows = state.pop("warmup_inputs")
+    pooled = torch.cat(windows)
+    reference = _subsample(pooled, v2.quarantine_samples, generator)
+    columns = _group_columns(model)
+    null = {name: [] for name in model.layer_names}
+    draws = [_subsample(window, v2.quarantine_samples, generator) for window in windows for _ in range(2)]
+    for name, cols in zip(model.layer_names, columns):
+        null[name] = [_group_distance(reference, draw, cols, v2.quarantine_samples) for draw in draws]
+    state["reference"] = {name: reference for name in model.layer_names}
+    state["median"] = {name: float(np.median(values)) for name, values in null.items()}
+    state["mad"] = {name: max(float(np.median(np.abs(np.asarray(values) - np.median(values)))),
+                              0.25 * float(np.median(values)), 1e-4) for name, values in null.items()}
+    state["streak"] = {name: 0 for name in model.layer_names}
+    state["quarantined"] = set()
 
 
 def refresh_trust(experiment, model, x: torch.Tensor, modules: list[str]) -> None:
-    """After a labeled repair, the repaired modules get a new trusted reference."""
+    """After a labeled repair, a repaired module's group is trusted on recent inputs."""
 
-    state = experiment.__dict__.get('_dasp_v2_trust', {})
-    if not state.get('reference') or not modules:
+    state = experiment.__dict__.get("_dasp_v2_trust", {})
+    if "reference" not in state or not modules:
         return
-    representations = _module_representations(model, x.to(experiment.device))
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed + 104729)
+    recent = _subsample(x.to(experiment.device), experiment.config.dasp_v2.quarantine_samples, generator)
     for name in modules:
-        _calibrate_module(state, name, representations[name], experiment.config.dasp_v2.quarantine_samples,
-                          experiment.config.data.random_seed + 104729 + len(name))
+        state["reference"][name] = recent
+        state["streak"][name] = 0
+        state["quarantined"].discard(name)
 
 
 def quarantine_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor | None, dict]:
-    """Replace far-from-reference modules by their reference mean when predicting."""
+    """Replace persistently shifted feature groups' modules by their reference mean."""
 
-    from .drift import multiscale_mmd
-
-    state = experiment.__dict__.get('_dasp_v2_trust', {})
-    if not state.get('reference'):
-        return None, {}
     v2 = experiment.config.dasp_v2
-    _, representations = model(x, return_representations=True)
+    state = experiment.__dict__.setdefault("_dasp_v2_trust", {})
+    if "reference" not in state:
+        inputs = state.setdefault("warmup_inputs", [])
+        if len(inputs) < experiment.config.data.warmup_windows:
+            generator = torch.Generator().manual_seed(experiment.config.data.random_seed + len(inputs))
+            inputs.append(_subsample(x.detach(), v2.quarantine_samples, generator))
+            return None, {}
+        _establish_trust(experiment, model, state)
     generator = torch.Generator().manual_seed(experiment.config.data.random_seed)
-    quarantined, scores = set(), {}
-    for name in model.layer_names:
-        current = _subsample(representations[name].detach(), v2.quarantine_samples, generator)
-        distance = float(multiscale_mmd(state['reference'][name], current, v2.quarantine_samples, [0.5, 1.0, 2.0]))
-        z = max(0.0, (distance - state['median'][name]) / (1.4826 * state['mad'][name]))
+    current = _subsample(x.detach(), v2.quarantine_samples, generator)
+    scores = {}
+    for name, cols in zip(model.layer_names, _group_columns(model)):
+        distance = _group_distance(state["reference"][name], current, cols, v2.quarantine_samples)
+        z = max(0.0, (distance - state["median"][name]) / (1.4826 * state["mad"][name]))
         scores[name] = z
-        if z >= v2.quarantine_z:
-            quarantined.add(name)
-    state['quarantined'] = quarantined
+        state["streak"][name] = state["streak"][name] + 1 if z >= v2.quarantine_z else 0
+    quarantined = {name for name in model.layer_names if state["streak"][name] >= 2}
     if len(quarantined) == len(model.layer_names):
-        quarantined = set(sorted(quarantined, key=lambda n: -scores[n])[:-1])  # keep the least shifted
-    adjusted = {name: (state['neutral'][name].expand_as(value) if name in quarantined else value)
-                for name, value in representations.items()}
-    return model.logits_from_representations(adjusted), {
-        'quarantined_modules': '|'.join(sorted(quarantined)),
-        **{f'quarantine_z_{name}': round(value, 4) for name, value in scores.items()}}
+        quarantined -= {min(quarantined, key=lambda n: scores[n])}  # never blank every module
+    state["quarantined"] = quarantined
+    _, representations = model(x, return_representations=True)
+    if quarantined:
+        for name in quarantined:
+            _, reference = model(state["reference"][name], return_representations=True)
+            representations[name] = reference[name].mean(dim=0, keepdim=True).expand_as(representations[name])
+    return model.logits_from_representations(representations), {
+        "quarantined_modules": "|".join(sorted(quarantined)),
+        **{f"quarantine_z_{name}": round(value, 4) for name, value in scores.items()}}
 
 
 def record_operating_rates(experiment, model, x: torch.Tensor, y: torch.Tensor) -> None:
@@ -345,7 +350,6 @@ def update(experiment, model, memory, item, row) -> str:
     gate = gate_assessment(pool_y, pool_prediction, n_classes, v2.gate_policy,
                            v2.gate_min_support, v2.gate_threshold, v2.gate_z)
     drift = bool(item.decision.triggered)
-    initialise_trust(experiment, model, memory)
     quarantined = sorted(experiment.__dict__.get("_dasp_v2_trust", {}).get("quarantined", set()))
     repair = drift or gate["degraded"] or bool(quarantined)
 
