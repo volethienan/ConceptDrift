@@ -133,3 +133,47 @@ def test_end_to_end_run_respects_budget_and_reports_v2_summary(tmp_path):
     assert result.summary['primary_comparison_scope'] == 'matched_total_query_budget'
     assert sum(result.summary['gate_state_counts'].values()) == len(evaluated)
     assert (tmp_path / 'v2' / 'provenance.json').is_file()
+
+
+def test_em_recovers_a_known_label_shift():
+    torch.manual_seed(0)
+    n, attack_prior = 20000, 0.2
+    y = (torch.rand(n) < attack_prior).long()
+    x = torch.randn(n) + (2 * y - 1).float()
+    # Uniform-prior posterior of N(-1,1) vs N(+1,1) is sigmoid(2x).
+    attack = torch.sigmoid(2 * x)
+    estimate = dasp_v2.em_prior(torch.stack([1 - attack, attack], dim=1), 1e-3)
+    assert float(estimate[1]) == pytest.approx(attack_prior, abs=0.015)
+
+
+def test_acc_inverts_the_classify_and_count_bias():
+    tpr, fpr, prior = 0.9, 0.1, 0.3
+    observed = tpr * prior + fpr * (1 - prior)
+    assert float(dasp_v2.acc_prior(observed, tpr, fpr, 1e-3)[1]) == pytest.approx(prior)
+    assert dasp_v2.acc_prior(0.5, 0.52, 0.5, 1e-3) is None
+
+
+def test_previous_window_prior_is_applied_causally(tmp_path):
+    cfg = config(tmp_path)
+    cfg.dasp_v2.prior_correction = 'em'
+    experiment = StreamingExperiment(cfg)
+    model = ModularOnlineMLP(16, 2, [16], n_modules=4, module_dim=8)
+    first_x, second_x = torch.randn(64, 16), torch.randn(64, 16) + 1
+    with torch.no_grad():
+        logits, diagnostics = dasp_v2.prediction_logits(experiment, model, first_x)
+        assert torch.equal(logits, model(first_x)) and math.isnan(diagnostics['prior_attack_estimate'])
+        expected = dasp_v2.em_prior(torch.softmax(model(first_x), 1), cfg.dasp_v2.prior_clip)
+        logits, diagnostics = dasp_v2.prediction_logits(experiment, model, second_x)
+        assert diagnostics['prior_attack_estimate'] == pytest.approx(float(expected[1]))
+        assert torch.allclose(logits, model(second_x) + torch.log(expected))
+
+
+@pytest.mark.parametrize('correction', ['em', 'acc'])
+def test_end_to_end_with_prior_correction_and_batch_prior(tmp_path, correction):
+    cfg = config(tmp_path, f'prior_{correction}')
+    cfg.dasp_v2.prior_correction = correction
+    cfg.dasp_v2.logit_adjustment_prior = 'batch'
+    result = StreamingExperiment(cfg).run()
+    assert 'prior_attack_estimate' in result.windows.columns
+    evaluated = result.windows[~result.windows.warmup.astype(bool)]
+    assert evaluated.prior_attack_estimate.notna().any()

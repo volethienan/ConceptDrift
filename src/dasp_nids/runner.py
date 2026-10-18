@@ -3970,7 +3970,8 @@ class StreamingExperiment:
         )
         forward_started = time.perf_counter()
         with torch.no_grad():
-            probability_tensor = F.softmax(model(device_x), dim=1)
+            logits, prior_diagnostics = dasp_v2.prediction_logits(self, model, device_x)
+            probability_tensor = F.softmax(logits, dim=1)
             predicted_tensor = probability_tensor.argmax(dim=1).cpu()
             attack_score = _tensor_to_numpy(1.0 - probability_tensor[:, 0])
         if self.device.type == "cuda":
@@ -3986,6 +3987,7 @@ class StreamingExperiment:
             y_score=attack_score,
         )
         result.update(self._subtype_recall_metrics(window, predicted))
+        result.update(prior_diagnostics)
         self._last_metric_seconds = time.perf_counter() - metric_started
         return result
 

@@ -80,6 +80,7 @@ def runs_frame(records: list[dict], root: Path | None = None) -> pd.DataFrame:
         rows.append({key: record[key] for key in (*PAIR, 'method', 'condition')}
                     | {'overrides': json.dumps(record['overrides'], sort_keys=True),
                        'mean_macro_f1': float(summary['mean_macro_f1']),
+                       'cumulative_macro_f1': float(summary.get('cumulative_macro_f1', np.nan)),
                        'gradient_cost': float(cost) if cost is not None else np.nan,
                        'cumulative_benign_fpr': summary.get('cumulative_benign_fpr', np.nan),
                        'cumulative_attack_recall': summary.get('cumulative_attack_recall', np.nan),
@@ -237,7 +238,7 @@ def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_
     by_dataset = frame.pivot_table(index='condition', columns='dataset', values='mean_macro_f1', aggfunc='mean')
     table = frame.groupby('condition').agg(
         runs=('mean_macro_f1', 'size'), mean_macro_f1=('mean_macro_f1', 'mean'),
-        mean_rank=('rank', 'mean'), cumulative_attack_recall=('cumulative_attack_recall', 'mean'),
+        cumulative_macro_f1=('cumulative_macro_f1', 'mean'), mean_rank=('rank', 'mean'), cumulative_attack_recall=('cumulative_attack_recall', 'mean'),
         cumulative_benign_fpr=('cumulative_benign_fpr', 'mean'), gradient_cost=('gradient_cost', 'mean'),
         update_seconds=('total_update_seconds', 'mean'), repairs=('repairs', 'mean'),
         post_change_f1=('post_change_f1', 'mean'), recurrence_f1=('recurrence_f1', 'mean'))
@@ -247,8 +248,9 @@ def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_
                       aggfunc='mean').to_csv(output_root / 'screen_by_scenario.csv')
     eligible = {cell for cell in construct_eligible_cells(prepared_root) if cell[0] in set(frame.dataset)}
     others = [condition for condition in table.index if condition != reference]
+    metrics = ('mean_macro_f1', 'cumulative_macro_f1', 'post_change_f1', 'recurrence_f1')
     contrasts = {metric: compare_family(frame, reference, others, eligible, replicates, metric)
-                 for metric in ('mean_macro_f1', 'post_change_f1', 'recurrence_f1')}
+                 for metric in metrics if frame[metric].notna().any()}
     result = {'stage': 'screen', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
               'reference': reference, 'construct_eligible_dev_cells': sorted(map(list, eligible)),
               'table': json.loads(table.reset_index().to_json(orient='records')),

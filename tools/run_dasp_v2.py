@@ -110,7 +110,23 @@ SCREEN = {
     'v2_bg_all': ('modular_dasp_v2', {'dasp_v2.background': 'all', 'dasp_v2.routing': 'all'}),
     'v2_bg_all_tau0': ('modular_dasp_v2', {'dasp_v2.background': 'all', 'dasp_v2.routing': 'all',
                                            'dasp_v2.logit_adjustment_tau': 0.0}),
+    # Round 4: label-shift correction from unlabeled windows.
+    'v2_batch_la': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch'}),
+    'v2_em_l1': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch',
+                                     'dasp_v2.prior_correction': 'em', 'dasp_v2.prior_strength': 1.0}),
+    'v2_em_l05': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch',
+                                      'dasp_v2.prior_correction': 'em', 'dasp_v2.prior_strength': 0.5}),
+    'v2_acc_l1': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch',
+                                      'dasp_v2.prior_correction': 'acc', 'dasp_v2.prior_strength': 1.0}),
+    'v2_acc_l05': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch',
+                                       'dasp_v2.prior_correction': 'acc', 'dasp_v2.prior_strength': 0.5}),
+    'v2_em_current_l1': ('modular_dasp_v2', {'dasp_v2.logit_adjustment_prior': 'batch',
+                                             'dasp_v2.prior_correction': 'em', 'dasp_v2.prior_strength': 1.0,
+                                             'dasp_v2.prior_source': 'current'}),
 }
+# Development datasets with a usable whole-capture chronological stream.
+NATURAL_DEV_DATASETS = ('nf-unsw-nb15-v3',)
+NATURAL_SCENARIO = 'Natural-Chronological'
 
 
 def config_id(method, overrides):
@@ -144,6 +160,11 @@ def jobs_for(args):
         scenarios = args.scenarios or PRIMARY_SCENARIOS
         cells = [(d, s, seed, model, str(Path(args.prepared_root) / d / s / f'stream_seed{seed}.npz'))
                  for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
+        if args.natural:
+            natural = [d for d in (args.datasets or NATURAL_DEV_DATASETS) if d in NATURAL_DEV_DATASETS]
+            cells = [(d, NATURAL_SCENARIO, seed, model,
+                      str(Path(args.prepared_root) / 'natural' / d / NATURAL_SCENARIO / f'stream_seed{seed}.npz'))
+                     for d in natural for seed in seeds for model in DEV_MODEL_SEEDS]
         grids = {method: grid for method, grid in GRIDS.items() if not args.methods or method in args.methods}
     if args.stage == 'screen':
         conditions = [(name, method, overrides) for name, (method, overrides) in SCREEN.items()
@@ -255,6 +276,8 @@ def parser():
     p.add_argument('--stream-seeds', nargs='+', type=int)
     p.add_argument('--methods', nargs='+', choices=sorted(set(GRIDS) | set(SCREEN)),
                    help='dev: method names; screen: condition names')
+    p.add_argument('--natural', action='store_true',
+                   help='use whole-capture chronological development streams instead of controlled scenarios')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--resume', action='store_true')
     p.add_argument('--preflight', action='store_true')

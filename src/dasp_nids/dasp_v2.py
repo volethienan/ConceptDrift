@@ -22,6 +22,77 @@ VERSION = "modular-dasp-v2-20261018-r0"
 GATE_POLICIES = ("wilson", "point", "off")
 ROUTINGS = ("utility", "native", "all", "classifier")
 BACKGROUNDS = ("classifier", "native", "all", "none")
+PRIOR_CORRECTIONS = ("none", "em", "acc")
+
+
+def em_prior(probabilities: torch.Tensor, clip: float, iterations: int = 200,
+             tolerance: float = 1e-7) -> torch.Tensor:
+    """Saerens-Latinne-Decaestecker EM for the target class prior.
+
+    ``probabilities`` are posteriors of a classifier whose implicit training
+    prior is uniform (logit-adjusted training with the batch prior), so the
+    reweighting factor is simply the candidate prior.
+    """
+
+    n_classes = probabilities.shape[1]
+    prior = torch.full((n_classes,), 1.0 / n_classes, dtype=probabilities.dtype)
+    for _ in range(iterations):
+        weighted = probabilities * prior
+        weighted = weighted / weighted.sum(dim=1, keepdim=True).clamp_min(1e-12)
+        updated = weighted.mean(dim=0).clamp(clip, 1 - clip)
+        updated = updated / updated.sum()
+        converged = float((updated - prior).abs().max()) < tolerance
+        prior = updated
+        if converged:
+            break
+    return prior
+
+
+def acc_prior(predicted_attack_rate: float, tpr: float, fpr: float, clip: float) -> torch.Tensor | None:
+    """Adjusted classify-and-count (Forman, 2008): binary hard-label BBSE."""
+
+    if not np.isfinite(tpr) or not np.isfinite(fpr) or tpr - fpr < 0.05:
+        return None
+    attack = float(np.clip((predicted_attack_rate - fpr) / (tpr - fpr), clip, 1 - clip))
+    return torch.tensor([1 - attack, attack])
+
+
+def prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+    """Raw logits plus the label-shift correction, and diagnostics for the row."""
+
+    raw = model(x)
+    v2 = experiment.config.dasp_v2
+    if experiment.config.dasp.baseline != "modular_dasp_v2" or v2.prior_correction == "none":
+        return raw, {}
+    if v2.prior_correction not in PRIOR_CORRECTIONS or v2.prior_source not in ("previous", "current"):
+        raise ValueError("unknown DASP-v2 prior correction settings")
+    state = experiment.__dict__.setdefault("_dasp_v2_prior", {})
+    probabilities = F.softmax(raw, dim=1).detach().cpu()
+    if v2.prior_correction == "em":
+        observed = em_prior(probabilities, v2.prior_clip)
+    else:
+        rates = state.get("rates")
+        attack_rate = float((probabilities.argmax(dim=1) == 1).float().mean())
+        observed = None if rates is None else acc_prior(attack_rate, rates[0], rates[1], v2.prior_clip)
+    estimate = observed if v2.prior_source == "current" else state.get("next")
+    state["next"] = observed
+    if estimate is None:
+        return raw, {"prior_attack_estimate": float("nan")}
+    offset = v2.prior_strength * torch.log(estimate.to(raw.device, raw.dtype))
+    return raw + offset, {"prior_attack_estimate": float(estimate[-1])}
+
+
+def record_operating_rates(experiment, model, x: torch.Tensor, y: torch.Tensor) -> None:
+    """TPR/FPR of the raw (uncorrected) classifier on held-out labeled gate data."""
+
+    model.eval()
+    with torch.no_grad():
+        predicted = model(x.to(experiment.device)).argmax(dim=1).cpu()
+    y = y.cpu()
+    attacks, benign = y == 1, y == 0
+    tpr = float((predicted[attacks] == 1).float().mean()) if bool(attacks.any()) else float("nan")
+    fpr = float((predicted[benign] == 1).float().mean()) if bool(benign.any()) else float("nan")
+    experiment.__dict__.setdefault("_dasp_v2_prior", {})["rates"] = (tpr, fpr)
 
 
 def wilson_lower_bound(successes: int, total: int, z: float) -> float:
@@ -79,15 +150,23 @@ def gate_assessment(
             "recall": recall, "wilson_lower": lower, "assessed_classes": assessed}
 
 
-def class_prior_adjustment(memory, n_classes: int, tau: float) -> torch.Tensor | None:
-    """C3: tau * log prior from labels that have arrived (Laplace-smoothed)."""
+def class_prior_adjustment(memory, n_classes: int, tau: float, batch=None) -> torch.Tensor | None:
+    """C3: tau * log prior (Laplace-smoothed).
+
+    With ``batch`` = (labels, weights) the prior is the weighted class
+    frequency of the training batch itself; otherwise labels in memory.
+    """
 
     if tau <= 0:
         return None
-    stored = memory.tensors(torch.device("cpu"))
     counts = torch.ones(n_classes)
-    if stored is not None:
-        counts += torch.bincount(stored[1].long(), minlength=n_classes).float()
+    if batch is not None:
+        labels, weights = batch
+        counts += torch.bincount(labels.cpu().long(), weights=weights.cpu().float(), minlength=n_classes)
+    else:
+        stored = memory.tensors(torch.device("cpu"))
+        if stored is not None:
+            counts += torch.bincount(stored[1].long(), minlength=n_classes).float()
     return tau * torch.log(counts / counts.sum())
 
 
@@ -168,7 +247,6 @@ def update(experiment, model, memory, item, row) -> str:
     drift = bool(item.decision.triggered)
     repair = drift or gate["degraded"]
 
-    adjustment = class_prior_adjustment(memory, n_classes, v2.logit_adjustment_tau)
     training_cfg = copy.deepcopy(cfg)
     training_cfg.dasp.modular_new_sample_weight = v2.new_sample_weight
     if not v2.replay_enabled:
@@ -182,6 +260,11 @@ def update(experiment, model, memory, item, row) -> str:
         batch = ((new_x, new_y, new_w) if replay is None else
                  (torch.cat([new_x, replay[0]]), torch.cat([new_y, replay[1]]),
                   torch.cat([new_w, torch.ones(len(replay[1]), device=device)])))
+    if v2.logit_adjustment_prior not in ("memory", "batch"):
+        raise ValueError("logit_adjustment_prior must be memory or batch")
+    adjustment = class_prior_adjustment(
+        memory, n_classes, v2.logit_adjustment_tau,
+        (batch[1], batch[2]) if v2.logit_adjustment_prior == "batch" else None)
 
     counters: dict[str, dict[str, int]] = {}
     gains: dict[str, float] = {}
@@ -232,6 +315,8 @@ def update(experiment, model, memory, item, row) -> str:
                                   epochs=epochs, use_projection_memory=False,
                                   logit_adjustment=adjustment)
     memory.add(tx, ty)
+    if v2.prior_correction == "acc":
+        record_operating_rates(experiment, model, pool_x, pool_y)
     experiment._dasp_v2_gate_history = [*history, (gx, gy)][-max(1, v2.gate_buffer_windows):]
 
     row.update(original_review._locality(model, before, plasticities))

@@ -363,6 +363,19 @@ class DaspV2Config:
     repair_epochs: int = 2
     # C3: logit-adjusted loss (Menon et al., ICLR 2021); 0 disables.
     logit_adjustment_tau: float = 1.0
+    # Prior used by the logit-adjusted loss: memory (arrived labels) or batch
+    # (weighted class frequencies of the training batch, as in Menon et al.;
+    # with tau=1 the raw logits then target a uniform-prior classifier).
+    logit_adjustment_prior: str = "memory"
+    # Label-shift correction at prediction time: none | em (Saerens et al.,
+    # 2002) | acc (adjusted classify-and-count / hard BBSE). The target prior
+    # is estimated from unlabeled windows; logits += prior_strength * log prior.
+    prior_correction: str = "none"
+    prior_strength: float = 1.0
+    # previous: estimate from the preceding window (causal for per-flow
+    # decisions); current: from the window being predicted (batch-transductive).
+    prior_source: str = "previous"
+    prior_clip: float = 0.001
     replay_enabled: bool = True
     # False draws replay uniformly from memory instead of class-balanced.
     balanced_replay: bool = True
