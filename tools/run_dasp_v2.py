@@ -127,6 +127,7 @@ SCREEN = {
 # Development datasets with a usable whole-capture chronological stream.
 NATURAL_DEV_DATASETS = ('nf-unsw-nb15-v3',)
 NATURAL_SCENARIO = 'Natural-Chronological'
+LABEL_SHIFT_SCENARIOS = ('L1-Burst', 'L2-Ramp', 'L3-Swing')
 
 
 def config_id(method, overrides):
@@ -165,6 +166,11 @@ def jobs_for(args):
             cells = [(d, NATURAL_SCENARIO, seed, model,
                       str(Path(args.prepared_root) / 'natural' / d / NATURAL_SCENARIO / f'stream_seed{seed}.npz'))
                      for d in natural for seed in seeds for model in DEV_MODEL_SEEDS]
+        if args.label_shift:
+            cells = [(d, s, seed, model,
+                      str(Path(args.prepared_root) / 'label_shift' / d / s / f'stream_seed{seed}.npz'))
+                     for d in datasets for s in LABEL_SHIFT_SCENARIOS for seed in seeds
+                     for model in DEV_MODEL_SEEDS]
         grids = {method: grid for method, grid in GRIDS.items() if not args.methods or method in args.methods}
     if args.stage == 'screen':
         conditions = [(name, method, overrides) for name, (method, overrides) in SCREEN.items()
@@ -278,6 +284,8 @@ def parser():
                    help='dev: method names; screen: condition names')
     p.add_argument('--natural', action='store_true',
                    help='use whole-capture chronological development streams instead of controlled scenarios')
+    p.add_argument('--label-shift', action='store_true',
+                   help='use controlled label-shift development streams (prevalence changes, families fixed)')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--resume', action='store_true')
     p.add_argument('--preflight', action='store_true')
