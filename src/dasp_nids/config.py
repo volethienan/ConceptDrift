@@ -386,6 +386,9 @@ class DaspV2Config:
     # Inference-time quarantine: a module whose current representation is far
     # (robust z >= quarantine_z) from its trusted reference is replaced by its
     # reference mean when predicting, until a labeled repair refreshes it.
+    # Blockwise heads: whether the shared head core (fusion bias, LayerNorm)
+    # keeps adapting after warm-up; module blocks follow their modules.
+    head_core_update: bool = False
     quarantine: bool = False
     quarantine_z: float = 6.0
     quarantine_samples: int = 512

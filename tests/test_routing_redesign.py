@@ -85,3 +85,49 @@ def test_end_to_end_with_additive_heads_and_quarantine(tmp_path, routing):
     evaluated = result.windows[~result.windows.warmup.astype(bool)]
     assert 'quarantine_z_module_1' in evaluated.columns
     assert set(evaluated.ground_truth_update_labels) == {32}
+
+
+def blockwise(seed=0, module_dim=8, head_dim=6):
+    torch.manual_seed(seed)
+    return ModularOnlineMLP(16, 2, [16], n_modules=4, module_dim=module_dim, head_dim=head_dim,
+                            head_type='blockwise')
+
+
+def test_blockwise_head_equals_a_linear_layer_on_concatenated_modules():
+    model = blockwise()
+    x = torch.randn(9, 16)
+    logits, reps = model(x, return_representations=True)
+    weight = torch.cat([block.weight for block in model.head_blocks], dim=1)
+    fused = torch.cat([reps[name] for name in model.layer_names], dim=1) @ weight.T + model.head_core_bias
+    assert torch.allclose(logits, model.classifier(model.head_core(fused)), atol=1e-6)
+    groups = model.adaptation_parameter_groups()
+    assert {id(p) for p in model.head_blocks[1].parameters()} <= {id(p) for p in groups['module_2']}
+    assert set(groups) == {*model.layer_names, 'head_core', 'classifier'}
+
+
+def test_subspace_repair_changes_only_the_module_its_head_block_and_the_final_layer(tmp_path):
+    from dasp_nids.runner import _train_dasp
+    cfg = load_config('configs/modular_dasp_smoke.yaml')
+    model = blockwise(2)
+    before = {name: p.detach().clone() for name, p in model.named_parameters()}
+    plasticities = {'module_1': 0., 'module_2': 1., 'module_3': 0., 'module_4': 0., 'head_core': 0., 'classifier': 1.}
+    _train_dasp(model, torch.randn(32, 16), torch.arange(32) % 2, plasticities, cfg, torch.device('cpu'),
+                ReservoirMemory(8, 1), strict_freeze=True, use_projection_memory=False, epochs=2)
+    changed = {name for name, p in model.named_parameters() if not torch.equal(p, before[name])}
+    assert changed == {name for name in before
+                       if name.startswith(('modules_list.1.', 'head_blocks.1.', 'classifier.'))}
+
+
+def test_end_to_end_blockwise_head_reports_head_aware_locality(tmp_path):
+    cfg = load_config('configs/modular_dasp_smoke.yaml')
+    cfg.output.directory, cfg.output.run_name = str(tmp_path), 'blockwise'
+    cfg.training.model_seed = 91
+    cfg.dasp.baseline = 'modular_dasp_v2'
+    cfg.baselines.update_label_budget = 32
+    cfg.model.modular_head_type = 'blockwise'
+    cfg.dasp_v2.routing, cfg.dasp_v2.routing_top_k = 'native', 1
+    result = StreamingExperiment(cfg).run()
+    evaluated = result.windows[~result.windows.warmup.astype(bool)]
+    background = evaluated[evaluated.selected_candidate == 'background_classifier']
+    assert (background.optimizer_included_parameter_fraction < 0.2).all()
+    assert (evaluated.inactive_module_max_abs_change.fillna(0) == 0).all()

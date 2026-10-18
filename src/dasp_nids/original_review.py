@@ -130,13 +130,14 @@ def _locality(model, before, plasticities):
     named = {id(p): n for n, p in model.named_parameters()}
     total, included, changed, inactive_max, representation, active_rep = 0, 0, 0, 0., 0, 0
     head = 0
+    module_names = set(getattr(model, 'layer_names', []))
     for group, parameters in model.adaptation_parameter_groups().items():
         active = plasticities.get(group, 1.) > 0
         for p in parameters:
             size = p.numel()
             total += size
             included += size if active else 0
-            if group == 'classifier':
+            if group not in module_names:
                 head += size
             else:
                 representation += size

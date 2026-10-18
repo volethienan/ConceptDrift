@@ -141,6 +141,20 @@ SCREEN.update({
     'v2_sem_full_every_window': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all',
                                                                  'dasp_v2.background': 'all'}),
 })
+# Round 10: subspace-local head. The first head layer is split into per-module
+# column blocks; repairs update the attributed module, its block and the
+# final layer; background updates touch only the final layer.
+_BLOCK = _SEMANTIC | {'model.modular_head_type': 'blockwise', 'dasp_v2.routing': 'native'}
+SCREEN.update({
+    'blk_k2': ('modular_dasp_v2', dict(_BLOCK)),
+    'blk_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing_top_k': 1}),
+    'blk_random_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing': 'random', 'dasp_v2.routing_top_k': 1}),
+    'blk_d128_f32_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing_top_k': 1, 'model.module_dim': 128,
+                                                     'model.modular_head_dim': 32}),
+    'blk_d128_f16_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing_top_k': 1, 'model.module_dim': 128,
+                                                     'model.modular_head_dim': 16}),
+    'blk_core_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing_top_k': 1, 'dasp_v2.head_core_update': True}),
+})
 FEATURE_SHIFT_SCENARIOS = tuple(f'{kind}-{group}' for kind in ('FS', 'FR', 'XS', 'XR')
                                 for group in ('volume', 'timing', 'tcp', 'protocol'))
 # Round 8: output-local repairs (additive heads) and inference-time quarantine.

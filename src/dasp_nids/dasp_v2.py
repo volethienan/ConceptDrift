@@ -421,6 +421,8 @@ def update(experiment, model, memory, item, row) -> str:
             plasticities = {name: 0.0 for name in names}
         plasticities["classifier"] = 0.0 if v2.background == "none" else 1.0
 
+    if "head_core" in model.adaptation_parameter_groups():
+        plasticities["head_core"] = 1.0 if v2.head_core_update else 0.0
     before = ({name: value.detach().cpu().clone() for name, value in model.named_parameters()}
               if v2.verify_locality else None)
     calls = 0

@@ -396,8 +396,8 @@ class ModularOnlineMLP(nn.Module):
         additive_head_dim: int = 16,
     ):
         super().__init__()
-        if head_type not in ("shared", "additive"):
-            raise ValueError("head_type must be shared or additive")
+        if head_type not in ("shared", "additive", "blockwise"):
+            raise ValueError("head_type must be shared, additive or blockwise")
         self.head_type = head_type
         if module_dim < 1:
             raise ValueError("module_dim must be positive")
@@ -443,7 +443,18 @@ class ModularOnlineMLP(nn.Module):
             if dropout > 0:
                 head.append(nn.Dropout(dropout))
             head.append(nn.Linear(fusion_dim, n_classes))
-        if head_type == "additive":
+        if head_type == "blockwise":
+            # Same function class as the shared head, Linear(concat z) -> LN ->
+            # ReLU -> Linear, but the first layer is written as sum_m W_m z_m + b
+            # so each column block W_m is its own parameter owned by module m.
+            if head_dim == 0:
+                raise ValueError("blockwise heads need a hidden fusion layer")
+            fusion = int(head_dim) if head_dim is not None else (int(hidden_dims[-1]) if hidden_dims else module_dim)
+            self.head_blocks = nn.ModuleList(nn.Linear(module_dim, fusion, bias=False) for _ in self.modules_list)
+            self.head_core = nn.Sequential(nn.LayerNorm(fusion), nn.ReLU())
+            self.head_core_bias = nn.Parameter(torch.zeros(fusion))
+            self.classifier = nn.Linear(fusion, n_classes)
+        elif head_type == "additive":
             # logits = sum_m h_m(z_m) + b: each module owns its contribution to
             # the decision, so repairing one module leaves the others' output
             # contributions exactly unchanged.
@@ -460,6 +471,9 @@ class ModularOnlineMLP(nn.Module):
 
     def logits_from_representations(self, representations: dict[str, torch.Tensor]) -> torch.Tensor:
         values = [representations[name] for name in self.layer_names]
+        if self.head_type == "blockwise":
+            fused = sum(block(value) for block, value in zip(self.head_blocks, values)) + self.head_core_bias
+            return self.classifier(self.head_core(fused))
         if self.head_type == "additive":
             logits = sum(head(value) for head, value in zip(self.module_heads, values))
             return logits + self.classifier(values[0].shape[0])
@@ -496,6 +510,10 @@ class ModularOnlineMLP(nn.Module):
         if self.head_type == "additive":
             for name, head in zip(self.layer_names, self.module_heads):
                 groups[name] += list(head.parameters())
+        if self.head_type == "blockwise":
+            for name, block in zip(self.layer_names, self.head_blocks):
+                groups[name] += list(block.parameters())
+            groups["head_core"] = [self.head_core_bias, *self.head_core.parameters()]
         groups["classifier"] = list(self.classifier.parameters())
         return groups
 
