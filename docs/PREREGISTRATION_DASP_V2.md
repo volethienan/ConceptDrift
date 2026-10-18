@@ -23,7 +23,7 @@ Thuật ngữ: "module" là nhóm tham số vận hành, không phải nhóm đ�
 | **Chronological tự nhiên** | NF-ToN-IoT-v3 (đã dùng ở vòng trước), NF-UNSW-NB15-v3, NF-CSE-CIC-IDS2018-v3, xếp theo `FLOW_START_MILLISECONDS` | Kiểm tra hành vi khi drift tự nhiên; không gọi là external validation |
 
 Lý do chọn:
-- NF-BoT-IoT-v3 có benign rất hiếm (13/4.096 mỗi cửa sổ ở S0). NF-UNSW-NB15-v3 có gate 32 mẫu thường chỉ có 1–4 benign. Hai dataset này bộc lộ đúng các lỗi cần sửa (gate, mất cân bằng lớp), nên dùng chúng để phát triển.
+- NF-BoT-IoT-v3 có benign rất hiếm (13/4.096 mỗi cửa sổ ở S0). NF-UNSW-NB15-v3 ngược lại có attack hiếm (221/4.096 ở S0), gate 32 mẫu thường chỉ có 1–4 attack. Hai dataset này bộc lộ đúng các lỗi cần sửa (gate, mất cân bằng lớp), nên dùng chúng để phát triển.
 - CICIoT2023 là dataset gần đây, khác phòng thí nghiệm, khác bộ trích xuất đặc trưng, và có các họ tấn công tương thích với scenario hiện tại (DDoS, DoS, Recon…). Trước khi tải cần kiểm tra danh sách cột chính thức. Nếu không có timestamp thì chỉ dùng cho scenario có kiểm soát.
 - NF-BoT-IoT-v3 không dùng cho chronological vì benign quá hiếm.
 
@@ -31,6 +31,8 @@ Ràng buộc dữ liệu:
 - Stream seed mới phải rời rạc theo session với các stream dev, kiểm tra bằng `source_ids`. Nếu builder không bảo đảm được điều này, kết quả seed mới trên dataset dev chỉ được báo là "độ bền theo seed".
 - Lệnh raw → prepared phải chạy lại được. Kiểm tra bằng cách tái sinh `stream_seed2001` của một dataset và so hash với NPZ lưu trữ. Nếu không khớp, ghi rõ và dùng NPZ mới cho mọi phương pháp.
 - CIC-IDS2017 có lỗi nhãn đã được công bố (Engelen et al., 2021). Ghi vào phần giới hạn.
+- Seed theo vai trò: NF-BoT-IoT-v3 có 8 seed rời rạc (2001–2003 dev, 3001–3005 xác nhận), sinh trong cùng một lệnh. NF-UNSW-NB15-v3 chỉ có 5 seed rời rạc (2001–2003 dev, 3001–3002 xác nhận): với 8 seed, họ `generic` (vài session rất lớn) không đủ cho đoạn cuối (380/768 ở S1-Sudden); quyết định này dựa trên tính khả thi của builder, trước khi có bất kỳ kết quả mô hình nào. Ba dataset giữ lại chỉ có 3001–3005. Với dedup, CIC-IDS2017 không đủ PortScan cho 8 seed rời rạc (cần 105% số dòng sạch), nhưng đủ cho 5 seed (66%).
+- CIC-IDS2017 dùng protocol mới `3.0-cic` (builder cũ đã mất): loại vector có nhãn mâu thuẫn, giữ lần xuất hiện đầu của mỗi vector trùng, gom khối dòng liên tiếp cùng họ làm đơn vị gán seed/đoạn. Lệnh tái sinh toàn bộ: `python tools/regenerate_v2_streams.py --output-dir prepared_streams_v2`.
 
 ## 3. Hợp đồng nhãn (áp dụng cho mọi phương pháp ở phần so sánh chính)
 

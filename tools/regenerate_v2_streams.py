@@ -29,7 +29,9 @@ DEVELOPMENT_SEEDS = (2001, 2002, 2003)
 CONFIRMATION_SEEDS = (3001, 3002, 3003, 3004, 3005)
 PLAN = (
     ('nf-bot-iot-v3', 'tools/build_controlled_nf_streams.py', DEVELOPMENT_SEEDS + CONFIRMATION_SEEDS),
-    ('nf-unsw-nb15-v3', 'tools/build_controlled_nf_streams.py', DEVELOPMENT_SEEDS + CONFIRMATION_SEEDS),
+    # Eight disjoint seeds are infeasible for NF-UNSW 'generic' (a few very
+    # large 5-tuples leave the last segment at 380/768 rows); five are not.
+    ('nf-unsw-nb15-v3', 'tools/build_controlled_nf_streams.py', DEVELOPMENT_SEEDS + CONFIRMATION_SEEDS[:2]),
     ('nf-cse-cic-ids2018-v3', 'tools/build_controlled_nf_streams.py', CONFIRMATION_SEEDS),
     ('nf-ton-iot-v3', 'tools/build_controlled_nf_streams.py', CONFIRMATION_SEEDS),
     ('cic-ids2017', 'tools/build_controlled_cic_streams.py', CONFIRMATION_SEEDS),
@@ -99,6 +101,16 @@ def main() -> None:
         'seed_roles': {'development': list(DEVELOPMENT_SEEDS), 'confirmation': list(CONFIRMATION_SEEDS)},
         'datasets': {},
     }
+    # Datasets built by an earlier invocation keep their own record, including
+    # the commit and builder hashes in force when they were built.
+    previous = output / 'BUILD_PROVENANCE.json'
+    if previous.is_file():
+        earlier = json.loads(previous.read_text(encoding='utf-8'))
+        for name, record in earlier.get('datasets', {}).items():
+            record.setdefault('code_commit', earlier.get('code_commit'))
+            record.setdefault('builders', earlier.get('builders'))
+            record.setdefault('environment', earlier.get('environment'))
+            provenance['datasets'][name] = record
     # Builders and the validator import dasp_nids/tools from this checkout.
     env = {**os.environ, 'PYTHONPATH': os.pathsep.join(
         [str(ROOT / 'src'), str(ROOT), os.environ.get('PYTHONPATH', '')])}
@@ -117,6 +129,8 @@ def main() -> None:
                      '--stream-seeds', ','.join(map(str, seeds)), '--output', str(report)],
                     stdout=log, stderr=subprocess.STDOUT, env=env).returncode
         provenance['datasets'][dataset] = {
+            'code_commit': provenance['code_commit'], 'builders': provenance['builders'],
+            'environment': provenance['environment'],
             'command': command, 'stream_seeds': list(seeds), 'build_returncode': build.returncode,
             'validation_returncode': validation, 'seconds': round(time.time() - started, 1)}
         failed |= build.returncode != 0 or validation != 0

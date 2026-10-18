@@ -33,7 +33,7 @@ Bản cài đặt cũ giữ nguyên để tái hiện kết quả lưu trữ. B�
 | NF-BoT-IoT-v3 (10 scenario × 5 seed, chạy trong một lệnh như bản gốc) | **Không tái hiện được.** Cả 50 manifest trùng hoàn toàn từng trường với bản lưu trữ, `y` cũng trùng, nhưng flow được chọn (`x`, `source_ids`, `timestamps`) khác. Nguyên nhân chưa xác định: có thể builder bị sửa sau khi tạo stream mà manifest không ghi lại, hoặc phiên bản numpy/pandas lúc đó khác (môi trường gốc `.venv` hiện đã hỏng). Lưu ý: chạy chỉ S0 thì manifest còn khác ở `observed_required_family_counts`, vì builder chỉ quét các họ tấn công của scenario được chọn. |
 | Tính xác định của builder hiện tại | **Đạt.** Chạy hai lần NF-UNSW (S0, S1; 5 seed) cho 10/10 stream giống hệt nhau. Môi trường: Python 3.12.7, numpy 1.26.4, pandas 2.3.3, scipy 1.16.2, scikit-learn 1.7.2. |
 | NF-CSE-CIC-IDS2018-v3 | Manifest lưu trữ tạo lúc 09:49, nhiều khả năng cùng phiên bản builder cũ như UNSW. |
-| CIC-IDS2017 | **Builder không còn.** Manifest protocol 2.0 ("exact-feature hash × 10000-row block"); không tìm thấy mã trong repo hay trong `.codex`. |
+| CIC-IDS2017 | **Builder cũ không còn** (protocol 2.0). Đã thay bằng `tools/build_controlled_cic_streams.py`, protocol `3.0-cic`, xem mục 7. |
 
 Hệ quả theo kế hoạch (mục 2): toàn bộ stream của DASP-v2, cả seed dev 2001–2003 lẫn seed xác nhận mới, phải được **tái sinh bằng builder có trong Git**, bằng một lệnh ghi trong tài liệu, rồi dùng chung cho mọi phương pháp. CIC-IDS2017 cần builder mới (phiên bản protocol mới, có test), hoặc phải thay dataset. Kết quả lưu trữ cũ chỉ tái hiện được từ NPZ lưu trữ, không tái hiện được từ dữ liệu thô.
 
@@ -52,7 +52,27 @@ Windows, `.venv-revision` (Python 3.12.7, PyTorch CPU), có junction chỉ đọ
 
 ## 6. Việc còn lại trước pha dev
 
-1. Quyết định CIC-IDS2017: viết builder mới hoặc thay dataset.
-2. Tái sinh toàn bộ stream (seed dev 2001–2003 và seed xác nhận 3001–3005) bằng builder trong Git, trong một lệnh có ghi tài liệu. Kiểm tra seed xác nhận rời rạc session với seed dev.
+1. ~~Quyết định CIC-IDS2017~~: đã viết builder mới (mục 7).
+2. Tái sinh toàn bộ stream bằng `tools/regenerate_v2_streams.py`: xem mục 8.
 3. Cài và audit đường chạy River/ARF dưới hợp đồng 128 nhãn.
 4. Chuyển so sánh chính sang hợp đồng 128 nhãn: SSF dùng `ssf_budget`, DASP dùng `label_mode='matched'`, thêm `online_ewc_v2`/`cdda_md_v2` vào danh sách phương pháp của stage mới.
+
+## 7. Builder CIC-IDS2017, protocol `3.0-cic`
+
+File MachineLearningCVE không có IP, port, flow ID hay timestamp, nên không dựng lại được session. Protocol mới:
+
+1. Loại mọi vector đặc trưng xuất hiện với nhiều nhãn: 698 vector, 7.020 dòng.
+2. Chỉ giữ lần xuất hiện đầu của mỗi vector trùng: loại 302.757 dòng. Một flow giống hệt không thể xuất hiện ở hai cửa sổ, hai đoạn hay hai seed.
+3. Gom dòng sạch cùng họ, cùng file capture thành khối liên tiếp theo thứ tự nguồn. Đây là proxy lân cận thời gian, không phải session. Kích thước khối = min(1.000, số dòng sạch / (số seed × 4 đoạn × 25)), để mỗi (seed, đoạn) có ít nhất 25 khối. Ví dụ với 5 seed: benign 1.000, DoS Hulk 345, PortScan 180, DDoS 256, GoldenEye 20, Slowloris 10 dòng/khối.
+4. Khối được gán nguyên vẹn cho seed (cân bằng tải, lớn trước) và cho đoạn stream. Phần công thức kịch bản, lắp cửa sổ và chuẩn hóa chỉ fit trên warmup dùng chung code với builder NF.
+5. Concept giữ như protocol 2.0: A = DoS Hulk 0,7 + DDoS 0,3; B = PortScan 0,6 + DDoS 0,4; tỷ lệ tấn công 807/4.096.
+
+Mức sử dụng dòng sạch với 5 seed: PortScan 0,71, DoS Hulk 0,65, DDoS 0,46. Với 8 seed thì PortScan không đủ, nên CIC chỉ có seed xác nhận, đúng vai trò dataset giữ lại.
+
+Giới hạn ghi trong mọi manifest: không có session thật; `timestamps` là thứ tự dòng nguồn, không phải thời gian; họ tấn công trùng với ngày capture; nhãn CIC-IDS2017 có lỗi đã công bố (Engelen et al., 2021).
+
+Test: `tests/test_cic_builder.py`, 6 test, gồm dedup, loại nhãn mâu thuẫn, khối không vượt seed/đoạn, công thức và tỷ lệ, tính xác định, quota bất khả thi phải báo lỗi, kiểm đếm nhãn.
+
+## 8. Tái sinh toàn bộ stream DASP-v2
+
+_(điền sau khi chạy)_
