@@ -137,6 +137,7 @@ SCREEN.update({
     'v2_sem_native_k1': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'native', 'dasp_v2.routing_top_k': 1}),
     'v2_sem_all': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all'}),
     'v2_sem_head': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'classifier'}),
+    'v2_contig_head': ('modular_dasp_v2', _V2_RECIPE | {'dasp_v2.routing': 'classifier'}),
     'v2_sem_full_every_window': ('modular_dasp_v2', _SEMANTIC | {'dasp_v2.routing': 'all',
                                                                  'dasp_v2.background': 'all'}),
 })
