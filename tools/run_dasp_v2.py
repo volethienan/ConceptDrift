@@ -155,6 +155,14 @@ SCREEN.update({
                                                      'model.modular_head_dim': 16}),
     'blk_core_k1': ('modular_dasp_v2', _BLOCK | {'dasp_v2.routing_top_k': 1, 'dasp_v2.head_core_update': True}),
 })
+# Round 11: class-conditional attribution steering the routing.
+_ATTR = _SEMANTIC | {'dasp_v2.routing': 'attributed', 'dasp_v2.routing_top_k': 1, 'dasp_v2.attribution': 'pseudo'}
+SCREEN.update({
+    'attr_pseudo_k1': ('modular_dasp_v2', dict(_ATTR)),
+    'attr_pseudo_only_k1': ('modular_dasp_v2', _ATTR | {'dasp_v2.attribution_repr_weight': 0.0}),
+    'attr_labels_k1': ('modular_dasp_v2', _ATTR | {'dasp_v2.attribution': 'labels'}),
+    'blk_attr_pseudo_k1': ('modular_dasp_v2', _ATTR | {'model.modular_head_type': 'blockwise'}),
+})
 FEATURE_SHIFT_SCENARIOS = tuple(f'{kind}-{group}' for kind in ('FS', 'FR', 'XS', 'XR')
                                 for group in ('volume', 'timing', 'tcp', 'protocol'))
 # Round 8: output-local repairs (additive heads) and inference-time quarantine.

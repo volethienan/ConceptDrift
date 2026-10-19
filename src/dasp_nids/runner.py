@@ -3983,7 +3983,9 @@ class StreamingExperiment:
         )
         forward_started = time.perf_counter()
         with torch.no_grad():
-            logits, prior_diagnostics = dasp_v2.prediction_logits(self, model, device_x)
+            # Window labels are passed for warm-up-only attribution references;
+            # dasp_v2 never reads them after warm-up (tested).
+            logits, prior_diagnostics = dasp_v2.prediction_logits(self, model, device_x, window.y)
             probability_tensor = F.softmax(logits, dim=1)
             predicted_tensor = probability_tensor.argmax(dim=1).cpu()
             attack_score = _tensor_to_numpy(1.0 - probability_tensor[:, 0])

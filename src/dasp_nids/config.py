@@ -389,6 +389,13 @@ class DaspV2Config:
     # Blockwise heads: whether the shared head core (fusion bias, LayerNorm)
     # keeps adapting after warm-up; module blocks follow their modules.
     head_core_update: bool = False
+    # Class-conditional drift attribution: per feature group and class, MMD of
+    # the current window (classes from the model's own predictions) against
+    # warm-up references; combined with the representation z of the drift
+    # monitor. none | pseudo | labels (queried delayed labels, majority-safe).
+    attribution: str = "none"
+    attribution_min_class: int = 64
+    attribution_repr_weight: float = 1.0
     quarantine: bool = False
     quarantine_z: float = 6.0
     quarantine_samples: int = 512

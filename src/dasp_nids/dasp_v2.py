@@ -20,7 +20,7 @@ from . import original_review
 
 VERSION = "modular-dasp-v2-20261018-r0"
 GATE_POLICIES = ("wilson", "point", "off")
-ROUTINGS = ("utility", "native", "all", "classifier", "random", "quarantine")
+ROUTINGS = ("utility", "native", "all", "classifier", "random", "quarantine", "attributed")
 BACKGROUNDS = ("classifier", "native", "all", "none")
 PRIOR_CORRECTIONS = ("none", "em", "acc")
 
@@ -57,7 +57,18 @@ def acc_prior(predicted_attack_rate: float, tpr: float, fpr: float, clip: float)
     return torch.tensor([1 - attack, attack])
 
 
-def prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
+def prediction_logits(experiment, model, x: torch.Tensor,
+                      labels: torch.Tensor | None = None) -> tuple[torch.Tensor, dict[str, float]]:
+    """Corrected logits; ``labels`` are read only for warm-up windows (attribution)."""
+
+    logits, diagnostics = _prediction_logits(experiment, model, x)
+    v2 = experiment.config.dasp_v2
+    if experiment.config.dasp.baseline == "modular_dasp_v2" and v2.attribution != "none":
+        diagnostics = diagnostics | observe_attribution(experiment, model, x, logits, labels)
+    return logits, diagnostics
+
+
+def _prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
     """Raw logits plus quarantine and label-shift corrections, and row diagnostics."""
 
     v2 = experiment.config.dasp_v2
@@ -185,6 +196,112 @@ def quarantine_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor 
     return model.logits_from_representations(representations), {
         "quarantined_modules": "|".join(sorted(quarantined)),
         **{f"quarantine_z_{name}": round(value, 4) for name, value in scores.items()}}
+
+
+def _class_conditional_z(state, columns, x: torch.Tensor, y: torch.Tensor, samples: int,
+                         minimum: int, generator) -> dict[str, float]:
+    """Count-weighted mean over classes of the robust z of group-input MMD."""
+
+    scores = {}
+    for name, cols in columns.items():
+        total, weight = 0.0, 0
+        for label, reference in state["class_reference"].items():
+            members = x[y == label]
+            if len(members) < minimum or name not in state["class_null"][label]:
+                continue
+            current = _subsample(members, samples, generator)
+            median, mad = state["class_null"][label][name]
+            distance = _group_distance(reference, current, cols, samples)
+            total += len(members) * max(0.0, (distance - median) / (1.4826 * mad))
+            weight += len(members)
+        scores[name] = total / weight if weight else float("nan")
+    return scores
+
+
+def _attribution_reference(experiment, model, state) -> None:
+    """Per-class warm-up references (warm-up labels are training data) and nulls."""
+
+    v2 = experiment.config.dasp_v2
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed + 4242)
+    windows = state.pop("warmup_labeled")
+    columns = dict(zip(model.layer_names, _group_columns(model)))
+    state["class_reference"], state["class_null"] = {}, {}
+    pooled_x = torch.cat([x for x, _ in windows])
+    pooled_y = torch.cat([y for _, y in windows])
+    for label in pooled_y.unique().tolist():
+        members = pooled_x[pooled_y == label]
+        if len(members) < 2 * v2.attribution_min_class:
+            continue
+        reference = _subsample(members, v2.quarantine_samples, generator)
+        state["class_reference"][label] = reference
+        state["class_null"][label] = {}
+        draws = [_subsample(x[y == label], v2.quarantine_samples, generator)
+                 for x, y in windows for _ in range(2) if int((y == label).sum()) >= v2.attribution_min_class]
+        if len(draws) < 3:
+            del state["class_reference"][label], state["class_null"][label]
+            continue
+        for name, cols in columns.items():
+            null = np.asarray([_group_distance(reference, draw, cols, v2.quarantine_samples) for draw in draws])
+            median = float(np.median(null))
+            state["class_null"][label][name] = (median, max(float(np.median(np.abs(null - median))),
+                                                            0.25 * median, 1e-4))
+
+
+def observe_attribution(experiment, model, x: torch.Tensor, logits: torch.Tensor,
+                        labels: torch.Tensor | None) -> dict[str, float]:
+    """Record class-conditional attribution for this window; labels only in warm-up."""
+
+    v2 = experiment.config.dasp_v2
+    state = experiment.__dict__.setdefault("_dasp_v2_attr", {"calls": 0, "scores": {}})
+    index = state["calls"]
+    state["calls"] += 1
+    warmup = experiment.config.data.warmup_windows
+    if index < warmup:
+        if labels is None:
+            raise ValueError("class-conditional attribution needs warm-up labels")
+        state.setdefault("warmup_labeled", []).append((x.detach().cpu(), labels.detach().cpu()))
+        return {}
+    if "class_reference" not in state:
+        _attribution_reference(experiment, model, state)
+    if v2.attribution != "pseudo":
+        return {}
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed + index)
+    predicted = logits.argmax(dim=1).detach().cpu()
+    columns = dict(zip(model.layer_names, _group_columns(model)))
+    scores = _class_conditional_z(state, columns, x.detach().cpu(), predicted,
+                                  v2.quarantine_samples, v2.attribution_min_class, generator)
+    state["scores"][index] = scores
+    return {f"attr_cc_z_{name}": (round(value, 4) if np.isfinite(value) else value) for name, value in scores.items()}
+
+
+def labeled_attribution(experiment, model, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
+    """Same statistic on the queried delayed labels (classes with enough labels only)."""
+
+    v2 = experiment.config.dasp_v2
+    state = experiment.__dict__.get("_dasp_v2_attr", {})
+    if "class_reference" not in state:
+        return {}
+    generator = torch.Generator().manual_seed(experiment.config.data.random_seed + 977)
+    columns = dict(zip(model.layer_names, _group_columns(model)))
+    return _class_conditional_z(state, columns, x.cpu(), y.cpu(), v2.quarantine_samples,
+                                max(8, v2.attribution_min_class // 4), generator)
+
+
+def combined_attribution(experiment, item, model, labeled: dict[str, float]) -> dict[str, float]:
+    """Class-conditional input z plus weighted representation z, per module."""
+
+    v2 = experiment.config.dasp_v2
+    if v2.attribution == "labels":
+        conditional = labeled
+    else:
+        conditional = experiment.__dict__.get("_dasp_v2_attr", {}).get("scores", {}).get(item.window.index, {})
+    representation = item.decision.z_scores or {}
+    combined = {}
+    for name in model.layer_names:
+        value = conditional.get(name, float("nan"))
+        value = 0.0 if not np.isfinite(value) else value
+        combined[name] = value + v2.attribution_repr_weight * float(representation.get(name, 0.0))
+    return combined
 
 
 def record_operating_rates(experiment, model, x: torch.Tensor, y: torch.Tensor) -> None:
@@ -395,6 +512,13 @@ def update(experiment, model, memory, item, row) -> str:
         elif v2.routing == "random":
             generator = torch.Generator().manual_seed(cfg.data.random_seed * 1009 + item.window.index)
             active = [names[i] for i in torch.randperm(len(names), generator=generator)[:v2.routing_top_k].tolist()]
+        elif v2.routing == "attributed":
+            attribution = combined_attribution(
+                experiment, item, model,
+                labeled_attribution(experiment, model, torch.cat([tx, gx]), torch.cat([ty, gy]))
+                if v2.attribution == "labels" else {})
+            row["attribution_scores"] = json.dumps({k: round(v, 4) for k, v in attribution.items()})
+            active = sorted(names, key=lambda n: (-attribution[n], names.index(n)))[:max(1, v2.routing_top_k)]
         elif v2.routing == "quarantine":
             # Repair what inference had to quarantine; otherwise the MMD attribution.
             if quarantined:

@@ -131,3 +131,81 @@ def test_end_to_end_blockwise_head_reports_head_aware_locality(tmp_path):
     background = evaluated[evaluated.selected_candidate == 'background_classifier']
     assert (background.optimizer_included_parameter_fraction < 0.2).all()
     assert (evaluated.inactive_module_max_abs_change.fillna(0) == 0).all()
+
+
+def attribution_experiment(tmp_path, mode='pseudo'):
+    cfg = load_config('configs/modular_dasp_smoke.yaml')
+    cfg.output.directory, cfg.output.run_name = str(tmp_path), 'attr'
+    cfg.dasp.baseline = 'modular_dasp_v2'
+    cfg.data.warmup_windows = 4
+    cfg.dasp_v2.attribution = mode
+    cfg.dasp_v2.quarantine_samples = 256
+    cfg.dasp_v2.attribution_min_class = 32
+    return StreamingExperiment(cfg)
+
+
+class Oracle(torch.nn.Module):
+    """Predicts the class from the sign of feature 0; enough to test attribution."""
+
+    def __init__(self, base):
+        super().__init__()
+        self.base = base
+        self.layer_names, self.feature_groups, self.feature_slices = base.layer_names, None, base.feature_slices
+
+    def forward(self, x, return_representations=False):
+        logits = torch.stack([-x[:, 0], x[:, 0]], dim=1) * 10
+        return (logits, self.base(x, return_representations=True)[1]) if return_representations else logits
+
+
+def window(n, attack_share, shift=None, seed=0):
+    generator = torch.Generator().manual_seed(seed)
+    y = (torch.rand(n, generator=generator) < attack_share).long()
+    x = torch.randn(n, 16, generator=generator)
+    x[:, 0] = x[:, 0].abs() * (2 * y - 1) + (2 * y - 1)
+    x[:, 8:12] += 2.0 * y[:, None]  # classes differ in module_3 inputs
+    if shift is not None:
+        x[:, shift] = x[:, shift] * 4 + 8
+    return x, y
+
+
+def test_attribution_reads_labels_only_during_warm_up(tmp_path):
+    outputs = []
+    for scramble in (False, True):
+        experiment = attribution_experiment(tmp_path)
+        model = Oracle(additive(4))
+        with torch.no_grad():
+            for w in range(4):
+                x, y = window(1024, 0.3, seed=w)
+                dasp_v2.prediction_logits(experiment, model, x, y)
+            x, y = window(1024, 0.3, seed=9)
+            labels = torch.randint(0, 2, y.shape) if scramble else y
+            outputs.append(dasp_v2.prediction_logits(experiment, model, x, labels))
+    assert torch.equal(outputs[0][0], outputs[1][0]) and outputs[0][1] == outputs[1][1]
+
+
+def test_class_mix_change_is_not_attributed_but_a_group_shift_is(tmp_path):
+    experiment = attribution_experiment(tmp_path)
+    model = Oracle(additive(5))
+    with torch.no_grad():
+        for w in range(4):
+            dasp_v2.prediction_logits(experiment, model, *window(1024, 0.3, seed=w))
+        _, mix = dasp_v2.prediction_logits(experiment, model, *window(1024, 0.8, seed=20))
+        _, shifted = dasp_v2.prediction_logits(experiment, model, *window(1024, 0.3, shift=slice(4, 8), seed=21))
+    scores = lambda d: {k.removeprefix('attr_cc_z_'): v for k, v in d.items() if k.startswith('attr_cc_z_')}
+    assert max(scores(mix).values()) < 6.0  # label shift alone stays near the null
+    top = max(scores(shifted), key=scores(shifted).get)
+    assert top == 'module_2' and scores(shifted)['module_2'] > 6.0
+
+
+@pytest.mark.parametrize('mode', ['pseudo', 'labels'])
+def test_end_to_end_attributed_routing(tmp_path, mode):
+    cfg = load_config('configs/modular_dasp_smoke.yaml')
+    cfg.output.directory, cfg.output.run_name = str(tmp_path), mode
+    cfg.training.model_seed = 91
+    cfg.dasp.baseline = 'modular_dasp_v2'
+    cfg.baselines.update_label_budget = 32
+    cfg.dasp_v2.attribution, cfg.dasp_v2.routing, cfg.dasp_v2.routing_top_k = mode, 'attributed', 1
+    cfg.dasp_v2.attribution_min_class = 16
+    result = StreamingExperiment(cfg).run()
+    evaluated = result.windows[~result.windows.warmup.astype(bool)]
+    assert set(evaluated.ground_truth_update_labels) == {32}
