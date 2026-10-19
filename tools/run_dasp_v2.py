@@ -80,6 +80,27 @@ GRIDS = {
                            'training.learning_rate': (5e-4, 1e-3)}),
 }
 
+# Budget-matched adaptations of published NIDS / streaming methods
+# (src/dasp_nids/sota_adapters.py), 24 configurations each. A separate suite so
+# the core development plan stays unchanged while it runs.
+_CND_THRESHOLDS = ({'sota.cnd_threshold': 'quantile', 'sota.cnd_quantile': 0.95},
+                   {'sota.cnd_threshold': 'quantile', 'sota.cnd_quantile': 0.99},
+                   {'sota.cnd_threshold': 'labelled_f1'})
+SOTA_GRIDS = {
+    'aoc_ids_adapted': _grid(**{'training.learning_rate': (3e-3, 1e-2, 3e-2), 'sota.epochs': (1, 2),
+                                'sota.aoc_flip_fraction': (0.0, 0.2), 'sota.aoc_temperature': (0.02, 0.1)}),
+    'cnd_ids_adapted': [axes | threshold
+                        for axes in _grid(**{'training.learning_rate': (5e-4, 1e-3), 'sota.epochs': (1, 3),
+                                             'sota.cnd_latent_dim': (16, 30)})
+                        for threshold in _CND_THRESHOLDS],
+    'soul_adapted': _grid(**{'training.learning_rate': (3e-3, 1e-2, 3e-2), 'sota.epochs': (1, 3),
+                             'sota.soul_alpha': (1.0, 9.0), 'sota.soul_gpm_threshold': (0.95, 0.99)}),
+    'arf_adapted': _grid(**{'sota.arf_n_models': (5, 10), 'sota.arf_leaf_prediction': ('mc', 'nba'),
+                            'sota.arf_grace_period': (50, 200), 'sota.arf_max_features': ('sqrt', '0.3', '0.6')}),
+}
+SUITES = {'core': GRIDS, 'sota': SOTA_GRIDS, 'all': GRIDS | SOTA_GRIDS}
+ALL_GRIDS = SUITES['all']
+
 
 # Fast iteration screen on development data: one default configuration per
 # method, a no-update lower bound, and DASP-v2 variants that switch one
@@ -278,14 +299,29 @@ def final_cells(args):
     return cells
 
 
-def final_conditions(selection_path):
-    selection = json.loads(Path(selection_path).read_text(encoding='utf-8'))['selection']
-    missing = set(GRIDS) - set(selection)
+def load_selection(paths):
+    """Merge dev_selection.json files (core and sota suites); a method may
+    appear in one file only."""
+
+    selection = {}
+    for path in paths:
+        part = json.loads(Path(path).read_text(encoding='utf-8'))['selection']
+        overlap = set(part) & set(selection)
+        if overlap:
+            raise ValueError(f'{path}: methods selected twice: {sorted(overlap)}')
+        selection |= part
+    return selection
+
+
+def final_conditions(selection_paths):
+    selection = load_selection(selection_paths)
+    missing = set(ALL_GRIDS) - set(selection)
     if missing:
         raise ValueError(f'dev selection lacks {sorted(missing)}')
     final = selection['modular_dasp_v2']['overrides']
     conditions = [('final', 'modular_dasp_v2', final), ('static', 'static', {})]
-    conditions += [(method, method, selection[method]['overrides']) for method in GRIDS if method != 'modular_dasp_v2']
+    conditions += [(method, method, selection[method]['overrides'])
+                   for method in ALL_GRIDS if method != 'modular_dasp_v2']
     conditions += [(name, 'modular_dasp_v2', final | delta) for name, delta in FINAL_ABLATIONS.items()]
     return conditions
 
@@ -308,7 +344,7 @@ def jobs_for(args):
         # smoke check uses contiguous modules; real streams keep semantic ones.
         grids = {method: [grid[0] | ({'model.feature_grouping': 'contiguous'}
                                      if 'model.feature_grouping' in grid[0] else {})]
-                 for method, grid in GRIDS.items()}
+                 for method, grid in SUITES[args.suite].items()}
     else:
         datasets = args.datasets or list(DEV_DATASETS)
         unknown = set(datasets) - set(DEV_DATASETS)
@@ -338,7 +374,11 @@ def jobs_for(args):
                       str(Path(args.prepared_root) / 'label_shift' / d / s / f'stream_seed{seed}.npz'))
                      for d in datasets for s in LABEL_SHIFT_SCENARIOS for seed in seeds
                      for model in DEV_MODEL_SEEDS]
-        grids = {method: grid for method, grid in GRIDS.items() if not args.methods or method in args.methods}
+        grids = {method: grid for method, grid in SUITES[args.suite].items()
+                 if not args.methods or method in args.methods}
+        outside = set(args.methods or ()) - set(SUITES[args.suite])
+        if args.stage == 'dev' and outside:
+            raise ValueError(f'methods outside the {args.suite} suite: {sorted(outside)}')
     if args.stage == 'screen':
         conditions = [(name, method, overrides) for name, (method, overrides) in SCREEN.items()
                       if not args.methods or name in args.methods]
@@ -389,7 +429,7 @@ def run(args):
     root = Path(args.output_root)
     root.mkdir(parents=True, exist_ok=True)
     plan = {'version': VERSION, 'stage': args.stage, 'planned_runs': len(jobs), 'jobs': jobs,
-            'grid_sizes': {method: len(grid) for method, grid in GRIDS.items()},
+            'grid_sizes': {method: len(grid) for method, grid in SUITES[args.suite].items()},
             'label_contract': 'label-blind uniform 128 queries per window for every method',
             'confirmation_data_read': False}
     write_plan(root, args.stage, plan)
@@ -447,11 +487,15 @@ def parser():
     p.add_argument('--datasets', nargs='+')
     p.add_argument('--scenarios', nargs='+', choices=PRIMARY_SCENARIOS)
     p.add_argument('--stream-seeds', nargs='+', type=int)
-    p.add_argument('--methods', nargs='+', choices=sorted(set(GRIDS) | set(SCREEN)),
-                   help='dev: method names; screen: condition names')
+    p.add_argument('--suite', choices=sorted(SUITES), default='core',
+                   help='dev/smoke: core methods (default), sota adapters, or all')
+    p.add_argument('--methods', nargs='+', choices=sorted(set(ALL_GRIDS) | set(SCREEN) | set(FINAL_ABLATIONS)
+                                                          | {'final', 'static'}),
+                   help='dev: method names; screen: condition names; final: condition names')
     p.add_argument('--tracks', default=','.join(DEV_TRACKS),
                    help='dev stage: comma list of controlled, feature_shift (moderate FS/FR), label_shift')
-    p.add_argument('--selection', type=Path, help='final stage: dev_selection.json from analyze_dasp_v2')
+    p.add_argument('--selection', type=Path, nargs='+',
+                   help='final stage: dev_selection.json files from analyze_dasp_v2 (core and sota)')
     p.add_argument('--natural', action='store_true',
                    help='use whole-capture chronological development streams instead of controlled scenarios')
     p.add_argument('--feature-shift', action='store_true',

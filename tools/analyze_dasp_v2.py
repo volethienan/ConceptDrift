@@ -264,7 +264,8 @@ def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_
 
 
 HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017')
-BASELINES = ('online_mlp', 'experience_replay', 'agem', 'online_ewc_v2', 'ssf_budget', 'cdda_md_v2', 'static')
+BASELINES = ('online_mlp', 'experience_replay', 'agem', 'online_ewc_v2', 'ssf_budget', 'cdda_md_v2',
+             'aoc_ids_adapted', 'cnd_ids_adapted', 'soul_adapted', 'arf_adapted', 'static')
 ABLATIONS = ('final_strict_locality', 'final_route_random', 'final_route_head_only', 'final_route_all',
              'final_contiguous_modules', 'final_no_logit_adjustment', 'final_no_prior_correction')
 GROUP_ORDER = ('volume', 'timing', 'tcp', 'protocol')

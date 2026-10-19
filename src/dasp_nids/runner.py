@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import gc
+import hashlib
 import json
 import os
 import pickle
@@ -44,7 +45,7 @@ from .baselines import (
     train_ssf,
 )
 from .config import ExperimentConfig
-from . import dasp_v2, original_review
+from . import dasp_v2, original_review, sota_adapters
 from .feature_groups import semantic_groups
 from .data import (
     PreparedStream,
@@ -164,6 +165,10 @@ METHODS = {
     "river_arf",
 }
 METHODS.update(REVISION_METHODS)
+
+# Budget-matched adaptations of published baselines (sota_adapters.py).
+SOTA_ADAPTER_METHODS = set(sota_adapters.ADAPTERS)
+METHODS.update(SOTA_ADAPTER_METHODS)
 
 REVISION_ROUTING_METHODS = REVISION_METHODS - {"revision_a10_ssf"}
 
@@ -3107,6 +3112,8 @@ class StreamingExperiment:
         stream = self._apply_revision_feature_permutation(self._load_stream())
         if cfg.dasp.baseline in RIVER_METHODS:
             return self._run_river_stream(stream)
+        if cfg.dasp.baseline in SOTA_ADAPTER_METHODS:
+            return self._run_adapter_stream(stream)
         self._feature_names = list(stream.feature_names)
         model = self._build_model(len(stream.feature_names), len(stream.class_names)).to(
             self.device
@@ -3965,6 +3972,166 @@ class StreamingExperiment:
                 },
                 "internal_drifts": counter("n_drifts_detected"),
                 "internal_warnings": counter("n_warnings_detected"),
+            }
+        )
+        output_dir = self._write_outputs(rows, summary)
+        return ExperimentResult(
+            output_dir, summary, pd.DataFrame(rows).sort_values("window")
+        )
+
+    def _evaluate_adapter(
+        self, adapter, window: StreamWindow, n_classes: int
+    ) -> dict[str, float | int]:
+        self._last_preprocessing_seconds = 0.0
+        forward_started = time.perf_counter()
+        predicted, attack_score = adapter.predict(window.x)
+        self._last_forward_seconds = time.perf_counter() - forward_started
+        metric_started = time.perf_counter()
+        predicted = np.asarray(predicted, dtype=np.int64)
+        self._last_predictions = predicted.copy()
+        result = classification_metrics(
+            np.asarray(window.y.tolist(), dtype=np.int64),
+            predicted,
+            n_classes,
+            y_score=np.asarray(attack_score, dtype=np.float64),
+        )
+        result.update(self._subtype_recall_metrics(window, predicted))
+        # Lets tests show predictions never depend on unqueried labels.
+        result["prediction_digest"] = hashlib.sha256(
+            predicted.astype(np.int8).tobytes()
+        ).hexdigest()[:16]
+        self._last_metric_seconds = time.perf_counter() - metric_started
+        return result
+
+    def _update_adapter(
+        self, adapter, window: StreamWindow, row: dict[str, object]
+    ) -> None:
+        cfg = self.config
+        started = time.perf_counter()
+        query = _label_blind_uniform_query_indices(
+            len(window.x),
+            cfg.baselines.update_label_budget,
+            cfg.data.random_seed + window.index * 104729 + 17,
+        )
+        if not len(query):
+            raise RuntimeError(f"{cfg.dasp.baseline} selected no label queries")
+        # The adapter sees the window's features and the queried labels only.
+        info = adapter.update(window.x, query, window.y[query])
+        row.update(info)
+        row["ground_truth_update_labels"] = len(query)
+        row["label_query_policy"] = "uniform_label_blind"
+        row["accepted"] = "online"
+        row["selected_candidate"] = cfg.dasp.baseline
+        row["rss_bytes"] = max(
+            int(row.get("rss_bytes", 0)), int(self._process.memory_info().rss)
+        )
+        row["update_seconds"] = time.perf_counter() - started
+
+    def _run_adapter_stream(self, stream: PreparedStream) -> ExperimentResult:
+        cfg = self.config
+        model_seed = (
+            cfg.data.random_seed
+            if cfg.training.model_seed is None
+            else int(cfg.training.model_seed)
+        )
+        n_classes = len(stream.class_names)
+        adapter = sota_adapters.build(
+            cfg, len(stream.feature_names), n_classes, model_seed
+        )
+        rows: list[dict[str, object]] = []
+        row_lookup: dict[int, dict[str, object]] = {}
+        warmup_labels = 0
+        for window in stream.windows[: cfg.data.warmup_windows]:
+            row = self._base_row(
+                window, self._evaluate_adapter(adapter, window, n_classes), warmup=True
+            )
+            started = time.perf_counter()
+            row.update(adapter.warmup(window.x, window.y))
+            row["update_seconds"] = time.perf_counter() - started
+            warmup_labels += len(window.y)
+            rows.append(row)
+            row_lookup[window.index] = row
+        started = time.perf_counter()
+        rows[-1].update(adapter.end_warmup())
+        rows[-1]["update_seconds"] = float(rows[-1]["update_seconds"]) + (
+            time.perf_counter() - started
+        )
+
+        pending: list[StreamWindow] = []
+        for window in stream.windows[cfg.data.warmup_windows :]:
+            row = self._base_row(
+                window, self._evaluate_adapter(adapter, window, n_classes), warmup=False
+            )
+            rows.append(row)
+            row_lookup[window.index] = row
+            pending.append(window)
+            if len(pending) > cfg.training.label_delay:
+                labeled = pending.pop(0)
+                self._update_adapter(adapter, labeled, row_lookup[labeled.index])
+        for labeled in pending:
+            self._update_adapter(adapter, labeled, row_lookup[labeled.index])
+
+        evaluated = [row for row in rows if not row["warmup"]]
+        summary = summarize_windows(rows, cfg.data.warmup_windows)
+        summary.update(_latency_summary(rows, cfg.data.warmup_windows))
+        summary.update(
+            {
+                "method": cfg.dasp.baseline,
+                "adapter_version": sota_adapters.ADAPTER_VERSION,
+                "source": cfg.data.source,
+                "scenario": cfg.data.scenario,
+                "seed": cfg.data.random_seed,
+                "stream_seed": (
+                    cfg.data.random_seed
+                    if cfg.data.stream_seed is None
+                    else cfg.data.stream_seed
+                ),
+                "model_seed": model_seed,
+                "n_features": len(stream.feature_names),
+                "n_classes": n_classes,
+                "total_update_seconds": float(
+                    sum(float(row.get("update_seconds", 0.0)) for row in rows)
+                ),
+                # Post-warm-up sample-gradients; comparable within one method.
+                "total_gradient_evaluations": int(
+                    sum(int(row.get("gradient_evaluations", 0)) for row in evaluated)
+                ),
+                "total_sample_updates": int(
+                    sum(int(row.get("sample_updates", 0)) for row in evaluated)
+                ),
+                "total_ground_truth_update_labels": int(
+                    sum(int(row.get("ground_truth_update_labels", 0)) for row in rows)
+                ),
+                "warmup_labels": warmup_labels,
+                "total_pseudo_labels_used": int(
+                    sum(int(row.get("pseudo_labels_used", 0)) for row in rows)
+                ),
+                "reference_resets": 0,
+                "global_update_count": 0,
+                "peak_rss_bytes": int(max(int(row.get("rss_bytes", 0)) for row in rows)),
+                "run_start_rss_bytes": self._run_start_rss_bytes,
+                "peak_rss_increment_bytes": max(
+                    0,
+                    int(max(int(row.get("rss_bytes", 0)) for row in rows))
+                    - self._run_start_rss_bytes,
+                ),
+                "model_parameter_bytes": adapter.model_bytes(),
+                "memory_payload_bytes": adapter.memory_bytes(),
+                "peak_cuda_allocated_bytes": 0,
+                "peak_cuda_reserved_bytes": 0,
+                "environment": {
+                    "python": sys.version.split()[0],
+                    "platform": platform.platform(),
+                    "processor": platform.processor(),
+                    "logical_cpu_count": psutil.cpu_count(logical=True),
+                    "torch": torch.__version__,
+                    "numpy": np.__version__,
+                    "pandas": pd.__version__,
+                    "scikit_learn": sklearn.__version__,
+                    "scipy": scipy.__version__,
+                    "device": str(self.device),
+                    "torch_threads": torch.get_num_threads(),
+                },
             }
         )
         output_dir = self._write_outputs(rows, summary)

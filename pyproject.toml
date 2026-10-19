@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-river = ["river>=0.25,<0.26"]
+river = ["river==0.23.0"]
 
 [project.scripts]
 dasp-nids = "dasp_nids.cli:main"

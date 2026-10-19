@@ -407,6 +407,45 @@ class DaspV2Config:
 
 
 @dataclass
+class SotaConfig:
+    """Budget-matched adaptations of published baselines (sota_adapters.py).
+
+    Learning rate and weight decay come from ``training``; buffers are sized by
+    ``dasp.memory_size`` so every replaying method gets the same memory.
+    """
+
+    warmup_epochs: int = 4
+    epochs: int = 1
+    # Recent queried label sets kept to calibrate decision thresholds.
+    calibration_windows: int = 8
+    # AOC-IDS (Zhang et al., INFOCOM 2024): CRC temperature, pseudo-label flips.
+    aoc_temperature: float = 0.02
+    aoc_flip_fraction: float = 0.2
+    # CND-IDS (Fuhrman et al., DAC 2025).
+    cnd_latent_dim: int = 30
+    cnd_threshold: str = "quantile"  # quantile | labelled_f1
+    cnd_quantile: float = 0.95
+    cnd_margin: float = 2.0
+    cnd_lwf_strength: float = 0.1
+    cnd_reg_strength: float = 0.1
+    cnd_max_teachers: int = 5
+    cnd_cluster_options: list[int] = field(default_factory=lambda: [100, 300, 500, 1000, 2000])
+    # SOUL (Amalapuram et al., 2024).
+    soul_alpha: float = 9.0
+    soul_memory_batch_fraction: float = 0.2
+    soul_minority_allocation: float = 0.3
+    soul_gpm_threshold: float = 0.95
+    soul_gpm_hidden_threshold: float = 0.99
+    soul_gpm_samples: int = 1000
+    # Adaptive Random Forest (Gomes et al., 2017; River).
+    arf_n_models: int = 10
+    arf_lambda: float = 6.0
+    arf_grace_period: int = 50
+    arf_max_features: str = "sqrt"
+    arf_leaf_prediction: str = "nba"  # mc (majority class) | nb | nba
+
+
+@dataclass
 class ExperimentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
@@ -418,6 +457,7 @@ class ExperimentConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     original_review: OriginalReviewConfig = field(default_factory=OriginalReviewConfig)
     dasp_v2: DaspV2Config = field(default_factory=DaspV2Config)
+    sota: SotaConfig = field(default_factory=SotaConfig)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -441,4 +481,5 @@ def load_config(path: str | Path) -> ExperimentConfig:
         output=_construct(OutputConfig, raw.get("output")),
         original_review=_construct(OriginalReviewConfig, raw.get("original_review")),
         dasp_v2=_construct(DaspV2Config, raw.get("dasp_v2")),
+        sota=_construct(SotaConfig, raw.get("sota")),
     )

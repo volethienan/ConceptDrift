@@ -9,7 +9,7 @@ import pytest
 from tools.analyze_dasp_v2 import (cell_differences, compare_family, construct_eligible_cells,
                                    hierarchical_bootstrap, holm, select_configurations)
 from tools.analyze_original_review import load_completed
-from tools.run_dasp_v2 import GRIDS, apply_overrides, config_id, configure, jobs_for, parser, run
+from tools.run_dasp_v2 import ALL_GRIDS, GRIDS, apply_overrides, config_id, configure, jobs_for, parser, run
 
 
 def test_every_method_gets_exactly_24_distinct_configurations():
@@ -131,13 +131,13 @@ def test_phase_metrics_measure_response_and_recurrence():
 
 def test_final_plan_uses_selected_configurations_and_only_unseen_seeds(tmp_path):
     from tools.run_dasp_v2 import FINAL_ABLATIONS, HELDOUT_DATASETS
-    selection = {'selection': {method: {'overrides': grid[3]} for method, grid in GRIDS.items()}}
+    selection = {'selection': {method: {'overrides': grid[3]} for method, grid in ALL_GRIDS.items()}}
     path = tmp_path / 'dev_selection.json'
     path.write_text(json.dumps(selection), encoding='utf-8')
     args = parser().parse_args(['--stage', 'final', '--output-root', str(tmp_path), '--selection', str(path)])
     jobs = jobs_for(args)
     conditions = {job['condition'] for job in jobs}
-    assert conditions == {'final', 'static', *(m for m in GRIDS if m != 'modular_dasp_v2'), *FINAL_ABLATIONS}
+    assert conditions == {'final', 'static', *(m for m in ALL_GRIDS if m != 'modular_dasp_v2'), *FINAL_ABLATIONS}
     final = next(job for job in jobs if job['condition'] == 'final')
     assert final['overrides'] == GRIDS['modular_dasp_v2'][3]
     strict = next(job for job in jobs if job['condition'] == 'final_strict_locality')
