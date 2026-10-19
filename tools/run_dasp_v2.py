@@ -36,7 +36,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'screen', 'smoke')
+STAGES = ('dev', 'final', 'screen', 'smoke')
 
 
 def _grid(**axes):
@@ -44,14 +44,22 @@ def _grid(**axes):
     return [dict(zip(names, values)) for values in itertools.product(*axes.values())]
 
 
-# Pre-registration section 5: exactly 24 configurations per method.
+# Final method (chosen on development screens): semantic feature-group modules,
+# class-conditional pseudo-label drift attribution steering the repair routing
+# (top-1 module), class-balanced replay, batch-prior logit adjustment and ACC
+# prior correction. STRICT keeps the same method with a blockwise head, so a
+# repair changes only the attributed module, its head block and the last layer.
+FINAL_METHOD = {
+    'model.feature_grouping': 'semantic', 'dasp_v2.logit_adjustment_prior': 'batch',
+    'dasp_v2.prior_correction': 'acc', 'dasp_v2.prior_strength': 0.5, 'dasp_v2.routing': 'attributed',
+    'dasp_v2.routing_top_k': 1, 'dasp_v2.attribution': 'pseudo', 'dasp_v2.attribution_repr_weight': 0.0}
+
+# Exactly 24 configurations per method, tuned on development data only.
 GRIDS = {
     'modular_dasp_v2': [
-        {'model.modular_head_dim': head, 'dasp_v2.gate_min_support': support,
-         'dasp_v2.gate_threshold': threshold, 'dasp_v2.routing_top_k': top_k,
-         'dasp_v2.logit_adjustment_tau': tau}
-        for head in (0, 16) for support, threshold in ((20, .80), (20, .70), (40, .80))
-        for top_k in (1, 2) for tau in (0.0, 1.0)],
+        FINAL_METHOD | {'dasp_v2.logit_adjustment_tau': tau, 'dasp_v2.prior_strength': strength,
+                        'dasp_v2.repair_epochs': epochs, 'training.learning_rate': lr}
+        for tau in (0.5, 1.0) for strength in (0.0, 0.5) for epochs in (1, 2) for lr in (5e-4, 1e-3, 2e-3)],
     'online_mlp': _grid(**{'training.learning_rate': (2.5e-4, 5e-4, 1e-3, 2e-3),
                            'training.epochs_per_window': (1, 2, 4),
                            'training.weight_decay': (1e-4, 1e-3)}),
@@ -206,12 +214,101 @@ def apply_overrides(cfg, overrides):
         setattr(target, name, value)
 
 
+DEV_TRACKS = ('controlled', 'feature_shift', 'label_shift')
+FEATURE_SHIFT_MODERATE = tuple(f'{kind}-{group}' for kind in ('FS', 'FR')
+                               for group in ('volume', 'timing', 'tcp', 'protocol'))
+HELDOUT_DATASETS = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017')
+CONFIRMATION_SEEDS = (3001, 3002, 3003, 3004, 3005)
+LABEL_SHIFT_SEEDS = (3001, 3002, 3003)
+FINAL_MODEL_SEEDS = (91, 92)
+# Dev datasets also have confirmation seeds; reported separately as seen-dataset results.
+DEV_CONFIRMATION_SEEDS = {'nf-bot-iot-v3': CONFIRMATION_SEEDS, 'nf-unsw-nb15-v3': (3001, 3002)}
+NATURAL_HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
+FINAL_ABLATIONS = {
+    'final_strict_locality': {'model.modular_head_type': 'blockwise'},
+    'final_route_random': {'dasp_v2.routing': 'random'},
+    'final_route_head_only': {'dasp_v2.routing': 'classifier'},
+    'final_route_all': {'dasp_v2.routing': 'all'},
+    'final_contiguous_modules': {'model.feature_grouping': 'contiguous'},
+    'final_no_logit_adjustment': {'dasp_v2.logit_adjustment_tau': 0.0},
+    'final_no_prior_correction': {'dasp_v2.prior_correction': 'none'},
+}
+
+
+def stream_path(root, dataset, scenario, seed):
+    root = Path(root)
+    if scenario == NATURAL_SCENARIO:
+        return str(root / 'natural' / dataset / scenario / f'stream_seed{seed}.npz')
+    if scenario.startswith(('FS-', 'FR-', 'XS-', 'XR-')):
+        return str(root / 'feature_shift' / dataset / scenario / f'stream_seed{seed}.npz')
+    if scenario.startswith('L') and scenario[1].isdigit():
+        return str(root / 'label_shift' / dataset / scenario / f'stream_seed{seed}.npz')
+    return str(root / dataset / scenario / f'stream_seed{seed}.npz')
+
+
+def dev_cells(args, datasets, seeds):
+    tracks = args.tracks.split(',')
+    scenarios = []
+    if 'controlled' in tracks:
+        scenarios += list(args.scenarios or PRIMARY_SCENARIOS)
+    if 'feature_shift' in tracks:
+        scenarios += list(FEATURE_SHIFT_MODERATE)
+    if 'label_shift' in tracks:
+        scenarios += list(LABEL_SHIFT_SCENARIOS)
+    return [(d, s, seed, model, stream_path(args.prepared_root, d, s, seed))
+            for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
+
+
+def final_cells(args):
+    cells = []
+    scenario_sets = (list(PRIMARY_SCENARIOS) + list(FEATURE_SHIFT_SCENARIOS), CONFIRMATION_SEEDS), \
+        (list(LABEL_SHIFT_SCENARIOS), LABEL_SHIFT_SEEDS)
+    for dataset in HELDOUT_DATASETS:
+        for scenarios, seeds in scenario_sets:
+            cells += [(dataset, s, seed, m, stream_path(args.prepared_root, dataset, s, seed))
+                      for s in scenarios for seed in seeds for m in FINAL_MODEL_SEEDS]
+    for dataset in NATURAL_HELDOUT:
+        cells += [(dataset, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, dataset, NATURAL_SCENARIO, seed))
+                  for seed in LABEL_SHIFT_SEEDS for m in FINAL_MODEL_SEEDS]
+    for dataset, seeds in DEV_CONFIRMATION_SEEDS.items():
+        cells += [(dataset, s, seed, m, stream_path(args.prepared_root, dataset, s, seed))
+                  for s in PRIMARY_SCENARIOS for seed in seeds for m in FINAL_MODEL_SEEDS]
+    if args.datasets:
+        cells = [cell for cell in cells if cell[0] in args.datasets]
+    return cells
+
+
+def final_conditions(selection_path):
+    selection = json.loads(Path(selection_path).read_text(encoding='utf-8'))['selection']
+    missing = set(GRIDS) - set(selection)
+    if missing:
+        raise ValueError(f'dev selection lacks {sorted(missing)}')
+    final = selection['modular_dasp_v2']['overrides']
+    conditions = [('final', 'modular_dasp_v2', final), ('static', 'static', {})]
+    conditions += [(method, method, selection[method]['overrides']) for method in GRIDS if method != 'modular_dasp_v2']
+    conditions += [(name, 'modular_dasp_v2', final | delta) for name, delta in FINAL_ABLATIONS.items()]
+    return conditions
+
+
 def jobs_for(args):
+    if args.stage == 'final':
+        if not args.selection:
+            raise ValueError('the final stage needs --selection pointing to dev_selection.json')
+        cells, conditions = final_cells(args), final_conditions(args.selection)
+        if args.methods:
+            conditions = [c for c in conditions if c[0] in args.methods]
+        return [dict(stage='final', dataset=d, scenario=s, stream_seed=seed, model_seed=m, method=method,
+                     condition=name, overrides=overrides, stream=stream)
+                for d, s, seed, m, stream in cells for name, method, overrides in conditions]
     if args.stage == 'smoke':
         path = Path(args.output_root) / '_fixtures' / 'synthetic_smoke.npz'
         _smoke_stream(path)
         cells = [('synthetic-smoke', 'S1', 2001, 91, str(path))]
-        grids = {method: grid[:1] for method, grid in GRIDS.items()}
+        # The synthetic smoke stream has no documented feature schema, so the
+        # smoke check uses contiguous modules; real streams keep semantic ones.
+        grids = {method: [grid[0] | ({'model.feature_grouping': 'contiguous'}
+                                     if 'model.feature_grouping' in grid[0] else {})]
+                 for method, grid in GRIDS.items()}
     else:
         datasets = args.datasets or list(DEV_DATASETS)
         unknown = set(datasets) - set(DEV_DATASETS)
@@ -220,9 +317,12 @@ def jobs_for(args):
         seeds = args.stream_seeds or list(DEV_STREAM_SEEDS)
         if set(seeds) - set(DEV_STREAM_SEEDS):
             raise ValueError('the development stage never reads confirmation seeds')
-        scenarios = args.scenarios or PRIMARY_SCENARIOS
-        cells = [(d, s, seed, model, str(Path(args.prepared_root) / d / s / f'stream_seed{seed}.npz'))
-                 for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
+        if args.stage == 'dev':
+            cells = dev_cells(args, datasets, seeds)
+        else:
+            scenarios = args.scenarios or PRIMARY_SCENARIOS
+            cells = [(d, s, seed, model, str(Path(args.prepared_root) / d / s / f'stream_seed{seed}.npz'))
+                     for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
         if args.natural:
             natural = [d for d in (args.datasets or NATURAL_DEV_DATASETS) if d in NATURAL_DEV_DATASETS]
             cells = [(d, NATURAL_SCENARIO, seed, model,
@@ -349,6 +449,9 @@ def parser():
     p.add_argument('--stream-seeds', nargs='+', type=int)
     p.add_argument('--methods', nargs='+', choices=sorted(set(GRIDS) | set(SCREEN)),
                    help='dev: method names; screen: condition names')
+    p.add_argument('--tracks', default=','.join(DEV_TRACKS),
+                   help='dev stage: comma list of controlled, feature_shift (moderate FS/FR), label_shift')
+    p.add_argument('--selection', type=Path, help='final stage: dev_selection.json from analyze_dasp_v2')
     p.add_argument('--natural', action='store_true',
                    help='use whole-capture chronological development streams instead of controlled scenarios')
     p.add_argument('--feature-shift', action='store_true',

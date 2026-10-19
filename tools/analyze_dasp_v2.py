@@ -61,6 +61,8 @@ def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
 
     points = CHANGE_POINTS.get(scenario, ())
     post = [mean_from(point) for point in points]
+    if 'optimizer_included_parameter_fraction' in evaluated:
+        counts['optimizer_fraction'] = float(evaluated.optimizer_included_parameter_fraction.mean())
     return counts | {'post_change_f1': float(np.nanmean(post)) if post else np.nan,
                      'recurrence_f1': mean_from(RECURRENCE_START[scenario]) if scenario in RECURRENCE_START else np.nan}
 CELL = ['dataset', 'scenario']
@@ -77,10 +79,7 @@ def runs_frame(records: list[dict], root: Path | None = None) -> pd.DataFrame:
     for record in records:
         summary = record['summary']
         phases = ({} if root is None else
-                  phase_metrics(pd.read_csv(run_directory(root, record) / 'windows.csv',
-                                            usecols=['window', 'warmup', 'macro_f1', 'attack_tp',
-                                                     'attack_fn', 'attack_fp', 'attack_tn']),
-                                record['scenario']))
+                  phase_metrics(pd.read_csv(run_directory(root, record) / 'windows.csv'), record['scenario']))
         cost = summary.get('total_overall_gradient_evaluations', summary.get('total_gradient_evaluations'))
         rows.append({key: record[key] for key in (*PAIR, 'method', 'condition')}
                     | {'overrides': json.dumps(record['overrides'], sort_keys=True),
@@ -264,15 +263,94 @@ def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_
     return result
 
 
+HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017')
+BASELINES = ('online_mlp', 'experience_replay', 'agem', 'online_ewc_v2', 'ssf_budget', 'cdda_md_v2', 'static')
+ABLATIONS = ('final_strict_locality', 'final_route_random', 'final_route_head_only', 'final_route_all',
+             'final_contiguous_modules', 'final_no_logit_adjustment', 'final_no_prior_correction')
+GROUP_ORDER = ('volume', 'timing', 'tcp', 'protocol')
+
+
+def track_of(scenario: str) -> str:
+    if scenario == 'Natural-Chronological':
+        return 'natural'
+    if scenario.startswith(('FS-', 'FR-')):
+        return 'feature_shift_moderate'
+    if scenario.startswith(('XS-', 'XR-')):
+        return 'feature_shift_severe'
+    if scenario.startswith('L') and scenario[1].isdigit():
+        return 'label_shift'
+    return 'attack_family'
+
+
+def attribution_table(root: Path, frame: pd.DataFrame) -> list[dict]:
+    """Top-1 class-conditional attribution of the final method at shift onset."""
+
+    rows = []
+    for record in frame[(frame.condition == 'final') & frame.track.str.startswith('feature_shift')].itertuples():
+        windows = pd.read_csv(run_directory(root, {'stage': 'final', 'dataset': record.dataset,
+                                                   'scenario': record.scenario, 'condition': 'final',
+                                                   'stream_seed': record.stream_seed,
+                                                   'model_seed': record.model_seed}) / 'windows.csv')
+        columns = [f'attr_cc_z_module_{i}' for i in range(1, 5)]
+        if not set(columns) <= set(windows):
+            continue
+        onset = windows[windows.window.between(12, 15)][columns].astype(float).fillna(0.0).to_numpy()
+        target = GROUP_ORDER.index(record.scenario.split('-')[1])
+        rows.append({'dataset': record.dataset, 'track': record.track, 'group': GROUP_ORDER[target],
+                     'top1': float(np.mean(onset.argmax(axis=1) == target))})
+    if not rows:
+        return []
+    table = pd.DataFrame(rows).groupby(['dataset', 'track', 'group']).top1.mean().reset_index()
+    return json.loads(table.to_json(orient='records'))
+
+
+def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
+    records = load_completed(output_root, 'final')
+    plan = json.loads((output_root / 'final_plan.json').read_text(encoding='utf-8'))
+    if len(records) != plan['planned_runs'] and not allow_incomplete:
+        raise ValueError(f"final stage incomplete: {len(records)}/{plan['planned_runs']}")
+    frame = runs_frame(records, output_root)
+    frame['track'] = frame.scenario.map(track_of)
+    frame['split'] = np.where(frame.dataset.isin(HELDOUT), 'held_out', 'dev_dataset_new_seeds')
+    frame.to_csv(output_root / 'final_runs.csv', index=False)
+    metrics = ['mean_macro_f1', 'cumulative_macro_f1', 'cumulative_attack_recall', 'cumulative_benign_fpr',
+               'post_change_f1', 'recurrence_f1', 'gradient_cost']
+    summary = frame.groupby(['split', 'track', 'condition'])[metrics].mean().reset_index()
+    summary.to_csv(output_root / 'final_summary.csv', index=False)
+    frame.pivot_table(index=['split', 'track', 'dataset'], columns='condition', values='mean_macro_f1') \
+        .to_csv(output_root / 'final_by_dataset.csv')
+    contrasts = {}
+    for (split, track), part in frame.groupby(['split', 'track']):
+        metric = 'cumulative_macro_f1' if track == 'natural' else 'mean_macro_f1'
+        present = set(part.condition)
+        families = {'baselines': [c for c in BASELINES if c in present],
+                    'ablations': [c for c in ABLATIONS if c in present]}
+        contrasts[f'{split}/{track}'] = {
+            name: compare_family(part, 'final', conditions, None, replicates, metric)
+            for name, conditions in families.items() if conditions and 'final' in present}
+    locality = frame[frame.condition.isin(['final', 'final_strict_locality'])]
+    result = {'stage': 'final', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
+              'reference': 'final', 'positive_difference_means': 'condition better than final',
+              'contrasts': contrasts, 'attribution_top1': attribution_table(output_root, frame),
+              'note': 'held-out datasets were not used for any design or tuning decision'}
+    if 'optimizer_fraction' in locality:
+        result['locality'] = locality.groupby('condition').optimizer_fraction.mean().to_dict()
+    (output_root / 'final_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'screen'), default='dev')
+    parser.add_argument('--stage', choices=('dev', 'screen', 'final'), default='dev')
     parser.add_argument('--output-root', type=Path, required=True)
     parser.add_argument('--prepared-root', type=Path, default=Path('prepared_streams_v2'))
     parser.add_argument('--reference', default='v2_linear')
     parser.add_argument('--allow-incomplete', action='store_true')
     arguments = parser.parse_args()
-    if arguments.stage == 'screen':
+    if arguments.stage == 'final':
+        report = analyze_final(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'final_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'screen':
         report = analyze_screen(arguments.output_root, arguments.prepared_root, arguments.reference)
         print(pd.DataFrame(report['table']).to_string(index=False, float_format=lambda v: f'{v:.4f}'))
     else:

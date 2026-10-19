@@ -23,7 +23,8 @@ def test_every_method_gets_exactly_24_distinct_configurations():
 def test_dev_plan_covers_only_development_data(tmp_path):
     args = parser().parse_args(['--stage', 'dev', '--output-root', str(tmp_path)])
     jobs = jobs_for(args)
-    assert len(jobs) == 7 * 24 * 2 * 10 * 3
+    # 10 attack-family + 8 moderate feature-shift + 3 label-shift scenarios.
+    assert len(jobs) == 7 * 24 * 2 * (10 + 8 + 3) * 3
     assert {job['stream_seed'] for job in jobs} == {2001, 2002, 2003}
     assert {job['dataset'] for job in jobs} == {'nf-bot-iot-v3', 'nf-unsw-nb15-v3'}
     for bad in (['--stream-seeds', '3001'], ['--datasets', 'cic-ids2017']):
@@ -35,7 +36,8 @@ def test_overrides_reach_the_config_and_unknown_fields_fail(tmp_path):
     args = parser().parse_args(['--stage', 'smoke', '--output-root', str(tmp_path)])
     job = next(j for j in jobs_for(args) if j['method'] == 'modular_dasp_v2')
     cfg = configure(args, job)
-    assert cfg.model.modular_head_dim == job['overrides']['model.modular_head_dim']
+    assert cfg.dasp_v2.routing == job['overrides']['dasp_v2.routing'] == 'attributed'
+    assert cfg.model.feature_grouping == 'contiguous'  # smoke stream has no schema
     assert cfg.baselines.update_label_budget == 128 and not cfg.original_review.enabled
     with pytest.raises(ValueError, match='unknown config field'):
         apply_overrides(cfg, {'dasp_v2.not_a_field': 1})
@@ -125,3 +127,25 @@ def test_phase_metrics_measure_response_and_recurrence():
     assert recurrent['recurrence_f1'] == pytest.approx(0.6)
     stationary = phase_metrics(windows, 'S0')
     assert np.isnan(stationary['post_change_f1']) and np.isnan(stationary['recurrence_f1'])
+
+
+def test_final_plan_uses_selected_configurations_and_only_unseen_seeds(tmp_path):
+    from tools.run_dasp_v2 import FINAL_ABLATIONS, HELDOUT_DATASETS
+    selection = {'selection': {method: {'overrides': grid[3]} for method, grid in GRIDS.items()}}
+    path = tmp_path / 'dev_selection.json'
+    path.write_text(json.dumps(selection), encoding='utf-8')
+    args = parser().parse_args(['--stage', 'final', '--output-root', str(tmp_path), '--selection', str(path)])
+    jobs = jobs_for(args)
+    conditions = {job['condition'] for job in jobs}
+    assert conditions == {'final', 'static', *(m for m in GRIDS if m != 'modular_dasp_v2'), *FINAL_ABLATIONS}
+    final = next(job for job in jobs if job['condition'] == 'final')
+    assert final['overrides'] == GRIDS['modular_dasp_v2'][3]
+    strict = next(job for job in jobs if job['condition'] == 'final_strict_locality')
+    assert strict['overrides'] == GRIDS['modular_dasp_v2'][3] | {'model.modular_head_type': 'blockwise'}
+    assert {job['stream_seed'] for job in jobs}.isdisjoint({2001, 2002, 2003})
+    held_out = [job for job in jobs if job['dataset'] in HELDOUT_DATASETS]
+    cells = {(j['dataset'], j['scenario'], j['stream_seed'], j['model_seed']) for j in held_out}
+    # 3 datasets x (26 controlled/feature-shift x 5 seeds + 3 label-shift x 3 seeds) x 2 models + natural
+    assert len(cells) == 3 * (26 * 5 + 3 * 3) * 2 + 2 * 3 * 2
+    with pytest.raises(ValueError, match='selection'):
+        jobs_for(parser().parse_args(['--stage', 'final', '--output-root', str(tmp_path)]))

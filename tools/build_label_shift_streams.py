@@ -41,6 +41,11 @@ SCENARIOS = ('L1-Burst', 'L2-Ramp', 'L3-Swing')
 SHIFT = {
     'nf-unsw-nb15-v3': {'minority': 'attack', 'base': 221 / 4096, 'high': 0.25, 'low': 0.01},
     'nf-bot-iot-v3': {'minority': 'benign', 'base': 13 / 4096, 'high': 0.12, 'low': 13 / 4096},
+    # Held-out datasets: base = capture prevalence; peaks feasible for three
+    # disjoint seeds (NF-ToN's natural capture itself swings up to 94%).
+    'nf-cse-cic-ids2018-v3': {'minority': 'attack', 'base': 528 / 4096, 'high': 0.60, 'low': 0.02},
+    'nf-ton-iot-v3': {'minority': 'attack', 'base': 1597 / 4096, 'high': 0.80, 'low': 0.05},
+    'cic-ids2017': {'minority': 'attack', 'base': 807 / 4096, 'high': 0.60, 'low': 0.02},
 }
 SEGMENTS = ((0, 4), (4, 12), (12, 24), (24, 36))
 
@@ -153,10 +158,27 @@ def assemble(spec, dataset, scenario, pools, slot, seed, features, window_size, 
     return arrays, counts
 
 
+def cic_pools(spec, seeds, required, source_dir: str):
+    """Deduplicated, conflict-free CIC-IDS2017 pools (protocol 3.0-cic), block-disjoint across seeds."""
+
+    from tools.build_controlled_cic_streams import FILE_ORDER, assign_slots, clean_rows, extract, scan_rows
+
+    source = Path(source_dir)
+    scan = scan_rows(source, FILE_ORDER)
+    cleaning = clean_rows(scan)
+    selected, _ = assign_slots(spec, scan, cleaning['keep'], required, len(seeds), 1000, 1.10, 2.0)
+    pools = extract(source, FILE_ORDER, scan, selected, cleaning['keep'], 1000)
+    observed = Counter(scan['family'].tolist())
+    return scan['feature_columns'], pools, {family: int(observed[family]) for family in required}
+
+
 def build(args) -> None:
     seeds = [int(value) for value in args.stream_seeds.split(',') if value.strip()]
     for dataset in [value.strip() for value in args.datasets.split(',') if value.strip()]:
-        spec = DATASETS[dataset]
+        if dataset == 'cic-ids2017':
+            from tools.build_controlled_cic_streams import CIC_IDS2017 as spec
+        else:
+            spec = DATASETS[dataset]
         required = {}
         for scenario in SCENARIOS:
             totals = Counter()
@@ -164,9 +186,13 @@ def build(args) -> None:
                 totals.update(recipe)
             for family, count in totals.items():
                 required[family] = max(required.get(family, 0), count)
-        features, pools, _, _, observed = _collect_pools(spec, seeds, required, {}, {}, 3.0,
-                                                         args.chunksize, 0, 0)
-        source_sha256 = _sha256(Path(spec.path))
+        if dataset == 'cic-ids2017':
+            features, pools, observed = cic_pools(spec, seeds, required, args.cic_source_dir)
+            source_sha256 = 'see cic-ids2017 controlled manifests (protocol 3.0-cic)'
+        else:
+            features, pools, _, _, observed = _collect_pools(spec, seeds, required, {}, {}, 3.0,
+                                                             args.chunksize, 0, 0)
+            source_sha256 = _sha256(Path(spec.path))
         for slot, seed in enumerate(seeds):
             for scenario in SCENARIOS:
                 arrays, counts = assemble(spec, dataset, scenario, pools, slot, seed, features,
@@ -199,6 +225,7 @@ def main() -> None:
     parser.add_argument('--n-windows', type=int, default=36)
     parser.add_argument('--warmup-windows', type=int, default=4)
     parser.add_argument('--chunksize', type=int, default=200_000)
+    parser.add_argument('--cic-source-dir', default='data/CIC-IDS2017')
     build(parser.parse_args())
 
 
