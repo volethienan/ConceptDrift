@@ -404,6 +404,25 @@ class DaspV2Config:
     balanced_replay: bool = True
     new_sample_weight: float = 3.0
     verify_locality: bool = True
+    # Routed recalibration. Before predicting, the attributed feature group is
+    # mapped back to its warm-up class-conditional median/IQR when the shift
+    # is explained by such a recalibration (residual z < realign_z); delayed
+    # labels revert maps that raise the labelled loss.
+    # none | attributed | random (same trigger, random group) | global (every
+    # group, every window, no attribution or acceptance test).
+    realign: str = "none"
+    realign_z: float = 20.0
+    # A group must trigger in this many consecutive windows, unless its z is
+    # at least realign_fast_factor * realign_z (a fault, not window noise).
+    realign_persistence: int = 2
+    realign_fast_factor: float = 5.0
+    # Re-estimate active maps every window; recalibrate only features whose
+    # change exceeds twice the warm-up window-to-window change.
+    realign_refresh: bool = True
+    realign_feature_mask: bool = True
+    realign_accept: bool = True
+    realign_validate: bool = True
+    realign_margin: float = 0.0
 
 
 @dataclass

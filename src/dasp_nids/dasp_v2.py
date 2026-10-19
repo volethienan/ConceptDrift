@@ -23,6 +23,7 @@ GATE_POLICIES = ("wilson", "point", "off")
 ROUTINGS = ("utility", "native", "all", "classifier", "random", "quarantine", "attributed")
 BACKGROUNDS = ("classifier", "native", "all", "none")
 PRIOR_CORRECTIONS = ("none", "em", "acc")
+REALIGNS = ("none", "attributed", "random", "global")
 
 
 def em_prior(probabilities: torch.Tensor, clip: float, iterations: int = 200,
@@ -61,11 +62,15 @@ def prediction_logits(experiment, model, x: torch.Tensor,
                       labels: torch.Tensor | None = None) -> tuple[torch.Tensor, dict[str, float]]:
     """Corrected logits; ``labels`` are read only for warm-up windows (attribution)."""
 
-    logits, diagnostics = _prediction_logits(experiment, model, x)
     v2 = experiment.config.dasp_v2
-    if experiment.config.dasp.baseline == "modular_dasp_v2" and v2.attribution != "none":
+    is_v2 = experiment.config.dasp.baseline == "modular_dasp_v2"
+    realigned = {}
+    if is_v2 and v2.realign != "none":
+        x, realigned = realign_inputs(experiment, model, x)
+    logits, diagnostics = _prediction_logits(experiment, model, x)
+    if is_v2 and v2.attribution != "none":
         diagnostics = diagnostics | observe_attribution(experiment, model, x, logits, labels)
-    return logits, diagnostics
+    return logits, diagnostics | realigned
 
 
 def _prediction_logits(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
@@ -228,10 +233,16 @@ def _attribution_reference(experiment, model, state) -> None:
     state["class_reference"], state["class_null"] = {}, {}
     pooled_x = torch.cat([x for x, _ in windows])
     pooled_y = torch.cat([y for _, y in windows])
+    state["class_moments"], state["moment_null"] = {}, {}
     for label in pooled_y.unique().tolist():
         members = pooled_x[pooled_y == label]
         if len(members) < 2 * v2.attribution_min_class:
             continue
+        state["class_moments"][label] = _robust_moments(members)
+        effects = [_moment_effects(state["class_moments"][label], _robust_moments(x[y == label]))
+                   for x, y in windows if int((y == label).sum()) >= v2.attribution_min_class]
+        if effects:
+            state["moment_null"][label] = tuple(torch.stack(part).amax(dim=0) for part in zip(*effects))
         reference = _subsample(members, v2.quarantine_samples, generator)
         state["class_reference"][label] = reference
         state["class_null"][label] = {}
@@ -272,6 +283,211 @@ def observe_attribution(experiment, model, x: torch.Tensor, logits: torch.Tensor
                                   v2.quarantine_samples, v2.attribution_min_class, generator)
     state["scores"][index] = scores
     return {f"attr_cc_z_{name}": (round(value, 4) if np.isfinite(value) else value) for name, value in scores.items()}
+
+
+def _robust_moments(x: torch.Tensor) -> dict[str, torch.Tensor]:
+    q25, q50, q75 = torch.quantile(x.double(), torch.tensor([0.25, 0.5, 0.75], dtype=torch.float64), dim=0)
+    return {"median": q50, "iqr": q75 - q25, "std": x.double().std(dim=0)}
+
+
+def _scale(moments: dict[str, torch.Tensor], eps: float = 1e-6) -> torch.Tensor:
+    return torch.where(moments["iqr"] > eps, moments["iqr"], moments["std"])
+
+
+def _moment_effects(reference: dict, current: dict, eps: float = 1e-6) -> tuple[torch.Tensor, torch.Tensor]:
+    """Per-feature location change in reference-scale units, and |log scale ratio|."""
+
+    scale = _scale(reference)
+    location = (current["median"] - reference["median"]).abs() / scale.clamp_min(eps)
+    ratio = (torch.log(_scale(current).clamp_min(eps)) - torch.log(scale.clamp_min(eps))).abs()
+    return location, ratio
+
+
+def apply_maps(x: torch.Tensor, maps: dict) -> torch.Tensor:
+    """Apply per-feature affine recalibrations, one per feature group."""
+
+    if not maps:
+        return x
+    x = x.clone()
+    for columns, scale, shift in maps.values():
+        x[:, columns] = (x[:, columns].double() * scale + shift).to(x.dtype)
+    return x
+
+
+def estimate_map(raw: torch.Tensor, pseudo: torch.Tensor, moments: dict, columns: torch.Tensor,
+                 minimum: int, null: dict | None = None, eps: float = 1e-6):
+    """Class-conditional affine that maps the current group back to warm-up.
+
+    Per class with enough pseudo-labelled members: scale from IQR (or the
+    standard deviation when an IQR is zero), location from the median. A
+    feature that collapsed to a constant is mapped to the reference median.
+    Classes are combined weighted by their count. With a warm-up ``null``,
+    a feature is recalibrated only where its change exceeds twice the largest
+    warm-up window-to-window change; other features keep the identity.
+    """
+
+    total_scale, total_shift, weight = 0.0, 0.0, 0
+    for label, reference in moments.items():
+        members = raw[pseudo == label][:, columns]
+        if len(members) < minimum:
+            continue
+        current = _robust_moments(members)
+        ref = {key: value[columns] for key, value in reference.items()}
+        use_iqr = (ref["iqr"] > eps) & (current["iqr"] > eps)
+        use_std = ~use_iqr & (ref["std"] > eps) & (current["std"] > eps)
+        scale = torch.where(use_iqr, ref["iqr"] / current["iqr"].clamp_min(eps),
+                            torch.where(use_std, ref["std"] / current["std"].clamp_min(eps),
+                                        torch.ones_like(ref["std"])))
+        collapsed = (current["std"] <= eps) & (ref["std"] > eps)
+        scale = torch.where(collapsed, torch.zeros_like(scale), scale)
+        scale = scale.clamp(0.0, 1e4)
+        shift = ref["median"] - scale * current["median"]
+        if null is not None and label in null:
+            location, ratio = _moment_effects(ref, current)
+            null_location, null_ratio = (value[columns] for value in null[label])
+            changed = (location > torch.clamp(2 * null_location, min=0.25)) \
+                | (ratio > torch.clamp(2 * null_ratio, min=math.log(1.25))) | collapsed
+            scale = torch.where(changed, scale, torch.ones_like(scale))
+            shift = torch.where(changed, shift, torch.zeros_like(shift))
+        total_scale = total_scale + len(members) * scale
+        total_shift = total_shift + len(members) * shift
+        weight += len(members)
+    if not weight:
+        return None
+    return columns, total_scale / weight, total_shift / weight
+
+
+def _leave_out_predictions(model, x: torch.Tensor, name: str, reference: torch.Tensor, device) -> torch.Tensor:
+    """Predictions with one module replaced by its warm-up mean output, so the
+    pseudo-labels used to recalibrate a group never read that group."""
+
+    model.eval()
+    with torch.no_grad():
+        _, representations = model(x.to(device), return_representations=True)
+        _, anchor = model(reference.to(device), return_representations=True)
+        representations[name] = anchor[name].mean(dim=0, keepdim=True).expand_as(representations[name])
+        return model.logits_from_representations(representations).argmax(dim=1).cpu()
+
+
+def realign_inputs(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, dict]:
+    """Routed, label-free recalibration of the attributed feature group."""
+
+    cfg, v2 = experiment.config, experiment.config.dasp_v2
+    if v2.realign not in REALIGNS:
+        raise ValueError(f"unknown DASP-v2 realign mode {v2.realign!r}")
+    attr = experiment.__dict__.setdefault("_dasp_v2_attr", {"calls": 0, "scores": {}})
+    state = experiment.__dict__.setdefault("_dasp_v2_align", {"maps": {}, "by_window": {}, "changes": {}})
+    index = attr["calls"]
+    if index < cfg.data.warmup_windows:
+        state["by_window"][index] = {}
+        return x, {}
+    if "class_reference" not in attr:
+        _attribution_reference(experiment, model, attr)
+    names = list(model.layer_names)
+    columns = dict(zip(names, _group_columns(model)))
+    raw = x.detach().cpu()
+    previous = dict(state["maps"])
+    maps = dict(previous)
+    generator = torch.Generator().manual_seed(cfg.data.random_seed + 7919 + index)
+    model.eval()
+    dropped = []
+    if maps and v2.realign != "global":
+        # A map lives only while its raw group stays shifted (reverting faults).
+        with torch.no_grad():
+            predicted = model(apply_maps(raw, maps).to(experiment.device)).argmax(dim=1).cpu()
+        raw_scores = _class_conditional_z(attr, {name: columns[name] for name in maps}, raw, predicted,
+                                          v2.quarantine_samples, v2.attribution_min_class, generator)
+        for name, value in raw_scores.items():
+            if np.isfinite(value) and value < v2.realign_z:
+                maps.pop(name)
+                dropped.append(name)
+    aligned = apply_maps(raw, maps)
+    with torch.no_grad():
+        predicted = model(aligned.to(experiment.device)).argmax(dim=1).cpu()
+    scores = _class_conditional_z(attr, columns, aligned, predicted, v2.quarantine_samples,
+                                  v2.attribution_min_class, generator)
+    finite = {name: value for name, value in scores.items() if np.isfinite(value)}
+    peak = max(finite.values()) if finite else float("nan")
+    triggered = bool(finite) and peak >= v2.realign_z
+    top = max(finite, key=lambda name: (finite[name], -names.index(name))) if triggered else None
+    streak = state.get("streak", (None, 0))
+    streak = (top, streak[1] + 1 if top is not None and streak[0] == top else int(top is not None))
+    state["streak"] = streak
+    persistent = triggered and (streak[1] >= v2.realign_persistence
+                                or peak >= v2.realign_fast_factor * v2.realign_z)
+    if v2.realign == "global":
+        candidates = list(names)
+    elif not persistent:
+        candidates = []
+    elif v2.realign == "attributed":
+        candidates = [top]
+    else:
+        pick = torch.Generator().manual_seed(cfg.data.random_seed * 1009 + index)
+        candidates = [names[int(torch.randint(len(names), (1,), generator=pick))]]
+    reference = torch.cat(list(attr["class_reference"].values()))
+    null = attr.get("moment_null") if v2.realign_feature_mask else None
+    refreshed = [name for name in maps if name not in candidates] if v2.realign_refresh else []
+    accepted, residual = [], {}
+    for name in [*candidates, *refreshed]:
+        pseudo = _leave_out_predictions(model, aligned, name, reference, experiment.device)
+        new_map = estimate_map(raw, pseudo, attr["class_moments"], columns[name], v2.attribution_min_class, null)
+        if new_map is None or not bool(((new_map[1] != 1) | (new_map[2] != 0)).any()):
+            continue
+        trial = maps | {name: new_map}
+        if v2.realign_accept and v2.realign != "global":
+            after = _class_conditional_z(attr, {name: columns[name]}, apply_maps(raw, trial), pseudo,
+                                         v2.quarantine_samples, v2.attribution_min_class, generator)[name]
+            residual[name] = after
+            if not (np.isfinite(after) and after < v2.realign_z):
+                continue
+        maps = trial
+        accepted.append(name)
+    state["maps"] = maps
+    state["by_window"][index] = dict(maps)
+    state["changes"][index] = (previous, accepted)
+    return apply_maps(raw, maps).to(x.device), {
+        "realign_trigger_z": round(peak, 4) if np.isfinite(peak) else peak,
+        "realign_triggered": triggered,
+        "realign_persistent": persistent,
+        "realign_dropped": "|".join(dropped),
+        "realign_accepted": "|".join(n for n in accepted if n in candidates),
+        "realign_refreshed": "|".join(n for n in accepted if n not in candidates),
+        "realign_rejected": "|".join(n for n in candidates if n not in accepted),
+        "realign_residual_z": json.dumps({k: round(float(v), 4) for k, v in residual.items()}),
+        "realign_active": "|".join(sorted(maps)),
+        "realign_parameters": int(sum(2 * len(cols) for cols, _, _ in maps.values())),
+    }
+
+
+def realigned_window(experiment, index: int, x: torch.Tensor) -> torch.Tensor:
+    """The window as the model saw it at prediction time."""
+
+    maps = experiment.__dict__.get("_dasp_v2_align", {}).get("by_window", {}).get(index, {})
+    return apply_maps(x, maps)
+
+
+def validate_realignment(experiment, model, index: int, raw_x: torch.Tensor, y: torch.Tensor) -> dict:
+    """Delayed labels revert maps accepted at ``index`` that raised the loss."""
+
+    v2 = experiment.config.dasp_v2
+    state = experiment.__dict__.get("_dasp_v2_align", {})
+    previous, accepted = state.get("changes", {}).get(index, ({}, []))
+    if not accepted or not v2.realign_validate or v2.realign == "global":
+        return {}
+    n_classes = int(model.classifier.out_features)
+    with_map = balanced_loss(model, apply_maps(raw_x, state["by_window"][index]), y, experiment.device, n_classes)
+    without = balanced_loss(model, apply_maps(raw_x, previous), y, experiment.device, n_classes)
+    reverted = []
+    if with_map > without + v2.realign_margin:
+        for name in accepted:
+            if state["maps"].get(name) is state["by_window"][index].get(name):
+                if name in previous:
+                    state["maps"][name] = previous[name]
+                else:
+                    state["maps"].pop(name, None)
+                reverted.append(name)
+    return {"realign_validated_window": index, "realign_loss_with": round(with_map, 6),
+            "realign_loss_without": round(without, 6), "realign_reverted": "|".join(reverted)}
 
 
 def labeled_attribution(experiment, model, x: torch.Tensor, y: torch.Tensor) -> dict[str, float]:
@@ -453,8 +669,15 @@ def update(experiment, model, memory, item, row) -> str:
         raise ValueError("DASP-v2 needs at least two queried labels")
     gate_count = min(len(query) - 1, max(1, round(len(query) * v2.gate_fraction)))
     train_ids, gate_ids = query[:-gate_count], query[-gate_count:]
-    tx, ty = item.window.x[train_ids], item.window.y[train_ids]
-    gx, gy = item.window.x[gate_ids], item.window.y[gate_ids]
+    realign_row = {}
+    if v2.realign != "none":
+        realign_row = validate_realignment(experiment, model, item.window.index,
+                                           item.window.x[query], item.window.y[query])
+    # Training and gating see the window exactly as it was predicted.
+    window_x = realigned_window(experiment, item.window.index, item.window.x) if v2.realign != "none" \
+        else item.window.x
+    tx, ty = window_x[train_ids], item.window.y[train_ids]
+    gx, gy = window_x[gate_ids], item.window.y[gate_ids]
 
     history = getattr(experiment, "_dasp_v2_gate_history", [])
     recent = history[-v2.gate_buffer_windows:] if v2.gate_buffer_windows > 0 else []
@@ -593,6 +816,7 @@ def update(experiment, model, memory, item, row) -> str:
     })
     row.update({f"plasticity_{name}": value for name, value in plasticities.items()})
     row.update({f"conflict_{name}": value for name, value in conflicts.items()})
+    row.update(realign_row)
     original_review.synchronize(device)
     row["update_seconds"] = time.perf_counter() - started
     return "dasp"

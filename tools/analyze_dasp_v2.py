@@ -266,7 +266,8 @@ def analyze_screen(output_root: Path, prepared_root: Path, reference: str = 'v2_
 HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017')
 BASELINES = ('online_mlp', 'experience_replay', 'agem', 'online_ewc_v2', 'ssf_budget', 'cdda_md_v2',
              'aoc_ids_adapted', 'cnd_ids_adapted', 'soul_adapted', 'arf_adapted', 'static')
-ABLATIONS = ('final_strict_locality', 'final_route_random', 'final_route_head_only', 'final_route_all',
+ABLATIONS = ('final_no_realign', 'final_realign_random', 'final_realign_global', 'final_realign_noaccept',
+             'final_strict_locality', 'final_route_random', 'final_route_head_only', 'final_route_all',
              'final_contiguous_modules', 'final_no_logit_adjustment', 'final_no_prior_correction')
 GROUP_ORDER = ('volume', 'timing', 'tcp', 'protocol')
 
@@ -305,6 +306,37 @@ def attribution_table(root: Path, frame: pd.DataFrame) -> list[dict]:
     return json.loads(table.to_json(orient='records'))
 
 
+REALIGN_CONDITIONS = ('final', 'final_realign_random', 'final_realign_noaccept', 'final_realign_global')
+
+
+def realign_table(root: Path, frame: pd.DataFrame) -> list[dict]:
+    """Where routed recalibration acted: did its first map hit the drifted
+    group (feature-shift tracks), and how often did it act with no
+    measurement drift (every other track)."""
+
+    rows = []
+    for record in frame[frame.condition.isin(REALIGN_CONDITIONS)].itertuples():
+        windows = pd.read_csv(run_directory(root, {'stage': 'final', 'dataset': record.dataset,
+                                                   'scenario': record.scenario, 'condition': record.condition,
+                                                   'stream_seed': record.stream_seed,
+                                                   'model_seed': record.model_seed}) / 'windows.csv')
+        if 'realign_accepted' not in windows:
+            continue
+        acted = windows[windows.realign_accepted.fillna('').astype(str) != '']
+        row = {'condition': record.condition, 'dataset': record.dataset, 'track': record.track,
+               'interventions': len(acted)}
+        if record.track.startswith('feature_shift'):
+            target = f"module_{GROUP_ORDER.index(record.scenario.split('-')[1]) + 1}"
+            first = acted.realign_accepted.iloc[0].split('|')[0] if len(acted) else None
+            row |= {'acted': first is not None, 'first_hits_target': first == target}
+        rows.append(row)
+    if not rows:
+        return []
+    table = pd.DataFrame(rows)
+    return json.loads(table.groupby(['condition', 'track']).mean(numeric_only=True).reset_index()
+                      .to_json(orient='records'))
+
+
 def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
     records = load_completed(output_root, 'final')
     plan = json.loads((output_root / 'final_plan.json').read_text(encoding='utf-8'))
@@ -333,6 +365,7 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
     result = {'stage': 'final', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
               'reference': 'final', 'positive_difference_means': 'condition better than final',
               'contrasts': contrasts, 'attribution_top1': attribution_table(output_root, frame),
+              'realignment': realign_table(output_root, frame),
               'note': 'held-out datasets were not used for any design or tuning decision'}
     if 'optimizer_fraction' in locality:
         result['locality'] = locality.groupby('condition').optimizer_fraction.mean().to_dict()

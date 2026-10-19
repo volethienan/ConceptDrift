@@ -138,10 +138,13 @@ def test_final_plan_uses_selected_configurations_and_only_unseen_seeds(tmp_path)
     jobs = jobs_for(args)
     conditions = {job['condition'] for job in jobs}
     assert conditions == {'final', 'static', *(m for m in ALL_GRIDS if m != 'modular_dasp_v2'), *FINAL_ABLATIONS}
+    from tools.run_dasp_v2 import FINAL_REALIGN
     final = next(job for job in jobs if job['condition'] == 'final')
-    assert final['overrides'] == GRIDS['modular_dasp_v2'][3]
+    assert final['overrides'] == GRIDS['modular_dasp_v2'][3] | FINAL_REALIGN
     strict = next(job for job in jobs if job['condition'] == 'final_strict_locality')
-    assert strict['overrides'] == GRIDS['modular_dasp_v2'][3] | {'model.modular_head_type': 'blockwise'}
+    assert strict['overrides'] == final['overrides'] | {'model.modular_head_type': 'blockwise'}
+    no_realign = next(job for job in jobs if job['condition'] == 'final_no_realign')
+    assert no_realign['overrides']['dasp_v2.realign'] == 'none'
     assert {job['stream_seed'] for job in jobs}.isdisjoint({2001, 2002, 2003})
     held_out = [job for job in jobs if job['dataset'] in HELDOUT_DATASETS]
     cells = {(j['dataset'], j['scenario'], j['stream_seed'], j['model_seed']) for j in held_out}

@@ -5,6 +5,12 @@
 - Module theo nhóm đặc trưng ngữ nghĩa (`model.feature_grouping = semantic`; nhóm volume / timing / tcp / protocol cho NetFlow v3 và CICFlowMeter, xem `src/dasp_nids/feature_groups.py`).
 - Chẩn đoán drift có điều kiện theo lớp bằng nhãn giả (`dasp_v2.attribution = pseudo`): MMD theo nhóm đặc trưng trong từng lớp dự đoán, so với reference warmup. Không tốn nhãn; phân biệt được drift đo lường với thay đổi tỷ lệ lớp.
 - Chẩn đoán điều khiển routing (`routing = attributed`, top-1): khi sửa chỉ cập nhật module của nhóm bị chẩn đoán, kèm head.
+- **Hiệu chỉnh theo routing** (`dasp_v2.realign = attributed`, `FINAL_REALIGN`). Ngay lúc dự đoán, không cần nhãn và không tốn gradient. Routing quyết định *có* can thiệp không và can thiệp *ở đâu*:
+  1. Nhóm bị chẩn đoán phải vượt `realign_z` ở 2 cửa sổ liên tiếp, hoặc vượt gấp 5 lần ngưỡng.
+  2. Ước lượng ánh xạ affine trung vị/IQR theo lớp, dùng nhãn giả của mô hình đã che module bị drift. Chỉ đổi những đặc trưng lệch quá 2 lần nhiễu warmup.
+  3. Chỉ chấp nhận khi drift của nhóm biến mất sau hiệu chỉnh, tức đó là lỗi đo đạc chứ không phải họ tấn công mới.
+  4. Ánh xạ được ước lượng lại mỗi cửa sổ, tự gỡ khi dữ liệu gốc trở lại bình thường, và bị gỡ khi nhãn trễ cho thấy loss tăng.
+  Tham số của bước này cố định trên dev, sau khi lưới dev lõi đã chạy. Lưới dev chỉ chỉnh phần huấn luyện.
 - Replay cân bằng lớp, logit adjustment theo prior của batch, hiệu chỉnh prior ACC.
 - Chế độ cục bộ nghiêm ngặt (`final_strict_locality`): như trên, nhưng head chia khối. Khi sửa chỉ đổi module được chẩn đoán, khối head của nó và lớp cuối; cập nhật nền chỉ đổi lớp cuối.
 
@@ -92,9 +98,9 @@ python tools/analyze_dasp_v2.py --stage dev --output-root results/dev_sota
 
 Mỗi lệnh ghi `dev_selection.json` vào thư mục của nó: với mỗi phương pháp, cấu hình có Macro-F1 trung bình cao nhất trên 126 cell dev; hòa trong phạm vi 0,002 thì chọn cấu hình ít lượt gradient hơn.
 
-### Bước 2: đánh giá cuối (18.734 run: 986 cell × 19 điều kiện)
+### Bước 2: đánh giá cuối (22.678 run: 986 cell × 23 điều kiện)
 
-Gồm phương pháp cuối, static, 6 baseline `core`, 4 bản chuyển thể `sota`, chế độ cục bộ nghiêm ngặt và 6 ablation. Khi cả 1a và 1b đã xong, cập nhật repo chính rồi truyền cả hai file selection:
+Gồm phương pháp cuối, static, 6 baseline `core`, 4 bản chuyển thể `sota`, chế độ cục bộ nghiêm ngặt, 6 ablation cũ và 4 ablation hiệu chỉnh: không hiệu chỉnh, nhóm ngẫu nhiên, mọi nhóm mọi cửa sổ, và bỏ kiểm định. Khi cả 1a và 1b đã xong, cập nhật repo chính rồi truyền cả hai file selection:
 
 ```bash
 cd /workspace/anvlt/ConceptDrift && git pull && pip install river==0.23.0
@@ -118,7 +124,7 @@ Thiếu selection của phương pháp nào thì lệnh báo lỗi; một phươ
 
 - `final_summary.csv`: trung bình theo (giữ lại / dev-seed-mới) × loại kịch bản × điều kiện. Gồm Macro-F1 trung bình cửa sổ và tích lũy, attack recall, FPR benign, F1 sau thay đổi và khi concept quay lại, chi phí gradient.
 - `final_by_dataset.csv`: Macro-F1 theo từng dataset.
-- `final_analysis.json`: so sánh cặp ở mức cell (trung bình theo seed); bootstrap phân cấp (dataset rồi kịch bản), Wilcoxon hai phía, Holm riêng cho họ baseline (10 đối chứng cùng static) và họ ablation, tách theo từng loại kịch bản. Stream tự nhiên dùng Macro-F1 tích lũy. Thêm độ chính xác chẩn đoán top-1 lúc drift bắt đầu, theo dataset và nhóm đặc trưng, và tỷ lệ tham số thay đổi mỗi cửa sổ của hai chế độ.
+- `final_analysis.json`: so sánh cặp ở mức cell (trung bình theo seed); bootstrap phân cấp (dataset rồi kịch bản), Wilcoxon hai phía, Holm riêng cho họ baseline (10 đối chứng cùng static) và họ ablation, tách theo từng loại kịch bản. Stream tự nhiên dùng Macro-F1 tích lũy. Thêm độ chính xác chẩn đoán top-1 lúc drift bắt đầu, theo dataset và nhóm đặc trưng, và tỷ lệ tham số thay đổi mỗi cửa sổ của hai chế độ. Mục `realignment` cho biết lần hiệu chỉnh đầu có trúng nhóm bị drift không, và số lần hiệu chỉnh ở những kịch bản không có lỗi đo đạc.
 - `final_runs.csv`: từng run.
 
 Gửi lại các file này cùng hai file `dev_selection.json` và `pip freeze` của server để viết phần kết quả.

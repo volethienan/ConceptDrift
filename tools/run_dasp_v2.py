@@ -245,7 +245,14 @@ FINAL_MODEL_SEEDS = (91, 92)
 # Dev datasets also have confirmation seeds; reported separately as seen-dataset results.
 DEV_CONFIRMATION_SEEDS = {'nf-bot-iot-v3': CONFIRMATION_SEEDS, 'nf-unsw-nb15-v3': (3001, 3002)}
 NATURAL_HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
+# Routed recalibration, added after the core development grid was frozen; its
+# settings (dasp_v2.realign_* defaults) were fixed on development data only.
+FINAL_REALIGN = {'dasp_v2.realign': 'attributed'}
 FINAL_ABLATIONS = {
+    'final_no_realign': {'dasp_v2.realign': 'none'},
+    'final_realign_random': {'dasp_v2.realign': 'random'},
+    'final_realign_global': {'dasp_v2.realign': 'global'},
+    'final_realign_noaccept': {'dasp_v2.realign_accept': False},
     'final_strict_locality': {'model.modular_head_type': 'blockwise'},
     'final_route_random': {'dasp_v2.routing': 'random'},
     'final_route_head_only': {'dasp_v2.routing': 'classifier'},
@@ -318,7 +325,7 @@ def final_conditions(selection_paths):
     missing = set(ALL_GRIDS) - set(selection)
     if missing:
         raise ValueError(f'dev selection lacks {sorted(missing)}')
-    final = selection['modular_dasp_v2']['overrides']
+    final = selection['modular_dasp_v2']['overrides'] | FINAL_REALIGN
     conditions = [('final', 'modular_dasp_v2', final), ('static', 'static', {})]
     conditions += [(method, method, selection[method]['overrides'])
                    for method in ALL_GRIDS if method != 'modular_dasp_v2']
