@@ -45,14 +45,16 @@ def _grid(**axes):
 
 
 # Final method (chosen on development screens): semantic feature-group modules,
-# class-conditional pseudo-label drift attribution steering the repair routing
-# (top-1 module), class-balanced replay, batch-prior logit adjustment and ACC
-# prior correction. STRICT keeps the same method with a blockwise head, so a
+# class-conditional pseudo-label drift attribution steering routed
+# recalibration of the attributed feature group and the repair routing (top-1
+# module), class-balanced replay, batch-prior logit adjustment and ACC prior
+# correction. STRICT keeps the same method with a blockwise head, so a
 # repair changes only the attributed module, its head block and the last layer.
 FINAL_METHOD = {
     'model.feature_grouping': 'semantic', 'dasp_v2.logit_adjustment_prior': 'batch',
     'dasp_v2.prior_correction': 'acc', 'dasp_v2.prior_strength': 0.5, 'dasp_v2.routing': 'attributed',
-    'dasp_v2.routing_top_k': 1, 'dasp_v2.attribution': 'pseudo', 'dasp_v2.attribution_repr_weight': 0.0}
+    'dasp_v2.routing_top_k': 1, 'dasp_v2.attribution': 'pseudo', 'dasp_v2.attribution_repr_weight': 0.0,
+    'dasp_v2.realign': 'attributed'}
 
 # Exactly 24 configurations per method, tuned on development data only.
 GRIDS = {
@@ -245,8 +247,8 @@ FINAL_MODEL_SEEDS = (91, 92)
 # Dev datasets also have confirmation seeds; reported separately as seen-dataset results.
 DEV_CONFIRMATION_SEEDS = {'nf-bot-iot-v3': CONFIRMATION_SEEDS, 'nf-unsw-nb15-v3': (3001, 3002)}
 NATURAL_HELDOUT = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
-# Routed recalibration, added after the core development grid was frozen; its
-# settings (dasp_v2.realign_* defaults) were fixed on development data only.
+# Routed recalibration (also part of FINAL_METHOD); its thresholds are the
+# dasp_v2.realign_* defaults, fixed on development data only.
 FINAL_REALIGN = {'dasp_v2.realign': 'attributed'}
 FINAL_ABLATIONS = {
     'final_no_realign': {'dasp_v2.realign': 'none'},
@@ -494,8 +496,8 @@ def parser():
     p.add_argument('--datasets', nargs='+')
     p.add_argument('--scenarios', nargs='+', choices=PRIMARY_SCENARIOS)
     p.add_argument('--stream-seeds', nargs='+', type=int)
-    p.add_argument('--suite', choices=sorted(SUITES), default='core',
-                   help='dev/smoke: core methods (default), sota adapters, or all')
+    p.add_argument('--suite', choices=sorted(SUITES), default='all',
+                   help='dev/smoke: all methods (default), or only the core or sota ones')
     p.add_argument('--methods', nargs='+', choices=sorted(set(ALL_GRIDS) | set(SCREEN) | set(FINAL_ABLATIONS)
                                                           | {'final', 'static'}),
                    help='dev: method names; screen: condition names; final: condition names')

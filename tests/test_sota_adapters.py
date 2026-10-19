@@ -138,14 +138,15 @@ def test_knee_picks_the_elbow_and_falls_back_to_the_largest_option():
 
 
 def test_sota_dev_suite_is_separate_and_development_only(tmp_path):
-    core = jobs_for(parser().parse_args(['--stage', 'dev', '--output-root', str(tmp_path)]))
+    core = jobs_for(parser().parse_args(['--stage', 'dev', '--suite', 'core', '--output-root', str(tmp_path)]))
     assert {job['method'] for job in core} == set(GRIDS)
     sota = jobs_for(parser().parse_args(['--stage', 'dev', '--suite', 'sota', '--output-root', str(tmp_path)]))
     assert {job['method'] for job in sota} == set(SOTA_GRIDS)
     assert len(sota) == 4 * 24 * 2 * (10 + 8 + 3) * 3
     assert {job['stream_seed'] for job in sota} == {2001, 2002, 2003}
     with pytest.raises(ValueError, match='outside'):
-        jobs_for(parser().parse_args(['--stage', 'dev', '--methods', 'soul_adapted', '--output-root', str(tmp_path)]))
+        jobs_for(parser().parse_args(['--stage', 'dev', '--suite', 'core', '--methods', 'soul_adapted',
+                                      '--output-root', str(tmp_path)]))
 
 
 def test_smoke_suite_runs_every_adapter_under_one_budget(tmp_path):

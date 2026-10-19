@@ -10,7 +10,7 @@
   2. Ước lượng ánh xạ affine trung vị/IQR theo lớp, dùng nhãn giả của mô hình đã che module bị drift. Chỉ đổi những đặc trưng lệch quá 2 lần nhiễu warmup.
   3. Chỉ chấp nhận khi drift của nhóm biến mất sau hiệu chỉnh, tức đó là lỗi đo đạc chứ không phải họ tấn công mới.
   4. Ánh xạ được ước lượng lại mỗi cửa sổ, tự gỡ khi dữ liệu gốc trở lại bình thường, và bị gỡ khi nhãn trễ cho thấy loss tăng.
-  Tham số của bước này cố định trên dev, sau khi lưới dev lõi đã chạy. Lưới dev chỉ chỉnh phần huấn luyện.
+  Ngưỡng của bước này cố định trên dev; lưới dev chỉnh phần huấn luyện khi đã bật hiệu chỉnh.
 - Replay cân bằng lớp, logit adjustment theo prior của batch, hiệu chỉnh prior ACC.
 - Chế độ cục bộ nghiêm ngặt (`final_strict_locality`): như trên, nhưng head chia khối. Khi sửa chỉ đổi module được chẩn đoán, khối head của nó và lớp cuối; cập nhật nền chỉ đổi lớp cuối.
 
@@ -44,81 +44,67 @@ Không quyết định thiết kế hay tham số nào dùng dữ liệu giữ l
 
 ## Lệnh chạy trên server (CPU, Python 3.12, PyTorch 2.3.1 CPU, 18 nhân)
 
-Repo chính: `/workspace/anvlt/ConceptDrift`, venv `.venv`, dữ liệu `prepared_streams_v2` (đã kiểm tra `sha256sum -c SHA256SUMS --quiet`).
+Repo: `/workspace/anvlt/ConceptDrift`, venv `.venv`, dữ liệu `prepared_streams_v2` (đã kiểm tra `sha256sum -c SHA256SUMS --quiet`). Mọi phương pháp chạy lại từ đầu bằng code hiện tại.
+
+### Bước 0: dừng lần chạy cũ, cất kết quả cũ, cập nhật code
 
 ```bash
-export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1; N=18; mkdir -p results/logs
-```
-
-### Bước 1a: chỉnh tham số, bộ `core` (21.168 run, đang chạy ở `results/dev`)
-
-```bash
-for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage dev --prepared-root prepared_streams_v2 --output-root results/dev --execute --resume --shard $k/$N > results/logs/dev_$k.log 2>&1 & done
-```
-
-Không `git pull` trong repo chính khi bước này đang chạy: mỗi run ghi hash của toàn bộ mã nguồn, nên đổi mã giữa chừng thì các run trong cùng thư mục không còn cùng phiên bản.
-
-### Bước 1b: chỉnh tham số, bộ `sota` (12.096 run: 4 phương pháp × 24 cấu hình × 126 cell)
-
-Chạy ở **checkout riêng**, dùng chung venv và dữ liệu, ghi kết quả vào `results/dev_sota` của repo chính:
-
-```bash
-cd /workspace/anvlt && git clone --branch dasp-v2-infra https://github.com/volethienan/ConceptDrift.git ConceptDrift-sota
+cd /workspace/anvlt/ConceptDrift && source .venv/bin/activate
 ```
 
 ```bash
-cd /workspace/anvlt/ConceptDrift-sota && source ../ConceptDrift/.venv/bin/activate && pip install river==0.23.0 && python -c "import numpy, river; print(numpy.__version__, river.__version__)"
+pkill -f "tools/run_dasp_v2.py"; mkdir -p results_old && mv results/dev results_old/dev_before_realign 2>/dev/null; mkdir -p results/logs
+```
+
+```bash
+git pull && pip install river==0.23.0 && python -c "import numpy, river; print(numpy.__version__, river.__version__)"
 ```
 
 Dòng cuối phải in `1.26.4 0.23.0`. River 0.25 trở lên đòi numpy 2, nên không dùng.
 
 ```bash
-python tools/run_dasp_v2.py --stage smoke --suite all --output-root /tmp/dasp_smoke_all --execute
+python tools/run_dasp_v2.py --stage smoke --output-root /tmp/dasp_smoke --execute
+```
+
+### Bước 1: chỉnh tham số trên dev (33.264 run: 11 phương pháp × 24 cấu hình × 126 cell)
+
+```bash
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1; N=18
 ```
 
 ```bash
-python tools/run_dasp_v2.py --stage dev --suite sota --prepared-root ../ConceptDrift/prepared_streams_v2 --output-root ../ConceptDrift/results/dev_sota --preflight
+python tools/run_dasp_v2.py --stage dev --prepared-root prepared_streams_v2 --output-root results/dev --preflight
 ```
 
 ```bash
-for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage dev --suite sota --prepared-root ../ConceptDrift/prepared_streams_v2 --output-root ../ConceptDrift/results/dev_sota --execute --resume --shard $k/$N > ../ConceptDrift/results/logs/dev_sota_$k.log 2>&1 & done
+for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage dev --prepared-root prepared_streams_v2 --output-root results/dev --execute --resume --shard $k/$N > results/logs/dev_$k.log 2>&1 & done
 ```
 
-Ước lượng từ máy local: AOC và SOUL khoảng 15–25 s/run, CND khoảng 90 s, ARF 35–200 s tùy kiểu lá. Tổng khoảng 200 giờ-CPU, tức khoảng 11 giờ với 18 nhân. Nên chạy sau khi bước 1a xong; chạy song song thì hai bước chia nhau 18 nhân và tổng thời gian không giảm.
-
-### Bước 1c: phân tích dev
+Ước lượng khoảng 16 giờ với 18 nhân; phần lớn thời gian là CND-IDS và ARF. Theo dõi tiến độ bằng `tail -qn1 results/logs/dev_*.log`.
 
 ```bash
 python tools/analyze_dasp_v2.py --stage dev --output-root results/dev
 ```
 
-```bash
-python tools/analyze_dasp_v2.py --stage dev --output-root results/dev_sota
-```
-
-Mỗi lệnh ghi `dev_selection.json` vào thư mục của nó: với mỗi phương pháp, cấu hình có Macro-F1 trung bình cao nhất trên 126 cell dev; hòa trong phạm vi 0,002 thì chọn cấu hình ít lượt gradient hơn.
+Lệnh này ghi `results/dev/dev_selection.json`: với mỗi phương pháp, cấu hình có Macro-F1 trung bình cao nhất trên 126 cell dev; hòa trong phạm vi 0,002 thì chọn cấu hình ít lượt gradient hơn.
 
 ### Bước 2: đánh giá cuối (22.678 run: 986 cell × 23 điều kiện)
 
-Gồm phương pháp cuối, static, 6 baseline `core`, 4 bản chuyển thể `sota`, chế độ cục bộ nghiêm ngặt, 6 ablation cũ và 4 ablation hiệu chỉnh: không hiệu chỉnh, nhóm ngẫu nhiên, mọi nhóm mọi cửa sổ, và bỏ kiểm định. Khi cả 1a và 1b đã xong, cập nhật repo chính rồi truyền cả hai file selection:
+Gồm phương pháp cuối, static, 6 baseline, 4 bản chuyển thể SOTA, chế độ cục bộ nghiêm ngặt, 6 ablation và 4 ablation hiệu chỉnh: không hiệu chỉnh, nhóm ngẫu nhiên, mọi nhóm mọi cửa sổ, và bỏ kiểm định.
 
 ```bash
-cd /workspace/anvlt/ConceptDrift && git pull && pip install river==0.23.0
+python tools/run_dasp_v2.py --stage final --selection results/dev/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/final --preflight
 ```
 
 ```bash
-python tools/run_dasp_v2.py --stage final --selection results/dev/dev_selection.json results/dev_sota/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/final --preflight
-```
-
-```bash
-for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage final --selection results/dev/dev_selection.json results/dev_sota/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/final --execute --resume --shard $k/$N > results/logs/final_$k.log 2>&1 & done
+for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage final --selection results/dev/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/final --execute --resume --shard $k/$N > results/logs/final_$k.log 2>&1 & done
 ```
 
 ```bash
 python tools/analyze_dasp_v2.py --stage final --output-root results/final
 ```
 
-Thiếu selection của phương pháp nào thì lệnh báo lỗi; một phương pháp xuất hiện trong hai file cũng báo lỗi. Theo dõi tiến độ bằng `tail -qn1 results/logs/final_*.log`. Bị ngắt thì chạy lại đúng lệnh với **cùng N**; `--resume` bỏ qua các run đã xong và kiểm tra hash.
+Nếu bị ngắt, chạy lại đúng lệnh với **cùng N**; `--resume` sẽ bỏ qua các run đã xong và kiểm tra hash. Trong lúc đang chạy, không `git pull`: mỗi run ghi hash mã nguồn.
 
 ## Đầu ra của bước 2
 
@@ -127,4 +113,4 @@ Thiếu selection của phương pháp nào thì lệnh báo lỗi; một phươ
 - `final_analysis.json`: so sánh cặp ở mức cell (trung bình theo seed); bootstrap phân cấp (dataset rồi kịch bản), Wilcoxon hai phía, Holm riêng cho họ baseline (10 đối chứng cùng static) và họ ablation, tách theo từng loại kịch bản. Stream tự nhiên dùng Macro-F1 tích lũy. Thêm độ chính xác chẩn đoán top-1 lúc drift bắt đầu, theo dataset và nhóm đặc trưng, và tỷ lệ tham số thay đổi mỗi cửa sổ của hai chế độ. Mục `realignment` cho biết lần hiệu chỉnh đầu có trúng nhóm bị drift không, và số lần hiệu chỉnh ở những kịch bản không có lỗi đo đạc.
 - `final_runs.csv`: từng run.
 
-Gửi lại các file này cùng hai file `dev_selection.json` và `pip freeze` của server để viết phần kết quả.
+Gửi lại các file này cùng `results/dev/dev_selection.json` và `pip freeze` của server để viết phần kết quả.

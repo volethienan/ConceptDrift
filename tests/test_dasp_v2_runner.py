@@ -21,15 +21,16 @@ def test_every_method_gets_exactly_24_distinct_configurations():
 
 
 def test_dev_plan_covers_only_development_data(tmp_path):
-    args = parser().parse_args(['--stage', 'dev', '--output-root', str(tmp_path)])
+    args = parser().parse_args(['--stage', 'dev', '--suite', 'core', '--output-root', str(tmp_path)])
     jobs = jobs_for(args)
     # 10 attack-family + 8 moderate feature-shift + 3 label-shift scenarios.
     assert len(jobs) == 7 * 24 * 2 * (10 + 8 + 3) * 3
+    assert len(jobs_for(parser().parse_args(['--stage', 'dev', '--output-root', str(tmp_path)]))) ==         11 * 24 * 2 * (10 + 8 + 3) * 3
     assert {job['stream_seed'] for job in jobs} == {2001, 2002, 2003}
     assert {job['dataset'] for job in jobs} == {'nf-bot-iot-v3', 'nf-unsw-nb15-v3'}
     for bad in (['--stream-seeds', '3001'], ['--datasets', 'cic-ids2017']):
         with pytest.raises(ValueError):
-            jobs_for(parser().parse_args(['--stage', 'dev', '--output-root', str(tmp_path), *bad]))
+            jobs_for(parser().parse_args(['--stage', 'dev', '--suite', 'core', '--output-root', str(tmp_path), *bad]))
 
 
 def test_overrides_reach_the_config_and_unknown_fields_fail(tmp_path):
@@ -44,7 +45,7 @@ def test_overrides_reach_the_config_and_unknown_fields_fail(tmp_path):
 
 
 def test_smoke_runs_every_method_and_resume_verifies_receipts(tmp_path):
-    base = ['--stage', 'smoke', '--output-root', str(tmp_path), '--execute']
+    base = ['--stage', 'smoke', '--suite', 'core', '--output-root', str(tmp_path), '--execute']
     run(parser().parse_args(base))
     records = load_completed(tmp_path, 'smoke')
     assert {record['method'] for record in records} == set(GRIDS)
