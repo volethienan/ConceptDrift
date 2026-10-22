@@ -1,0 +1,2877 @@
+{
+  "stage": "sweep",
+  "runs": 424,
+  "rope": 0.01,
+  "positive_difference_means": "condition better than reference",
+  "contrasts": {
+    "attack_family": {
+      "experience_replay_vs_final_per_setting": [
+        {
+          "reference": "final@b128_d0_mixed",
+          "condition": "experience_replay@b128_d0_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.011400027284673958,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.01083921013293826,
+            "ci95_high": 0.011960844436409657,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d0_uniform",
+          "condition": "experience_replay@b128_d0_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.007880480584258276,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.007194310107169144,
+            "ci95_high": 0.008566651061347408,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_mixed",
+          "condition": "experience_replay@b128_d10_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.024245693224038023,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.012181589533152348,
+            "ci95_high": 0.0363097969149237,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13415,
+              "p_condition_better": 0.86585
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_uniform",
+          "condition": "experience_replay@b128_d10_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.01175171811931719,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.007536895299646962,
+            "ci95_high": 0.015966540938987417,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.55585,
+              "p_condition_better": 0.44415
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_mixed",
+          "condition": "experience_replay@b128_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.010542554630323608,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.006952745999167953,
+            "ci95_high": 0.014132363261479264,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.5632,
+              "p_condition_better": 0.4368
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_pred_stratified",
+          "condition": "experience_replay@b128_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.009517721633794163,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.006484050781827733,
+            "ci95_high": 0.012551392485760593,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uncertainty",
+          "condition": "experience_replay@b128_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.02455520384815199,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.040722668466312006,
+            "ci95_high": -0.008387739229991975,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.016418815637529505,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.01576286349397965,
+            "ci95_high": 0.01707476778107936,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_mixed",
+          "condition": "experience_replay@b128_d5_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.006976208114613858,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 6.082948249608311e-05,
+            "ci95_high": 0.013891586746731632,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_uniform",
+          "condition": "experience_replay@b128_d5_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.03849039724706646,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.006546416120513654,
+            "ci95_high": 0.07043437837361927,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_mixed",
+          "condition": "experience_replay@b256_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.014786043159706636,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.012403240369745494,
+            "ci95_high": 0.017168845949667777,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_pred_stratified",
+          "condition": "experience_replay@b256_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.015276392039730413,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.01490542721321264,
+            "ci95_high": 0.015647356866248185,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uncertainty",
+          "condition": "experience_replay@b256_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.010824994645730585,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.039553819585316674,
+            "ci95_high": 0.017903830293855505,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.6361,
+              "p_practically_equivalent": 0.167,
+              "p_condition_better": 0.1969
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.016567501611950447,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.015017727240214385,
+            "ci95_high": 0.01811727598368651,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_mixed",
+          "condition": "experience_replay@b32_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.005583178475751682,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.005138823330093301,
+            "ci95_high": 0.016305180281596665,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_pred_stratified",
+          "condition": "experience_replay@b32_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.023980886938825552,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.02041865365376383,
+            "ci95_high": 0.027543120223887274,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.96305
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uncertainty",
+          "condition": "experience_replay@b32_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.00963739235848482,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.021415219964253662,
+            "ci95_high": 0.0021404352472840227,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.2835,
+              "p_practically_equivalent": 0.7165,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.021835593652118235,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.01277624151414114,
+            "ci95_high": 0.03089494579009533,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13415,
+              "p_condition_better": 0.86585
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_mixed",
+          "condition": "experience_replay@b512_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.014932277856237353,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.00914010559391537,
+            "ci95_high": 0.020724450118559334,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_pred_stratified",
+          "condition": "experience_replay@b512_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.018419160152927272,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.009895672407698841,
+            "ci95_high": 0.026942647898155703,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uncertainty",
+          "condition": "experience_replay@b512_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.014102486607928594,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.009869652620719982,
+            "ci95_high": 0.018335320595137206,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.5632,
+              "p_condition_better": 0.4368
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.017735334557098303,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.015336707625647872,
+            "ci95_high": 0.020133961488548735,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.86625
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_mixed",
+          "condition": "experience_replay@b64_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.018852978410808463,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.010617787074118867,
+            "ci95_high": 0.02708816974749806,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13415,
+              "p_condition_better": 0.86585
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_pred_stratified",
+          "condition": "experience_replay@b64_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.012818583371301012,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.010300756248379839,
+            "ci95_high": 0.015336410494222186,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.72855
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uncertainty",
+          "condition": "experience_replay@b64_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.009770198420226556,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.035266654905304784,
+            "ci95_high": 0.015726258064851673,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.31505,
+              "p_practically_equivalent": 0.4979,
+              "p_condition_better": 0.18705
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_uniform",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.02260525021033924,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.014955927258766766,
+            "ci95_high": 0.030254573161911713,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.86625
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ],
+      "experience_replay_policy_vs_uniform": [
+        {
+          "reference": "experience_replay@b128_d0_uniform",
+          "condition": "experience_replay@b128_d0_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.006418884516292883,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.014630952532553143,
+            "ci95_high": 0.0017931834999673768,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d10_uniform",
+          "condition": "experience_replay@b128_d10_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.006224678572450848,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.009078444567197419,
+            "ci95_high": -0.003370912577704277,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.013157052235921729,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.028639689968453175,
+            "ci95_high": 0.0023255854966097167,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59775,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.004755036777414262,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.009393365284088961,
+            "ci95_high": -0.0001167082707395628,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.12133495470144609,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.13863922274304585,
+            "ci95_high": -0.10403068665984633,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d5_uniform",
+          "condition": "experience_replay@b128_d5_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.022873639438836912,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.04254632452007068,
+            "ci95_high": -0.0032009543576031474,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59775,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.005177303792947452,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.009595953447611605,
+            "ci95_high": -0.000758654138283299,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.002164844198587562,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.003785798352579195,
+            "ci95_high": -0.0005438900445959294,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.07698612077566933,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.10170222518654709,
+            "ci95_high": -0.05227001636479156,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.02976991201692225,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.03527734905635721,
+            "ci95_high": -0.02426247497748729,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.011617180469441435,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.013461104350586117,
+            "ci95_high": -0.009773256588296753,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.4368,
+              "p_practically_equivalent": 0.5632,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.09318125487316661,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.11522207837373988,
+            "ci95_high": -0.07114043137259335,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.002313287497872435,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.00478325482982922,
+            "ci95_high": 0.00015667983408435004,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.003178365158776675,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0010811208947407724,
+            "ci95_high": 0.007437851212294122,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.039990021488140126,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.04501035763260064,
+            "ci95_high": -0.03496968534367961,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.011228569874258049,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.023329342513742746,
+            "ci95_high": 0.0008722027652266484,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59775,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.004511051818639172,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.006544965117721513,
+            "ci95_high": -0.002477138519556832,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.10899371203726782,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.1325972136618705,
+            "ci95_high": -0.08539021041266515,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ],
+      "final_policy_vs_uniform": [
+        {
+          "reference": "final@b128_d0_uniform",
+          "condition": "final@b128_d0_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.009938431216708565,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.019397486861793656,
+            "ci95_high": -0.0004793755716234749,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_uniform",
+          "condition": "final@b128_d10_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.01871865367717168,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.03214381419298101,
+            "ci95_high": -0.00529349316136235,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.007280791228715833,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.01851766818654177,
+            "ci95_high": 0.003956085729110104,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0021460572263210798,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.0011973517151626645,
+            "ci95_high": 0.003094762737479495,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0803609352157646,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.0821536907827542,
+            "ci95_high": -0.078568179648775,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_uniform",
+          "condition": "final@b128_d5_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.00864054969361569,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.010546124983821126,
+            "ci95_high": 0.027827224371052506,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.1779,
+              "p_practically_equivalent": 0.4975,
+              "p_condition_better": 0.3246
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0033958453407036404,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.008647523413592872,
+            "ci95_high": 0.0018558327321855916,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0008737346263675283,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.001315879235140871,
+            "ci95_high": -0.0004315900175941856,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.049593624517988294,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.052056570674960556,
+            "ci95_high": -0.04713067836101603,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.013517496840555698,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.020687583547858546,
+            "ci95_high": -0.006347410133252851,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.013762473756148752,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.017415668727919442,
+            "ci95_high": -0.010109278784378062,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.72855,
+              "p_practically_equivalent": 0.27145,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.06170826886256356,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.06291191261939089,
+            "ci95_high": -0.06050462510573623,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0004897692029885159,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.005373743459839819,
+            "ci95_high": 0.006353281865816851,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0024945395629477063,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.0006291648026871544,
+            "ci95_high": 0.004359914323208258,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.036357173538970416,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.04800897060208997,
+            "ci95_high": -0.02470537647585086,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_mixed",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.007476298074727272,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.011260039723504645,
+            "ci95_high": -0.0036925564259499,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.153,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_pred_stratified",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.005275615020399055,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0018897941073345859,
+            "ci95_high": 0.012441024148132696,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.15995
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_uncertainty",
+          "metric": "mean_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.07661826340670203,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.08237463149779894,
+            "ci95_high": -0.0708618953156051,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ]
+    },
+    "natural": {
+      "experience_replay_vs_final_per_setting": [
+        {
+          "reference": "final@b128_d0_mixed",
+          "condition": "experience_replay@b128_d0_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.004400755039191295,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.004484779275447159,
+            "ci95_high": 0.01328628935382975,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d0_uniform",
+          "condition": "experience_replay@b128_d0_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.019207899124772998,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0031967248268513493,
+            "ci95_high": 0.041612523076397345,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.5893
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_mixed",
+          "condition": "experience_replay@b128_d10_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.012484339485532903,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.002925412767826485,
+            "ci95_high": 0.02789409173889229,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_uniform",
+          "condition": "experience_replay@b128_d10_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.02609174026934749,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0008433063344019942,
+            "ci95_high": 0.053026786873096976,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_mixed",
+          "condition": "experience_replay@b128_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.006484468422715994,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.007488487755584472,
+            "ci95_high": -0.005480449089847517,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_pred_stratified",
+          "condition": "experience_replay@b128_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.002699984935256944,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0014427965627074602,
+            "ci95_high": 0.006842766433221348,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uncertainty",
+          "condition": "experience_replay@b128_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.10974272888864814,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.266869230841527,
+            "ci95_high": 0.04738377306423075,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.631,
+              "p_practically_equivalent": 0.0548,
+              "p_condition_better": 0.3142
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0037095918545627105,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0015252129385915913,
+            "ci95_high": 0.008944396647717012,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_mixed",
+          "condition": "experience_replay@b128_d5_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.00943965166025898,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.02044270217968147,
+            "ci95_high": 0.0015633988591635117,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.28955,
+              "p_practically_equivalent": 0.71045,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_uniform",
+          "condition": "experience_replay@b128_d5_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.013868154432362126,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.029570747444473272,
+            "ci95_high": 0.0018344385797490204,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_mixed",
+          "condition": "experience_replay@b256_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.006383583849348062,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.018281235121345607,
+            "ci95_high": 0.005514067422649482,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_pred_stratified",
+          "condition": "experience_replay@b256_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.005472936070552353,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.002223801397721714,
+            "ci95_high": 0.008722070743382992,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uncertainty",
+          "condition": "experience_replay@b256_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.03563808690655895,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.02685627653099132,
+            "ci95_high": 0.044419897282126586,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.96305
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.005043821504836565,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.003578168813134608,
+            "ci95_high": 0.013665811822807739,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_mixed",
+          "condition": "experience_replay@b32_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0354646347674141,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.0077263384491115805,
+            "ci95_high": 0.06320293108571662,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.5893
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_pred_stratified",
+          "condition": "experience_replay@b32_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.026201307851862088,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.059572902423835894,
+            "ci95_high": 0.007170286720111718,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59775,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uncertainty",
+          "condition": "experience_replay@b32_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.08068223874501124,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.2235091578888012,
+            "ci95_high": 0.06214468039877874,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.631,
+              "p_practically_equivalent": 0.0548,
+              "p_condition_better": 0.3142
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.007532185741000702,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.03828455216458582,
+            "ci95_high": 0.023220180682584413,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.38285,
+              "p_practically_equivalent": 0.2433,
+              "p_condition_better": 0.37385
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_mixed",
+          "condition": "experience_replay@b512_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.00861780100758719,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.005261506933948001,
+            "ci95_high": 0.011974095081226377,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_pred_stratified",
+          "condition": "experience_replay@b512_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.009577237826539187,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.004603214951131196,
+            "ci95_high": 0.014551260701947177,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.153
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uncertainty",
+          "condition": "experience_replay@b512_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0026552152145832564,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.01367002433345571,
+            "ci95_high": 0.018980454762622223,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.17685,
+              "p_practically_equivalent": 0.6545,
+              "p_condition_better": 0.16865
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.020213170871241498,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.020089002440175197,
+            "ci95_high": 0.0203373393023078,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.96305
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_mixed",
+          "condition": "experience_replay@b64_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.010868091263102758,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.009553126439357684,
+            "ci95_high": 0.0312893089655632,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.5893
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_pred_stratified",
+          "condition": "experience_replay@b64_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.000536870983380261,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.03137588766161081,
+            "ci95_high": 0.03030214569485029,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.38285,
+              "p_practically_equivalent": 0.2433,
+              "p_condition_better": 0.37385
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uncertainty",
+          "condition": "experience_replay@b64_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.06465133546388525,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.19008105950659718,
+            "ci95_high": 0.06077838857882667,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.631,
+              "p_practically_equivalent": 0.0548,
+              "p_condition_better": 0.3142
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_uniform",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.01843693762714549,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.008952562965325539,
+            "ci95_high": 0.02792131228896544,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.5893
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ],
+      "experience_replay_policy_vs_uniform": [
+        {
+          "reference": "experience_replay@b128_d0_uniform",
+          "condition": "experience_replay@b128_d0_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.015546002935787256,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.023679790960521918,
+            "ci95_high": -0.007412214911052595,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d10_uniform",
+          "condition": "experience_replay@b128_d10_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.008949245507172077,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0180533531289071,
+            "ci95_high": 0.00015486211456294807,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.01000525800173116,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.021608870765384924,
+            "ci95_high": 0.0015983547619226046,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.5893,
+              "p_practically_equivalent": 0.4107,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0015388394317597531,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.006365806234634119,
+            "ci95_high": 0.003288127371114613,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d1_uniform",
+          "condition": "experience_replay@b128_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.17647861159022266,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.3171370410836082,
+            "ci95_high": -0.03582018209683713,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b128_d5_uniform",
+          "condition": "experience_replay@b128_d5_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0008132351951755379,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.00240404248637488,
+            "ci95_high": 0.0007775720960238042,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.007982615911283408,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.012228448686347981,
+            "ci95_high": -0.0037367831362188353,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.15995,
+              "p_practically_equivalent": 0.84005,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0016693048535655064,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0019035651288468736,
+            "ci95_high": 0.005242174835977886,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b256_d1_uniform",
+          "condition": "experience_replay@b256_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0444174732215436,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.050025201717129486,
+            "ci95_high": -0.03880974472595772,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0053992262934560165,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.017344299271745744,
+            "ci95_high": 0.028142751858657777,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.1779,
+              "p_practically_equivalent": 0.4975,
+              "p_condition_better": 0.3246
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0032147872609880612,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.00012233844296055674,
+            "ci95_high": 0.006307236079015566,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b32_d1_uniform",
+          "condition": "experience_replay@b32_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.11232003003508931,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.20762611581944196,
+            "ci95_high": -0.017013944250736657,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.86625,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.011606452084966357,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.020120466174539442,
+            "ci95_high": -0.0030924379953932712,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59775,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0016223396957477376,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.006822192423640128,
+            "ci95_high": 0.0035775130321446524,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b512_d1_uniform",
+          "condition": "experience_replay@b512_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.049176917426266537,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.07891716728109066,
+            "ci95_high": -0.019436667571442412,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.86625,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0066241417515600365,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.013434120096072921,
+            "ci95_high": 0.00018583659295284827,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.153,
+              "p_practically_equivalent": 0.847,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 6.71750588467912e-05,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.00018731309462044488,
+            "ci95_high": 0.0003216632123140273,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "experience_replay@b64_d1_uniform",
+          "condition": "experience_replay@b64_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.13320492127879313,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.24089594147988083,
+            "ci95_high": -0.025513901077705403,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ],
+      "final_policy_vs_uniform": [
+        {
+          "reference": "final@b128_d0_uniform",
+          "condition": "final@b128_d0_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0007388588502055538,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.006124160462456785,
+            "ci95_high": 0.004646442762045677,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d10_uniform",
+          "condition": "final@b128_d10_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.004658155276642512,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.002236968547987439,
+            "ci95_high": 0.007079342005297584,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.00018880227554754492,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.00517598636208344,
+            "ci95_high": 0.00555359091317853,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.0005292325124539865,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.004264176020138455,
+            "ci95_high": 0.003205710995230482,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d1_uniform",
+          "condition": "final@b128_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.06302629084701183,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.07425955851335087,
+            "ci95_high": -0.051793023180672804,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b128_d5_uniform",
+          "condition": "final@b128_d5_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.005241737967278684,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.03035657420761298,
+            "ci95_high": 0.01987309827305561,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.31505,
+              "p_practically_equivalent": 0.4979,
+              "p_condition_better": 0.18705
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0034447894429012194,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.002474617621863018,
+            "ci95_high": 0.004414961263939421,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0012401902878497184,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.0005597953748784357,
+            "ci95_high": 0.0030401759505778725,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b256_d1_uniform",
+          "condition": "final@b256_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.07501173862326599,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.08045964706125541,
+            "ci95_high": -0.06956383018527657,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.037597594214958785,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.05732704967487795,
+            "ci95_high": -0.01786813875503962,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.86585,
+              "p_practically_equivalent": 0.13415,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.021883909371849447,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.01617223240543325,
+            "ci95_high": 0.027595586338265643,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.86625
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b32_d1_uniform",
+          "condition": "final@b32_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.03916997703107877,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.055938443966930984,
+            "ci95_high": -0.022401510095226562,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -1.1082221312047613e-05,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.005292970668312247,
+            "ci95_high": 0.005270806225688152,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.009013593348954574,
+            "positive_cells": 2,
+            "positive_datasets": 2,
+            "ci95_low": 0.008663595065403873,
+            "ci95_high": 0.009363591632505275,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b512_d1_uniform",
+          "condition": "final@b512_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.031618961769608295,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.045158140507459754,
+            "ci95_high": -0.018079783031756835,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.86625,
+              "p_practically_equivalent": 0.13375,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_mixed",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.0009447046124826941,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.016802116772670683,
+            "ci95_high": 0.01869152599763607,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.16865,
+              "p_practically_equivalent": 0.6545,
+              "p_condition_better": 0.17685
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_pred_stratified",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": 0.01904098366937254,
+            "positive_cells": 1,
+            "positive_datasets": 1,
+            "ci95_low": -0.002059170193570825,
+            "ci95_high": 0.04014113753231591,
+            "p_two_sided": 1.0,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.40225,
+              "p_condition_better": 0.59775
+            },
+            "holm_adjusted_p": 1.0
+          }
+        },
+        {
+          "reference": "final@b64_d1_uniform",
+          "condition": "final@b64_d1_uncertainty",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "all_cells": {
+            "cells": 2,
+            "datasets": 2,
+            "mean_difference": -0.050116648187762375,
+            "positive_cells": 0,
+            "positive_datasets": 0,
+            "ci95_low": -0.058370977367566634,
+            "ci95_high": -0.041862319007958115,
+            "p_two_sided": 0.5,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.96305,
+              "p_practically_equivalent": 0.03695,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          }
+        }
+      ]
+    }
+  },
+  "note": "dev-selected configurations, no re-tuning; every dataset is development data"
+}

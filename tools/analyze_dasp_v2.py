@@ -10,7 +10,9 @@ seeds. Uncertainty comes from a hierarchical bootstrap that resamples
 datasets and then scenarios within each drawn dataset; two-sided Wilcoxon
 tests over cells; Holm correction within a family. A construct-eligible
 sensitivity analysis keeps only drift cells the stream validator classified
-as boundary-impacting.
+as boundary-impacting. Every contrast also reports a Bayesian signed-rank
+test (Benavoli et al., JMLR 2017) with a region of practical equivalence of
++-ROPE Macro-F1, so ties can be stated as practical equivalence.
 """
 from __future__ import annotations
 
@@ -29,6 +31,9 @@ sys.path.insert(0, str(ROOT))
 from tools.analyze_original_review import load_completed  # noqa: E402
 
 TIE_MARGIN = 0.002
+# Region of practical equivalence for the Bayesian signed-rank test (E15).
+ROPE = 0.01
+BAYES_SAMPLES = 20000
 # Windows where the attack concept changes (stream builder recipes).
 CHANGE_POINTS = {'S1-Sudden': (12,), 'S2-Gradual': (12,), 'S3-Incremental': (12,),
                  'S4-Recurrent': (12, 24), 'S5-Blip': (12, 14), 'S6-Combined': (12, 16, 24, 28),
@@ -41,6 +46,7 @@ for _group in ('volume', 'timing', 'tcp', 'protocol'):
         CHANGE_POINTS[f'{_persistent}-{_group}'] = (12,)
         CHANGE_POINTS[f'{_recurrent}-{_group}'] = (12, 24)
         RECURRENCE_START[f'{_recurrent}-{_group}'] = 24
+    CHANGE_POINTS[f'CX-{_group}'] = (12,)
 
 
 def phase_metrics(windows: pd.DataFrame, scenario: str) -> dict[str, float]:
@@ -153,6 +159,29 @@ def holm(p_values: list[float]) -> list[float]:
     return adjusted.tolist()
 
 
+def bayesian_signed_rank(values: np.ndarray, rope: float | None = None, samples: int = BAYES_SAMPLES,
+                         prior: float = 0.5, seed: int = 20261022) -> dict:
+    """Bayesian signed-rank test (Benavoli et al. 2017, as in baycomp).
+
+    A Dirichlet process over the differences with ``prior`` weight on a
+    pseudo-observation at 0; each posterior draw gives the probability that a
+    Walsh average lies left of, inside or right of [-rope, rope]. Reported:
+    the share of draws in which each region is the most probable one.
+    """
+
+    rope = ROPE if rope is None else rope
+    values = np.asarray(values, dtype=float)
+    points = np.concatenate(([0.0], values))
+    weights = np.random.default_rng(seed).dirichlet(
+        np.concatenate(([prior], np.ones(len(values)))), samples)
+    sums = points[:, None] + points[None, :]
+    regions = [(sums < -2 * rope), (sums >= -2 * rope) & (sums <= 2 * rope), (sums > 2 * rope)]
+    probability = np.stack([((weights @ region.astype(float)) * weights).sum(axis=1) for region in regions], axis=1)
+    winner = np.bincount(probability.argmax(axis=1), minlength=3) / samples
+    return {'rope': rope, 'p_condition_worse': float(winner[0]), 'p_practically_equivalent': float(winner[1]),
+            'p_condition_better': float(winner[2])}
+
+
 def contrast(cells: pd.DataFrame, replicates: int = 10000) -> dict:
     values = cells.difference.to_numpy(float)
     result = {'cells': int(len(values)), 'datasets': int(cells.dataset.nunique()),
@@ -165,6 +194,8 @@ def contrast(cells: pd.DataFrame, replicates: int = 10000) -> dict:
         result['p_two_sided'] = 1.0 if np.allclose(values, 0) else float(wilcoxon(values).pvalue)
     else:
         result['limitation'] = 'fewer than two datasets: no inference'
+    if len(values) >= 2:
+        result['bayes_signed_rank'] = bayesian_signed_rank(values)
     return result
 
 
@@ -208,6 +239,122 @@ def compare_family(frame: pd.DataFrame, reference: str, conditions: list[str],
     return results
 
 
+def paired_family(frame: pd.DataFrame, pairs: list[tuple[str, str]], column: str = 'mean_macro_f1',
+                  replicates: int = 10000, subset_to_condition: bool = False) -> list[dict]:
+    """One Holm family of (reference, condition) pairs. ``subset_to_condition``
+    keeps only the reference runs whose cell the condition was planned for
+    (shortcut sets that a dataset's schema lacks)."""
+
+    frame = frame[frame[column].notna()]
+    results = []
+    for reference, condition in pairs:
+        part = frame
+        if subset_to_condition:
+            keys = frame.loc[frame.condition == condition, PAIR].drop_duplicates()
+            part = frame.merge(keys, on=PAIR)
+        results.append({'reference': reference, 'condition': condition, 'metric': column,
+                        'positive_difference_means': 'condition better than reference',
+                        'all_cells': contrast(cell_differences(part, reference, condition, column), replicates)})
+    tested = [(i, r['all_cells']['p_two_sided']) for i, r in enumerate(results)
+              if r['all_cells'].get('p_two_sided') is not None]
+    for (index, _), value in zip(tested, holm([p for _, p in tested])):
+        results[index]['all_cells']['holm_adjusted_p'] = value
+    return results
+
+
+def analysis_frame(records: list[dict]) -> pd.DataFrame:
+    """Runs of the sweep and shortcut stages, whose conditions are
+    '<method>@<setting>'; natural streams are scored by cumulative Macro-F1."""
+
+    frame = runs_frame(records)
+    frame['method_name'], frame['setting'] = zip(*frame.condition.str.split('@', n=1))
+    frame['track'] = frame.scenario.map(track_of)
+    frame['score'] = np.where(frame.track == 'natural', frame.cumulative_macro_f1, frame.mean_macro_f1)
+    return frame
+
+
+def _load_stage(output_root: Path, stage: str, allow_incomplete: bool) -> list[dict]:
+    plan = json.loads((output_root / f'{stage}_plan.json').read_text(encoding='utf-8'))
+    records = load_completed(output_root, stage)
+    if len(records) != plan['planned_runs'] and not allow_incomplete:
+        raise ValueError(f"{stage} stage incomplete: {len(records)}/{plan['planned_runs']}")
+    return records
+
+
+def analyze_sweep(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
+    """E6: does the ranking survive other label budgets, delays and query
+    policies, and which policy spends a budget best?"""
+
+    records = _load_stage(output_root, 'sweep', allow_incomplete)
+    frame = analysis_frame(records)
+    overrides = frame.overrides.map(json.loads)
+    frame['budget'] = overrides.map(lambda o: o.get('baselines.update_label_budget', 0))
+    frame['delay'] = overrides.map(lambda o: o.get('training.label_delay', -1))
+    frame['policy'] = overrides.map(lambda o: o.get('baselines.query_policy', 'none'))
+    frame.to_csv(output_root / 'sweep_runs.csv', index=False)
+    metrics = ['score', 'cumulative_benign_fpr', 'cumulative_attack_recall', 'gradient_cost', 'total_update_seconds']
+    summary = frame.groupby(['track', 'method_name', 'budget', 'delay', 'policy'])[metrics].mean().reset_index()
+    summary.to_csv(output_root / 'sweep_summary.csv', index=False)
+    contrasts = {}
+    for track, part in frame.groupby('track'):
+        column = 'cumulative_macro_f1' if track == 'natural' else 'mean_macro_f1'
+        present = set(part.condition)
+        settings = sorted({c.split('@', 1)[1] for c in present} - {'no_labels'})
+        families = {}
+        for rival in ('experience_replay', 'arf_adapted', 'online_mlp', 'ssf_budget'):
+            pairs = [(f'final@{s}', f'{rival}@{s}') for s in settings
+                     if {f'final@{s}', f'{rival}@{s}'} <= present]
+            if pairs:
+                families[f'{rival}_vs_final_per_setting'] = paired_family(part, pairs, column, replicates)
+        for method in sorted(set(part.method_name) - {'static'}):
+            pairs = [(f'{method}@{budget}_{delay}_uniform', f'{method}@{s}')
+                     for s in settings for budget, delay, policy in [s.split('_', 2)]
+                     if policy != 'uniform' and f'{method}@{budget}_{delay}_uniform' in present
+                     and f'{method}@{s}' in present]
+            if pairs:
+                families[f'{method}_policy_vs_uniform'] = paired_family(part, pairs, column, replicates)
+        contrasts[track] = families
+    result = {'stage': 'sweep', 'runs': len(records), 'rope': ROPE,
+              'positive_difference_means': 'condition better than reference', 'contrasts': contrasts,
+              'note': 'dev-selected configurations, no re-tuning; every dataset is development data'}
+    (output_root / 'sweep_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
+def analyze_shortcut(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
+    """E4: how much each method leans on known shortcut features, and whether
+    the method ranking survives their removal."""
+
+    records = _load_stage(output_root, 'shortcut', allow_incomplete)
+    frame = analysis_frame(records)
+    frame.to_csv(output_root / 'shortcut_runs.csv', index=False)
+    summary = frame.pivot_table(index=['track', 'dataset', 'method_name'], columns='setting', values='score',
+                                aggfunc='mean')
+    summary.to_csv(output_root / 'shortcut_summary.csv')
+    contrasts = {}
+    for track, part in frame.groupby('track'):
+        column = 'cumulative_macro_f1' if track == 'natural' else 'mean_macro_f1'
+        present = set(part.condition)
+        drops = sorted({c.split('@', 1)[1] for c in present} - {'none'})
+        families = {}
+        for method in sorted(set(part.method_name)):
+            pairs = [(f'{method}@none', f'{method}@{d}') for d in drops if f'{method}@{d}' in present]
+            if pairs:
+                families[f'{method}_drop_vs_none'] = paired_family(part, pairs, column, replicates,
+                                                                   subset_to_condition=True)
+        for rival in ('experience_replay', 'arf_adapted'):
+            pairs = [(f'final@{d}', f'{rival}@{d}') for d in ['none', *drops]
+                     if {f'final@{d}', f'{rival}@{d}'} <= present]
+            if pairs:
+                families[f'{rival}_vs_final_per_drop'] = paired_family(part, pairs, column, replicates)
+        contrasts[track] = families
+    result = {'stage': 'shortcut', 'runs': len(records), 'rope': ROPE,
+              'positive_difference_means': 'condition better than reference', 'contrasts': contrasts}
+    (output_root / 'shortcut_analysis.json').write_text(json.dumps(result, indent=2, default=float),
+                                                        encoding='utf-8')
+    return result
+
+
 def analyze_dev(output_root: Path, allow_incomplete: bool = False) -> dict:
     plan = json.loads((output_root / 'dev_plan.json').read_text(encoding='utf-8'))
     records = load_completed(output_root, 'dev')
@@ -227,6 +374,88 @@ def analyze_dev(output_root: Path, allow_incomplete: bool = False) -> dict:
               'selection': selection,
               'note': 'development data only; not evidence for H1-H5'}
     (output_root / 'dev_selection.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+    return result
+
+
+def dataset_means(frame: pd.DataFrame) -> pd.DataFrame:
+    """Per configuration and dataset: mean over cells (each cell = seed mean)."""
+
+    cells = frame.groupby(['method', 'condition', 'overrides', 'dataset', 'scenario']).agg(
+        f1=('mean_macro_f1', 'mean'), cost=('gradient_cost', 'mean')).reset_index()
+    return cells.groupby(['method', 'condition', 'overrides', 'dataset']).agg(
+        f1=('f1', 'mean'), cost=('cost', 'mean'), cells=('f1', 'size')).reset_index()
+
+
+def select_on(means: pd.DataFrame, datasets: list[str]) -> dict[str, dict]:
+    """Best configuration per method by the dataset-weighted mean over
+    ``datasets`` (each dataset counts once); ties within TIE_MARGIN go to
+    fewer gradient evaluations."""
+
+    part = means[means.dataset.isin(datasets)]
+    table = part.groupby(['method', 'condition', 'overrides']).agg(
+        f1=('f1', 'mean'), cost=('cost', 'mean'), datasets=('dataset', 'nunique')).reset_index()
+    if (table.datasets != len(datasets)).any():
+        raise ValueError(f'configurations missing datasets among {datasets}')
+    selection = {}
+    for method, rows in table.groupby('method'):
+        best = rows.f1.max()
+        tied = rows[rows.f1 >= best - TIE_MARGIN]
+        chosen = tied.sort_values(['cost', 'f1', 'condition'], ascending=[True, False, True]).iloc[0]
+        selection[method] = {'condition': chosen.condition, 'overrides': json.loads(chosen.overrides),
+                             'mean_macro_f1': float(chosen.f1), 'best_mean_macro_f1': float(best),
+                             'tied_configurations': int(len(tied)), 'gradient_cost': float(chosen.cost),
+                             'datasets': sorted(datasets)}
+    return selection
+
+
+def analyze_lodo(output_root: Path, reference: str = 'modular_dasp_v2', replicates: int = 10000,
+                 allow_incomplete: bool = False) -> dict:
+    """Leave-one-dataset-out: configurations chosen on four datasets, scored on
+    the fifth; the scored runs of all folds form one comparison set."""
+
+    plan = json.loads((output_root / 'lodo_plan.json').read_text(encoding='utf-8'))
+    records = load_completed(output_root, 'lodo')
+    if len(records) != plan['planned_runs'] and not allow_incomplete:
+        raise ValueError(f"lodo stage incomplete: {len(records)}/{plan['planned_runs']}")
+    frame = runs_frame(records)
+    frame.to_csv(output_root / 'lodo_runs.csv', index=False)
+    means = dataset_means(frame)
+    datasets = sorted(frame.dataset.unique())
+    folds, scored = {}, []
+    for held in datasets:
+        selection = select_on(means, [d for d in datasets if d != held])
+        folds[held] = {method: {'condition': s['condition'], 'overrides': s['overrides'],
+                                'train_mean_macro_f1': s['mean_macro_f1']} for method, s in selection.items()}
+        for method, chosen in selection.items():
+            rows = frame[(frame.condition == chosen['condition']) & (frame.dataset == held)].copy()
+            rows['condition'] = method
+            scored.append(rows)
+    scored = pd.concat(scored, ignore_index=True)
+    scored['track'] = scored.scenario.map(track_of)
+    scored.to_csv(output_root / 'lodo_scored_runs.csv', index=False)
+    cell = scored.groupby(['condition', 'dataset', 'scenario']).mean_macro_f1.mean().reset_index()
+    by_dataset = cell.pivot_table(index='condition', columns='dataset', values='mean_macro_f1')
+    by_dataset['dataset_weighted_mean'] = by_dataset.mean(axis=1)
+    by_track = scored.groupby(['condition', 'track']).mean_macro_f1.mean().unstack()
+    costs = scored.groupby('condition')[['gradient_cost', 'cumulative_benign_fpr']].mean()
+    summary = by_dataset.join(by_track).join(costs).sort_values('dataset_weighted_mean', ascending=False)
+    summary.to_csv(output_root / 'lodo_summary.csv')
+    others = [method for method in summary.index if method != reference]
+    contrasts = {'all_tracks': compare_family(scored, reference, others, None, replicates)}
+    for track, part in scored.groupby('track'):
+        contrasts[track] = compare_family(part, reference, others, None, replicates)
+    final_selection = select_on(means, datasets)
+    (output_root / 'lodo_selection.json').write_text(json.dumps(
+        {'stage': 'lodo', 'selection': final_selection,
+         'selection_rule': f'dataset-weighted mean Macro-F1 over all {len(datasets)} development datasets; '
+                           f'ties within {TIE_MARGIN} -> fewer gradient evaluations',
+         'note': 'configuration for the untouched test datasets'}, indent=2), encoding='utf-8')
+    result = {'stage': 'lodo', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
+              'reference': reference, 'positive_difference_means': 'condition better than reference',
+              'folds': folds, 'summary': json.loads(summary.reset_index().to_json(orient='records')),
+              'contrasts': contrasts,
+              'note': 'every dataset is development data; the untouched test is a separate stage'}
+    (output_root / 'lodo_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
     return result
 
 
@@ -279,6 +508,8 @@ def track_of(scenario: str) -> str:
         return 'feature_shift_moderate'
     if scenario.startswith(('XS-', 'XR-')):
         return 'feature_shift_severe'
+    if scenario.startswith('CX-'):
+        return 'compound'
     if scenario.startswith('L') and scenario[1].isdigit():
         return 'label_shift'
     return 'attack_family'
@@ -337,6 +568,45 @@ def realign_table(root: Path, frame: pd.DataFrame) -> list[dict]:
                       .to_json(orient='records'))
 
 
+def final_contrasts(frame: pd.DataFrame, replicates: int = 10000) -> dict:
+    contrasts = {}
+    for (split, track), part in frame.groupby(['split', 'track']):
+        metric = 'cumulative_macro_f1' if track == 'natural' else 'mean_macro_f1'
+        present = set(part.condition)
+        families = {'baselines': [c for c in BASELINES if c in present],
+                    'ablations': [c for c in ABLATIONS if c in present]}
+        contrasts[f'{split}/{track}'] = {
+            name: compare_family(part, 'final', conditions, None, replicates, metric)
+            for name, conditions in families.items() if conditions and 'final' in present}
+    return contrasts
+
+
+def analyze_rope(runs: Path, output: Path, replicates: int = 10000) -> dict:
+    """E15: the final-stage contrasts recomputed from final_runs.csv, with the
+    Bayesian signed-rank test and ROPE alongside the frequentist ones."""
+
+    frame = pd.read_csv(runs)
+    result = {'stage': 'rope', 'source': str(runs), 'rope': ROPE, 'reference': 'final',
+              'positive_difference_means': 'condition better than final',
+              'contrasts': final_contrasts(frame, replicates)}
+    output.write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
+def rope_table(result: dict) -> pd.DataFrame:
+    rows = []
+    for key, families in result['contrasts'].items():
+        for family, entries in families.items():
+            for entry in entries:
+                cells, bayes = entry['all_cells'], entry['all_cells'].get('bayes_signed_rank', {})
+                rows.append({'split/track': key, 'family': family, 'condition': entry['condition'],
+                             'mean_diff': cells['mean_difference'], 'holm_p': cells.get('holm_adjusted_p'),
+                             'P(worse)': bayes.get('p_condition_worse'),
+                             'P(rope)': bayes.get('p_practically_equivalent'),
+                             'P(better)': bayes.get('p_condition_better')})
+    return pd.DataFrame(rows)
+
+
 def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
     records = load_completed(output_root, 'final')
     plan = json.loads((output_root / 'final_plan.json').read_text(encoding='utf-8'))
@@ -352,15 +622,7 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
     summary.to_csv(output_root / 'final_summary.csv', index=False)
     frame.pivot_table(index=['split', 'track', 'dataset'], columns='condition', values='mean_macro_f1') \
         .to_csv(output_root / 'final_by_dataset.csv')
-    contrasts = {}
-    for (split, track), part in frame.groupby(['split', 'track']):
-        metric = 'cumulative_macro_f1' if track == 'natural' else 'mean_macro_f1'
-        present = set(part.condition)
-        families = {'baselines': [c for c in BASELINES if c in present],
-                    'ablations': [c for c in ABLATIONS if c in present]}
-        contrasts[f'{split}/{track}'] = {
-            name: compare_family(part, 'final', conditions, None, replicates, metric)
-            for name, conditions in families.items() if conditions and 'final' in present}
+    contrasts = final_contrasts(frame, replicates)
     locality = frame[frame.condition.isin(['final', 'final_strict_locality'])]
     result = {'stage': 'final', 'complete': len(records) == plan['planned_runs'], 'runs': len(records),
               'reference': 'final', 'positive_difference_means': 'condition better than final',
@@ -375,15 +637,36 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'screen', 'final'), default='dev')
-    parser.add_argument('--output-root', type=Path, required=True)
+    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope'),
+                        default='dev')
+    parser.add_argument('--output-root', type=Path, required=True,
+                        help='stage results; for --stage rope, where rope_analysis.json is written')
+    parser.add_argument('--runs', type=Path, help='rope stage: final_runs.csv(.gz) to recompute contrasts from')
+    parser.add_argument('--rope', type=float, default=ROPE, help='half-width of the practical-equivalence region')
     parser.add_argument('--prepared-root', type=Path, default=Path('prepared_streams_v2'))
     parser.add_argument('--reference', default='v2_linear')
     parser.add_argument('--allow-incomplete', action='store_true')
     arguments = parser.parse_args()
-    if arguments.stage == 'final':
+    ROPE = arguments.rope
+    if arguments.stage == 'rope':
+        arguments.output_root.mkdir(parents=True, exist_ok=True)
+        report = analyze_rope(arguments.runs or arguments.output_root / 'final_runs.csv',
+                              arguments.output_root / 'rope_analysis.json')
+        table = rope_table(report)
+        table.to_csv(arguments.output_root / 'rope_table.csv', index=False)
+        print(table[table.family == 'baselines'].to_string(index=False, float_format=lambda v: f'{v:.4f}'))
+    elif arguments.stage == 'sweep':
+        analyze_sweep(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'sweep_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'shortcut':
+        analyze_shortcut(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'shortcut_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'final':
         report = analyze_final(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'final_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'lodo':
+        analyze_lodo(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'lodo_summary.csv').round(4).to_string(index=False))
     elif arguments.stage == 'screen':
         report = analyze_screen(arguments.output_root, arguments.prepared_root, arguments.reference)
         print(pd.DataFrame(report['table']).to_string(index=False, float_format=lambda v: f'{v:.4f}'))

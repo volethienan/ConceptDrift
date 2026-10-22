@@ -59,18 +59,25 @@ CICFLOWMETER = {
 SCHEMAS = {'netflow_v3': NETFLOW_V3, 'cicflowmeter': CICFLOWMETER}
 
 
-def schema_for(feature_names: list[str]) -> str:
+def schema_for(feature_names: list[str], dropped: list[str] | tuple[str, ...] = ()) -> str:
+    """The documented schema whose features are exactly ``feature_names`` plus
+    the explicitly ``dropped`` ones (shortcut ablation)."""
+
     names = set(feature_names)
     matches = [key for key, groups in SCHEMAS.items()
-               if names == {feature for members in groups.values() for feature in members}]
+               if names <= (members := {feature for group in groups.values() for feature in group})
+               and members <= names | set(dropped)]
     if len(matches) != 1:
         raise ValueError('feature names do not match exactly one documented schema')
     return matches[0]
 
 
-def semantic_groups(feature_names: list[str]) -> list[list[int]]:
+def semantic_groups(feature_names: list[str], dropped: list[str] | tuple[str, ...] = ()) -> list[list[int]]:
     """Column indices of each group in GROUP_NAMES order, for this column order."""
 
-    groups = SCHEMAS[schema_for(feature_names)]
+    groups = SCHEMAS[schema_for(feature_names, dropped)]
     position = {name: index for index, name in enumerate(feature_names)}
-    return [sorted(position[name] for name in groups[group]) for group in GROUP_NAMES]
+    result = [sorted(position[name] for name in groups[group] if name in position) for group in GROUP_NAMES]
+    if not all(result):
+        raise ValueError('dropping features emptied a semantic group')
+    return result

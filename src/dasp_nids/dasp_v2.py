@@ -24,6 +24,8 @@ ROUTINGS = ("utility", "native", "all", "classifier", "random", "quarantine", "a
 BACKGROUNDS = ("classifier", "native", "all", "none")
 PRIOR_CORRECTIONS = ("none", "em", "acc")
 REALIGNS = ("none", "attributed", "random", "global")
+# Methods whose predictions and delayed updates can use routed recalibration.
+REALIGN_HOSTS = ("modular_dasp_v2", "experience_replay")
 
 
 def em_prior(probabilities: torch.Tensor, clip: float, iterations: int = 200,
@@ -64,11 +66,13 @@ def prediction_logits(experiment, model, x: torch.Tensor,
 
     v2 = experiment.config.dasp_v2
     is_v2 = experiment.config.dasp.baseline == "modular_dasp_v2"
+    realigning = experiment.config.dasp.baseline in REALIGN_HOSTS and v2.realign != "none"
     realigned = {}
-    if is_v2 and v2.realign != "none":
+    if realigning:
         x, realigned = realign_inputs(experiment, model, x)
     logits, diagnostics = _prediction_logits(experiment, model, x)
-    if is_v2 and v2.attribution != "none":
+    if (is_v2 and v2.attribution != "none") or realigning:
+        # Also the warm-up bookkeeping that recalibration needs.
         diagnostics = diagnostics | observe_attribution(experiment, model, x, logits, labels)
     return logits, diagnostics | realigned
 
@@ -357,6 +361,27 @@ def estimate_map(raw: torch.Tensor, pseudo: torch.Tensor, moments: dict, columns
     return columns, total_scale / weight, total_shift / weight
 
 
+def class_consistent(mapped: torch.Tensor, pseudo: torch.Tensor, moments: dict, columns: torch.Tensor,
+                     changed: torch.Tensor, minimum: int, tolerance: float) -> tuple[bool, int]:
+    """Does the shared map return every well-populated class to its own
+    warm-up medians on the recalibrated features? Returns (consistent,
+    number of classes checked); with fewer than two classes it cannot tell."""
+
+    checked, consistent = 0, True
+    if not bool(changed.any()):
+        return True, 0
+    for label, reference in moments.items():
+        members = mapped[pseudo == label][:, columns]
+        if len(members) < minimum:
+            continue
+        checked += 1
+        ref = {key: value[columns] for key, value in reference.items()}
+        location, _ = _moment_effects(ref, _robust_moments(members))
+        if float((location[changed] > tolerance).float().mean()) > 0.25:
+            consistent = False
+    return (consistent if checked >= 2 else True), checked
+
+
 def _leave_out_predictions(model, x: torch.Tensor, name: str, reference: torch.Tensor, device) -> torch.Tensor:
     """Predictions with one module replaced by its warm-up mean output, so the
     pseudo-labels used to recalibrate a group never read that group."""
@@ -427,13 +452,20 @@ def realign_inputs(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, di
     reference = torch.cat(list(attr["class_reference"].values()))
     null = attr.get("moment_null") if v2.realign_feature_mask else None
     refreshed = [name for name in maps if name not in candidates] if v2.realign_refresh else []
-    accepted, residual = [], {}
+    accepted, residual, inconsistent = [], {}, []
     for name in [*candidates, *refreshed]:
         pseudo = _leave_out_predictions(model, aligned, name, reference, experiment.device)
         new_map = estimate_map(raw, pseudo, attr["class_moments"], columns[name], v2.attribution_min_class, null)
         if new_map is None or not bool(((new_map[1] != 1) | (new_map[2] != 0)).any()):
             continue
         trial = maps | {name: new_map}
+        if v2.realign_class_check and v2.realign != "global":
+            changed = (new_map[1] != 1) | (new_map[2] != 0)
+            ok, _ = class_consistent(apply_maps(raw, trial), pseudo, attr["class_moments"], columns[name],
+                                     changed, v2.attribution_min_class, v2.realign_class_tolerance)
+            if not ok:
+                inconsistent.append(name)
+                continue
         if v2.realign_accept and v2.realign != "global":
             after = _class_conditional_z(attr, {name: columns[name]}, apply_maps(raw, trial), pseudo,
                                          v2.quarantine_samples, v2.attribution_min_class, generator)[name]
@@ -453,6 +485,7 @@ def realign_inputs(experiment, model, x: torch.Tensor) -> tuple[torch.Tensor, di
         "realign_accepted": "|".join(n for n in accepted if n in candidates),
         "realign_refreshed": "|".join(n for n in accepted if n not in candidates),
         "realign_rejected": "|".join(n for n in candidates if n not in accepted),
+        "realign_class_inconsistent": "|".join(inconsistent),
         "realign_residual_z": json.dumps({k: round(float(v), 4) for k, v in residual.items()}),
         "realign_active": "|".join(sorted(maps)),
         "realign_parameters": int(sum(2 * len(cols) for cols, _, _ in maps.values())),
@@ -662,9 +695,7 @@ def update(experiment, model, memory, item, row) -> str:
     n_classes = int(model.classifier.out_features)
 
     # Common label-blind query, the same indices every budget-matched method uses.
-    query = r._label_blind_uniform_query_indices(
-        len(item.window.x), cfg.baselines.update_label_budget,
-        cfg.data.random_seed + item.window.index * 104729 + 17)
+    query = experiment._query_indices(item.window)
     if len(query) < 2:
         raise ValueError("DASP-v2 needs at least two queried labels")
     gate_count = min(len(query) - 1, max(1, round(len(query) * v2.gate_fraction)))
@@ -693,6 +724,14 @@ def update(experiment, model, memory, item, row) -> str:
     quarantined = sorted(experiment.__dict__.get("_dasp_v2_trust", {}).get("quarantined", set()))
     repair = drift or gate["degraded"] or bool(quarantined)
 
+    attribution_x, attribution_y = torch.cat([tx, gx]), torch.cat([ty, gy])
+    if v2.train_on_gate:
+        if v2.routing == "utility":
+            # Utility probes are scored on the gate pool; training on it too
+            # would score candidates on their own training data.
+            raise ValueError("train_on_gate cannot be combined with utility routing")
+        # The gate decision is made; its labels now also train the model.
+        tx, ty = attribution_x, attribution_y
     training_cfg = copy.deepcopy(cfg)
     training_cfg.dasp.modular_new_sample_weight = v2.new_sample_weight
     if not v2.replay_enabled:
@@ -738,7 +777,7 @@ def update(experiment, model, memory, item, row) -> str:
         elif v2.routing == "attributed":
             attribution = combined_attribution(
                 experiment, item, model,
-                labeled_attribution(experiment, model, torch.cat([tx, gx]), torch.cat([ty, gy]))
+                labeled_attribution(experiment, model, attribution_x, attribution_y)
                 if v2.attribution == "labels" else {})
             row["attribution_scores"] = json.dumps({k: round(v, 4) for k, v in attribution.items()})
             active = sorted(names, key=lambda n: (-attribution[n], names.index(n)))[:max(1, v2.routing_top_k)]
@@ -790,7 +829,7 @@ def update(experiment, model, memory, item, row) -> str:
     row.update({
         "dasp_v2_version": VERSION,
         "labels_exposed_total": len(query), "ground_truth_update_labels": len(query),
-        "new_training_labels_used": len(train_ids), "labels_used_for_gating": len(gate_ids),
+        "new_training_labels_used": len(ty), "labels_used_for_gating": len(gate_ids),
         "gate_pool_size": len(pool_y), "gate_state": gate["state"],
         "gate_support": json.dumps(gate["support"]),
         "gate_wilson_lower": json.dumps([None if math.isnan(v) else round(v, 6) for v in gate["wilson_lower"]]),
@@ -813,6 +852,7 @@ def update(experiment, model, memory, item, row) -> str:
         "global_update": False,
         "rss_bytes": int(experiment._process.memory_info().rss),
         "query_indices": json.dumps(query.tolist()),
+        "label_query_policy": f"{cfg.baselines.query_policy}_label_blind",
     })
     row.update({f"plasticity_{name}": value for name, value in plasticities.items()})
     row.update({f"conflict_{name}": value for name, value in conflicts.items()})

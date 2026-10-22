@@ -533,6 +533,55 @@ def _label_blind_uniform_query_indices(
     return torch.randperm(int(n_samples), generator=generator)[:count]
 
 
+# Label-blind update-label query policies (E6). Every policy reads only the
+# attack scores the method itself produced when it predicted the window.
+#   uniform:         random subset (the historical contract; scores unused)
+#   uncertainty:     the samples closest to the method's decision threshold
+#   mixed:           half uncertainty, half uniform from the rest
+#   pred_stratified: half from predicted-benign, half from predicted-attack
+#                    (the larger side fills any shortfall)
+QUERY_POLICIES = ("uniform", "uncertainty", "mixed", "pred_stratified")
+
+
+def _score_query_indices(
+    scores: np.ndarray,
+    budget: int,
+    seed: int,
+    policy: str,
+    threshold: float = 0.5,
+) -> torch.Tensor:
+    """Choose ``budget`` indices from prediction-time attack scores; ties and
+    the uniform parts are broken by the same seeded permutation."""
+
+    if policy not in QUERY_POLICIES:
+        raise ValueError(f"unknown query policy {policy!r}; choose from {QUERY_POLICIES}")
+    n_samples = len(scores)
+    if policy == "uniform":
+        return _label_blind_uniform_query_indices(n_samples, budget, seed)
+    count = min(max(0, int(budget)), n_samples)
+    if count <= 0:
+        return torch.empty(0, dtype=torch.long)
+    generator = torch.Generator().manual_seed(int(seed))
+    order = torch.randperm(n_samples, generator=generator)
+    shuffled = torch.as_tensor(np.asarray(scores, dtype=np.float64))[order]
+    if policy == "pred_stratified":
+        attack = shuffled >= threshold
+        benign_side, attack_side = order[~attack], order[attack]
+        take_attack = min(len(attack_side), count - min(len(benign_side), count // 2))
+        take_benign = min(len(benign_side), count - take_attack)
+        selected = torch.cat([benign_side[:take_benign], attack_side[:take_attack]])
+    else:
+        uncertain = count if policy == "uncertainty" else count // 2
+        margin = torch.nan_to_num((shuffled - threshold).abs(), nan=float("inf"))
+        ranked = order[torch.argsort(margin, stable=True)]
+        chosen = ranked[:uncertain]
+        free = torch.ones(n_samples, dtype=torch.bool)
+        free[chosen] = False
+        selected = torch.cat([chosen, order[free[order]][: count - uncertain]])
+    # Random order, so callers that split the query (train/gate) stay unbiased.
+    return selected[torch.randperm(len(selected), generator=generator)]
+
+
 def _review_runtime(cfg: ExperimentConfig) -> bool:
     """Methods using the review runtime: full-cycle timing, provenance,
     run-identity guard and real checkpoints."""
@@ -2889,6 +2938,17 @@ class StreamingExperiment:
     def __init__(self, config: ExperimentConfig):
         if config.dasp.baseline not in METHODS:
             raise ValueError(f"Unknown method {config.dasp.baseline!r}; choose from {sorted(METHODS)}")
+        if config.baselines.query_policy not in QUERY_POLICIES:
+            raise ValueError(f"unknown baselines.query_policy {config.baselines.query_policy!r}")
+        if config.baselines.query_policy != "uniform" and config.dasp.baseline not in (
+            BUDGET_MATCHED_BASELINES | SOTA_ADAPTER_METHODS | {"modular_dasp_v2"}
+        ):
+            raise ValueError(
+                f"{config.dasp.baseline} does not use the common query; keep query_policy=uniform"
+            )
+        # Prediction-time attack scores by window index, kept only for
+        # score-based query policies until that window's labels arrive.
+        self._query_scores: dict[int, tuple[np.ndarray, float]] = {}
         if config.dasp.baseline in REVISION_METHODS:
             required_architecture = REVISION_CONDITIONS[
                 config.dasp.baseline
@@ -2947,7 +3007,7 @@ class StreamingExperiment:
         if cfg.path is None:
             raise ValueError(f"data.path is required for source={cfg.source!r}")
         if cfg.source == "prepared_npz":
-            return load_prepared_stream(cfg.path)
+            return load_prepared_stream(cfg.path, cfg.drop_features)
         if cfg.source in {"nf_v3", "nf-unsw", "nf-cicids"}:
             return load_nf_v3_stream(
                 cfg.path,
@@ -3055,7 +3115,7 @@ class StreamingExperiment:
                 names = getattr(self, "_feature_names", None)
                 if names is None or len(names) != input_dim:
                     raise ValueError("semantic feature grouping needs the stream feature names")
-                groups = semantic_groups(names)
+                groups = semantic_groups(names, self.config.data.drop_features)
             return ModularOnlineMLP(
                 input_dim,
                 n_classes,
@@ -3989,6 +4049,10 @@ class StreamingExperiment:
         metric_started = time.perf_counter()
         predicted = np.asarray(predicted, dtype=np.int64)
         self._last_predictions = predicted.copy()
+        threshold = float(getattr(adapter, "threshold", 0.5))
+        self._remember_query_scores(
+            window, attack_score, threshold if np.isfinite(threshold) else 0.5
+        )
         result = classification_metrics(
             np.asarray(window.y.tolist(), dtype=np.int64),
             predicted,
@@ -4003,23 +4067,48 @@ class StreamingExperiment:
         self._last_metric_seconds = time.perf_counter() - metric_started
         return result
 
+    def _remember_query_scores(
+        self, window: StreamWindow, attack_score, threshold: float = 0.5
+    ) -> None:
+        if self.config.baselines.query_policy != "uniform":
+            self._query_scores[window.index] = (
+                np.asarray(attack_score, dtype=np.float64).copy(),
+                float(threshold),
+            )
+
+    def _query_indices(self, window: StreamWindow) -> torch.Tensor:
+        """The common update-label query of ``window`` under the configured
+        policy and budget; same seed for every method."""
+
+        cfg = self.config
+        seed = cfg.data.random_seed + window.index * 104729 + 17
+        policy = cfg.baselines.query_policy
+        if policy == "uniform":
+            return _label_blind_uniform_query_indices(
+                len(window.x), cfg.baselines.update_label_budget, seed
+            )
+        if window.index not in self._query_scores:
+            raise RuntimeError(f"no prediction-time scores for window {window.index}")
+        scores, threshold = self._query_scores.pop(window.index)
+        if len(scores) != len(window.x):
+            raise RuntimeError("prediction-time scores do not match the window")
+        return _score_query_indices(
+            scores, cfg.baselines.update_label_budget, seed, policy, threshold
+        )
+
     def _update_adapter(
         self, adapter, window: StreamWindow, row: dict[str, object]
     ) -> None:
         cfg = self.config
         started = time.perf_counter()
-        query = _label_blind_uniform_query_indices(
-            len(window.x),
-            cfg.baselines.update_label_budget,
-            cfg.data.random_seed + window.index * 104729 + 17,
-        )
+        query = self._query_indices(window)
         if not len(query):
             raise RuntimeError(f"{cfg.dasp.baseline} selected no label queries")
         # The adapter sees the window's features and the queried labels only.
         info = adapter.update(window.x, query, window.y[query])
         row.update(info)
         row["ground_truth_update_labels"] = len(query)
-        row["label_query_policy"] = "uniform_label_blind"
+        row["label_query_policy"] = f"{cfg.baselines.query_policy}_label_blind"
         row["accepted"] = "online"
         row["selected_candidate"] = cfg.dasp.baseline
         row["rss_bytes"] = max(
@@ -4162,6 +4251,7 @@ class StreamingExperiment:
         metric_started = time.perf_counter()
         predicted = np.asarray(predicted_tensor.tolist(), dtype=np.int64)
         self._last_predictions = predicted.copy()
+        self._remember_query_scores(window, attack_score)
         result = classification_metrics(
             np.asarray(window.y.tolist(), dtype=np.int64),
             predicted,
@@ -5530,26 +5620,28 @@ class StreamingExperiment:
                 }
             )
         elif method in BUDGET_MATCHED_BASELINES:
-            query_indices = _label_blind_uniform_query_indices(
-                len(item.window.x),
-                cfg.baselines.update_label_budget,
-                cfg.data.random_seed
-                + item.window.index * 104729
-                + 17,
-            )
+            query_indices = self._query_indices(item.window)
             if not len(query_indices):
                 raise RuntimeError(
                     f"{method} selected no budget-matched label queries"
                 )
             train_x = item.window.x[query_indices]
             train_y = item.window.y[query_indices]
+            if method in dasp_v2.REALIGN_HOSTS and cfg.dasp_v2.realign != "none":
+                # Delayed labels check the window's maps; training and memory
+                # see the window as it was predicted.
+                row.update(dasp_v2.validate_realignment(
+                    self, model, item.window.index, train_x, train_y))
+                train_x = dasp_v2.realigned_window(
+                    self, item.window.index, item.window.x
+                )[query_indices]
             guard_pair = memory_guard or memory_probe
             if guard_pair is None:
                 guard_x, guard_y = train_x, train_y
             else:
                 guard_x, guard_y = guard_pair
             row["ground_truth_update_labels"] = len(train_y)
-            row["label_query_policy"] = "uniform_label_blind"
+            row["label_query_policy"] = f"{cfg.baselines.query_policy}_label_blind"
         else:
             train_x, train_y, guard_x, guard_y = _split_train_guard(
                 item.window, cfg.dasp.guard_ratio, cfg.data.random_seed

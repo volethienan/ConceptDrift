@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 
 from dasp_nids.config import load_config  # noqa: E402
 from dasp_nids.original_review import identity, sha256  # noqa: E402
-from dasp_nids.runner import StreamingExperiment  # noqa: E402
+from dasp_nids.runner import QUERY_POLICIES, StreamingExperiment  # noqa: E402
 from tools.run_modular_dasp_protocol import PRIMARY_SCENARIOS  # noqa: E402
 from tools.run_original_review import (  # noqa: E402
     _smoke_stream, inspect_prepared, parse_shard, shard_jobs, write_plan)
@@ -36,7 +36,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'final', 'screen', 'smoke')
+STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep')
 
 
 def _grid(**axes):
@@ -265,10 +265,59 @@ FINAL_ABLATIONS = {
 }
 
 
+# Leave-one-dataset-out development: every grid runs on all five datasets;
+# configurations are chosen on four datasets and scored on the fifth. The
+# former held-out datasets use stream seeds 3001-3003 (their final-stage
+# results were already seen, so they are development data now).
+LODO_DATASETS = (*DEV_DATASETS, *HELDOUT_DATASETS)
+LODO_SEEDS = {**{dataset: DEV_STREAM_SEEDS for dataset in DEV_DATASETS},
+              **{dataset: LABEL_SHIFT_SEEDS for dataset in HELDOUT_DATASETS}}
+
+
+# Analysis stages on the dev-selected configurations (no re-tuning). Every
+# dataset is development data by now; cells use the first --seeds-per-dataset
+# seeds of each dataset, controlled scenarios plus the chronological streams.
+ANALYSIS_SCENARIOS = ('S0', 'S1-Sudden', 'S6-Combined')
+NATURAL_SEEDS = {'nf-bot-iot-v3': DEV_STREAM_SEEDS, 'nf-unsw-nb15-v3': DEV_STREAM_SEEDS,
+                 'nf-cse-cic-ids2018-v3': LABEL_SHIFT_SEEDS, 'nf-ton-iot-v3': LABEL_SHIFT_SEEDS}
+
+# E6: label budget x query policy at delay 1, and label delay x {uniform,
+# mixed} at budget 128. Static (no labels) is the floor of every cell.
+SWEEP_BUDGETS = (32, 64, 128, 256, 512)
+SWEEP_DELAYS = (0, 1, 5, 10)
+SWEEP_SETTINGS = tuple(sorted({(b, 1, p) for b in SWEEP_BUDGETS for p in QUERY_POLICIES}
+                              | {(128, d, p) for d in SWEEP_DELAYS for p in ('uniform', 'mixed')}))
+SWEEP_METHODS = ('final', 'experience_replay', 'online_mlp', 'ssf_budget', 'arf_adapted', 'static')
+SWEEP_SCENARIOS = ('S1-Sudden', 'S2-Gradual', 'S6-Combined')
+
+# E4: known shortcut features (Layeghy & Portmann: MAX_TTL; D'hooge et al.:
+# destination port), removed at load time. A set is skipped on a dataset
+# whose schema has none of its features (CIC-IDS2017 has no TTL).
+SHORTCUT_SETS = {
+    'none': (),
+    'ports': ('L4_SRC_PORT', 'L4_DST_PORT', 'Destination Port'),
+    'ttl': ('MIN_TTL', 'MAX_TTL'),
+    'ports_ttl': ('L4_SRC_PORT', 'L4_DST_PORT', 'Destination Port', 'MIN_TTL', 'MAX_TTL'),
+}
+SHORTCUT_METHODS = ('final', 'experience_replay', 'online_mlp', 'ssf_budget', 'arf_adapted', 'static')
+
+
+def setting_name(budget, delay, policy):
+    return f'b{budget}_d{delay}_{policy}'
+
+
+def dataset_features(dataset):
+    from dasp_nids.feature_groups import SCHEMAS
+    schema = SCHEMAS['cicflowmeter' if dataset == 'cic-ids2017' else 'netflow_v3']
+    return {feature for group in schema.values() for feature in group}
+
+
 def stream_path(root, dataset, scenario, seed):
     root = Path(root)
     if scenario == NATURAL_SCENARIO:
         return str(root / 'natural' / dataset / scenario / f'stream_seed{seed}.npz')
+    if scenario.startswith('CX-'):
+        return str(root / 'compound' / dataset / scenario / f'stream_seed{seed}.npz')
     if scenario.startswith(('FS-', 'FR-', 'XS-', 'XR-')):
         return str(root / 'feature_shift' / dataset / scenario / f'stream_seed{seed}.npz')
     if scenario.startswith('L') and scenario[1].isdigit():
@@ -287,6 +336,75 @@ def dev_cells(args, datasets, seeds):
         scenarios += list(LABEL_SHIFT_SCENARIOS)
     return [(d, s, seed, model, stream_path(args.prepared_root, d, s, seed))
             for d in datasets for s in scenarios for seed in seeds for model in DEV_MODEL_SEEDS]
+
+
+def lodo_cells(args):
+    tracks = args.tracks.split(',')
+    scenarios = (list(args.scenarios or PRIMARY_SCENARIOS) if 'controlled' in tracks else []) \
+        + (list(FEATURE_SHIFT_MODERATE) if 'feature_shift' in tracks else []) \
+        + (list(LABEL_SHIFT_SCENARIOS) if 'label_shift' in tracks else [])
+    datasets = args.datasets or list(LODO_DATASETS)
+    unknown = set(datasets) - set(LODO_DATASETS)
+    if unknown:
+        raise ValueError(f'not leave-one-dataset-out datasets: {sorted(unknown)}')
+    return [(d, s, seed, model, stream_path(args.prepared_root, d, s, seed))
+            for d in datasets for s in scenarios for seed in LODO_SEEDS[d][:args.seeds_per_dataset]
+            for model in DEV_MODEL_SEEDS]
+
+
+def analysis_cells(args, default_scenarios):
+    datasets = args.datasets or list(LODO_DATASETS)
+    unknown = set(datasets) - set(LODO_DATASETS)
+    if unknown:
+        raise ValueError(f'unknown datasets: {sorted(unknown)}')
+    k = args.seeds_per_dataset
+    cells = [(d, s, seed, m, stream_path(args.prepared_root, d, s, seed))
+             for d in datasets for s in (args.scenarios or default_scenarios)
+             for seed in LODO_SEEDS[d][:k] for m in DEV_MODEL_SEEDS]
+    if not args.skip_natural:
+        cells += [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
+                  for d in datasets if d in NATURAL_SEEDS for seed in NATURAL_SEEDS[d][:k]
+                  for m in DEV_MODEL_SEEDS]
+    return cells
+
+
+def selected_overrides(args):
+    if not args.selection:
+        raise ValueError(f'the {args.stage} stage needs --selection pointing to dev_selection.json')
+    selection = load_selection(args.selection)
+
+    def overrides(name):
+        if name == 'final':
+            return selection['modular_dasp_v2']['overrides'] | FINAL_REALIGN
+        return {} if name == 'static' else dict(selection[name]['overrides'])
+    return overrides
+
+
+def analysis_jobs(args):
+    """E6 sweep and E4 shortcut ablation: conditions are '<method>@<setting>'."""
+
+    overrides_of = selected_overrides(args)
+    methods = [m for m in (SWEEP_METHODS if args.stage == 'sweep' else SHORTCUT_METHODS)
+               if not args.methods or m in args.methods]
+    scenarios = SWEEP_SCENARIOS if args.stage == 'sweep' else ANALYSIS_SCENARIOS
+    jobs = []
+    for d, s, seed, m, stream in analysis_cells(args, scenarios):
+        for name in methods:
+            method, base = ('modular_dasp_v2' if name == 'final' else name), overrides_of(name)
+            if args.stage == 'sweep':
+                settings = [(setting_name(b, delay, p), {'baselines.update_label_budget': b, 'training.label_delay': delay,
+                                                         'baselines.query_policy': p}) for b, delay, p in SWEEP_SETTINGS]
+                if name == 'static':  # learns nothing after warm-up: one run per cell
+                    settings = [('no_labels', {})]
+            else:
+                present = dataset_features(d)
+                settings = [(drop, {'data.drop_features': sorted(set(features) & present)})
+                            for drop, features in SHORTCUT_SETS.items()
+                            if drop == 'none' or set(features) & present]
+            jobs += [dict(stage=args.stage, dataset=d, scenario=s, stream_seed=seed, model_seed=m, method=method,
+                          condition=f'{name}@{label}', overrides=base | delta, stream=stream)
+                     for label, delta in settings]
+    return jobs
 
 
 def final_cells(args):
@@ -336,6 +454,15 @@ def final_conditions(selection_paths):
 
 
 def jobs_for(args):
+    if args.stage in ('sweep', 'shortcut'):
+        return analysis_jobs(args)
+    if args.stage == 'lodo':
+        grids = {method: grid for method, grid in SUITES[args.suite].items()
+                 if not args.methods or method in args.methods}
+        return [dict(stage='lodo', dataset=d, scenario=s, stream_seed=seed, model_seed=m, method=method,
+                     condition=config_id(method, overrides), overrides=overrides, stream=stream)
+                for d, s, seed, m, stream in lodo_cells(args)
+                for method, grid in grids.items() for overrides in grid]
     if args.stage == 'final':
         if not args.selection:
             raise ValueError('the final stage needs --selection pointing to dev_selection.json')
@@ -511,6 +638,10 @@ def parser():
                    help='use feature-group-local drift development streams (FS/FR scenarios)')
     p.add_argument('--label-shift', action='store_true',
                    help='use controlled label-shift development streams (prevalence changes, families fixed)')
+    p.add_argument('--seeds-per-dataset', type=int, default=3,
+                   help='lodo/sweep/shortcut: stream seeds per dataset (first k of each dataset\'s seeds)')
+    p.add_argument('--skip-natural', action='store_true',
+                   help='sweep/shortcut: controlled scenarios only, no chronological streams')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--resume', action='store_true')
     p.add_argument('--preflight', action='store_true')

@@ -29,13 +29,16 @@ class PreparedStream:
     class_names: list[str]
 
 
-def load_prepared_stream(path: str | Path) -> PreparedStream:
+def load_prepared_stream(
+    path: str | Path, drop_features: list[str] | tuple[str, ...] = ()
+) -> PreparedStream:
     """Load a frozen, leakage-audited stream artifact.
 
     Prepared artifacts are generated before model training and contain the
     warm-up-only scaled features, labels, phase names, source row identifiers,
     and timestamps.  The loader validates the rectangular window layout and
-    does not reshuffle any samples.
+    does not reshuffle any samples.  ``drop_features`` removes the named
+    columns (shortcut ablation); names the stream does not have are ignored.
     """
 
     source = Path(path)
@@ -75,6 +78,12 @@ def load_prepared_stream(path: str | Path) -> PreparedStream:
         raise ValueError("Prepared phases must contain one value per window")
     if len(feature_names) != x.shape[2]:
         raise ValueError("Prepared feature_names do not match x feature dimension")
+    if drop_features:
+        keep = [i for i, name in enumerate(feature_names) if name not in set(drop_features)]
+        if not keep:
+            raise ValueError("drop_features would remove every feature")
+        x = np.ascontiguousarray(x[:, :, keep])
+        feature_names = [feature_names[i] for i in keep]
     for name, values in {
         "subtypes": subtypes,
         "source_ids": source_ids,

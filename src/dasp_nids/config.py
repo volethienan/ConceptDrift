@@ -46,6 +46,9 @@ class DataConfig:
     include_partial_window: bool = False
     random_seed: int = 42
     stream_seed: int | None = None
+    # prepared_npz only: feature columns removed at load time (shortcut
+    # ablation); names absent from a stream's schema are ignored.
+    drop_features: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -264,6 +267,9 @@ class BaselineConfig:
     """Hyperparameters for protocol-aligned external baselines."""
 
     update_label_budget: int = 256
+    # How budget-matched methods choose their update labels; every policy is
+    # label-blind (runner.QUERY_POLICIES). uniform is the historical contract.
+    query_policy: str = "uniform"
     ssf_label_budget: int = 256
     ssf_new_sample_weight: float = 3.0
     ssf_lwf_lambda: float = 0.5
@@ -403,6 +409,8 @@ class DaspV2Config:
     # False draws replay uniformly from memory instead of class-balanced.
     balanced_replay: bool = True
     new_sample_weight: float = 3.0
+    # After the gate decision, also train on the gate labels (already acquired).
+    train_on_gate: bool = False
     verify_locality: bool = True
     # Routed recalibration. Before predicting, the attributed feature group is
     # mapped back to its warm-up class-conditional median/IQR when the shift
@@ -420,6 +428,11 @@ class DaspV2Config:
     # change exceeds twice the warm-up window-to-window change.
     realign_refresh: bool = True
     realign_feature_mask: bool = True
+    # A measurement change moves every class the same way: accept a map only
+    # if it returns each class with enough members to that class's warm-up
+    # medians (a new attack family moves the attack class alone).
+    realign_class_check: bool = True
+    realign_class_tolerance: float = 0.5
     realign_accept: bool = True
     realign_validate: bool = True
     realign_margin: float = 0.0
