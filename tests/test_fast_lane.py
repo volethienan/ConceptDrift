@@ -136,3 +136,15 @@ def test_verify_stage_plan():
     assert {j['dataset'] for j in held} == {'cic-ids2017'} and len(held) == 405
     budgets = {j['overrides'].get('baselines.update_label_budget') for j in jobs}
     assert budgets == {128}
+
+
+def test_tradeoff_stage_plan():
+    from dasp_nids.verified_propagation import clopper_pearson_lower
+    from tools.run_dasp_v2 import TRADEOFF_R, certified_epsilon, jobs_for, parser
+
+    jobs = jobs_for(parser().parse_args(['--stage', 'tradeoff', '--selection',
+                                         'results_snapshot/dev/dev_selection.json']))
+    assert len(jobs) == 240 and {j['stage'] for j in jobs} == {'tradeoff'}
+    assert {j['dataset'] for j in jobs} == {'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3'}
+    for r in (*TRADEOFF_R, 4):
+        assert clopper_pearson_lower(r, r, 0.25) >= 1 - certified_epsilon(r)

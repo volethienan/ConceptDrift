@@ -371,6 +371,86 @@ def window_confusion(root: Path, record: dict) -> dict[str, float]:
             'cumulative_attack_recall': tp / (tp + fn) if tp + fn else np.nan}
 
 
+VERIFY_METRICS = ['cumulative_macro_f1', 'cumulative_benign_fpr', 'cumulative_attack_recall', 'mean_macro_f1',
+                  'total_update_seconds']
+
+
+def confusion_frame(output_root: Path, records: list[dict]) -> pd.DataFrame:
+    """Run frame whose cumulative FPR and recall are recounted from the
+    post-warm-up confusion counts in windows.csv (not every learner's summary
+    carries them)."""
+    frame = analysis_frame(records)
+    counts = [window_confusion(output_root, record) for record in records]
+    keyed = pd.DataFrame([{key: r[key] for key in (*PAIR, 'condition')} | c for r, c in zip(records, counts)])
+    frame = frame.drop(columns=['cumulative_benign_fpr', 'cumulative_attack_recall']).merge(keyed, on=[*PAIR, 'condition'])
+    overrides = frame.overrides.map(json.loads)
+    frame['delay'] = overrides.map(lambda o: o.get('training.label_delay', -1))
+    frame['fast_budget'] = overrides.map(lambda o: o.get('baselines.fast_label_budget', 0))
+    return frame
+
+
+def verify_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    grouped = frame.groupby(['dataset', 'condition', 'delay', 'fast_budget'])[VERIFY_METRICS]
+    return grouped.mean().join(grouped.std().add_suffix('_std')).join(grouped.size().rename('runs')).reset_index()
+
+
+# verify-stage runs that are points of the trade-off curve, under their sweep names
+TRADEOFF_ANCHORS = {'er+purity@d5_k16': 'er+purity@d5_k16_r4',
+                    'er+representative@d5_k16': 'er+representative@d5_k16_c16',
+                    'er+uniform@d5_k16': 'er+uniform@d5_k16', 'er+uniform_knn@d5_k16': 'er+uniform_knn@d5_k16',
+                    'er+hierarchical@d5_k16': 'er+hierarchical@d5_k16', 'er@d5': 'er@d5', 'er@d0': 'er@d0'}
+
+
+def pareto_front(summary: pd.DataFrame) -> pd.Series:
+    """Per dataset: True when no other condition has both higher-or-equal F1
+    and lower-or-equal FPR (means), with one of them strict."""
+    out = pd.Series(False, index=summary.index)
+    for _, part in summary.groupby('dataset'):
+        f1, fpr = part.cumulative_macro_f1.to_numpy(), part.cumulative_benign_fpr.to_numpy()
+        for index, a, b in zip(part.index, f1, fpr):
+            out[index] = not ((f1 >= a) & (fpr <= b) & ((f1 > a) | (fpr < b))).any()
+    return out
+
+
+def analyze_tradeoff(output_root: Path, verify_root: Path, replicates: int = 10000,
+                     allow_incomplete: bool = False) -> dict:
+    """F1/FPR trade-off at d5, k16: purity over its certification size r
+    against representative propagation over its number of clusters, joined
+    with the matching verify-stage runs. Each representative point is paired
+    with the default purity (r = 4) and with the purity point of highest mean
+    F1 whose mean FPR is not above it, per dataset."""
+
+    sweep = confusion_frame(output_root, _load_stage(output_root, 'tradeoff', allow_incomplete))
+    anchors = confusion_frame(verify_root, _load_stage(verify_root, 'verify', allow_incomplete))
+    anchors = anchors[anchors.condition.isin(TRADEOFF_ANCHORS) & anchors.dataset.isin(set(sweep.dataset))].copy()
+    anchors['condition'] = anchors.condition.map(TRADEOFF_ANCHORS)
+    frame = pd.concat([sweep, anchors], ignore_index=True)
+    frame.to_csv(output_root / 'tradeoff_runs.csv', index=False)
+    summary = verify_summary(frame)
+    summary['pareto'] = pareto_front(summary)
+    summary.to_csv(output_root / 'tradeoff_summary.csv', index=False)
+    families = {}
+    for dataset, part in summary.groupby('dataset'):
+        purity = part[part.condition.str.startswith('er+purity@')]
+        runs = frame[frame.dataset == dataset]
+        pairs, matched = [], {}
+        for _, rep in part[part.condition.str.startswith('er+representative@')].iterrows():
+            pairs.append(('er+purity@d5_k16_r4', rep.condition))
+            eligible = purity[purity.cumulative_benign_fpr <= rep.cumulative_benign_fpr]
+            if len(eligible):
+                best = eligible.loc[eligible.cumulative_macro_f1.idxmax(), 'condition']
+                matched[rep.condition] = best
+                if best != 'er+purity@d5_k16_r4':
+                    pairs.append((best, rep.condition))
+        families[dataset] = {'matched_purity_at_no_higher_fpr': matched,
+                             'f1': run_level_family(runs, pairs, 'cumulative_macro_f1', replicates),
+                             'fpr': run_level_family(runs, pairs, 'cumulative_benign_fpr', replicates)}
+    result = {'stage': 'tradeoff', 'runs': len(frame), 'rope': ROPE,
+              'positive_difference_means': 'representative better than purity', 'contrasts': families}
+    (output_root / 'tradeoff_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
 def analyze_verify(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
     """Same-window verification under label delay: the purity-verified fast
     lane against every other learner at the same label delay and total
@@ -378,21 +458,9 @@ def analyze_verify(output_root: Path, replicates: int = 10000, allow_incomplete:
     Natural streams are scored by cumulative Macro-F1."""
 
     records = _load_stage(output_root, 'verify', allow_incomplete)
-    frame = analysis_frame(records)
-    # Not every learner's summary carries cumulative FPR and recall; recount
-    # them for every run from the post-warm-up confusion counts in windows.csv.
-    counts = [window_confusion(output_root, record) for record in records]
-    keyed = pd.DataFrame([{key: r[key] for key in (*PAIR, 'condition')} | c for r, c in zip(records, counts)])
-    frame = frame.drop(columns=['cumulative_benign_fpr', 'cumulative_attack_recall']).merge(keyed, on=[*PAIR, 'condition'])
-    overrides = frame.overrides.map(json.loads)
-    frame['delay'] = overrides.map(lambda o: o.get('training.label_delay', -1))
-    frame['fast_budget'] = overrides.map(lambda o: o.get('baselines.fast_label_budget', 0))
+    frame = confusion_frame(output_root, records)
     frame.to_csv(output_root / 'verify_runs.csv', index=False)
-    metrics = ['cumulative_macro_f1', 'cumulative_benign_fpr', 'cumulative_attack_recall', 'mean_macro_f1',
-               'total_update_seconds']
-    grouped = frame.groupby(['dataset', 'condition', 'delay', 'fast_budget'])[metrics]
-    summary = grouped.mean().join(grouped.std().add_suffix('_std')).join(grouped.size().rename('runs')).reset_index()
-    summary.to_csv(output_root / 'verify_summary.csv', index=False)
+    verify_summary(frame).to_csv(output_root / 'verify_summary.csv', index=False)
     present = set(frame.condition)
     families = {}
     for delay in sorted(frame.delay.unique()):
@@ -737,7 +805,7 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify'),
+    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify', 'tradeoff'),
                         default='dev')
     parser.add_argument('--output-root', type=Path, required=True,
                         help='stage results; for --stage rope, where rope_analysis.json is written')
@@ -745,6 +813,7 @@ if __name__ == '__main__':
     parser.add_argument('--rope', type=float, default=ROPE, help='half-width of the practical-equivalence region')
     parser.add_argument('--prepared-root', type=Path, default=Path('prepared_streams_v2'))
     parser.add_argument('--reference', default='v2_linear')
+    parser.add_argument('--verify-root', type=Path, help='tradeoff stage: verify-stage results to join')
     parser.add_argument('--allow-incomplete', action='store_true')
     arguments = parser.parse_args()
     ROPE = arguments.rope
@@ -761,6 +830,9 @@ if __name__ == '__main__':
     elif arguments.stage == 'verify':
         analyze_verify(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'verify_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'tradeoff':
+        analyze_tradeoff(arguments.output_root, arguments.verify_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'tradeoff_summary.csv').round(4).to_string(index=False))
     elif arguments.stage == 'shortcut':
         analyze_shortcut(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'shortcut_summary.csv').round(4).to_string(index=False))

@@ -17,6 +17,7 @@ import copy
 import hashlib
 import itertools
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -36,7 +37,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'verify')
+STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify')
 
 
 def _grid(**axes):
@@ -346,6 +347,33 @@ def verify_settings(overrides_of):
     return out
 
 
+# F1/FPR trade-off of the fast lanes at d5, k16 on the dev streams where they
+# differ (UNSW is saturated). Purity's only free knob is the number r of
+# all-attack draws that certify a cluster: at level delta the Clopper-Pearson
+# lower bound of r/r is delta**(1/r), so epsilon is set to 1 - delta**(1/r).
+# Representative trades recall for FPR through its number of clusters. The
+# r = 4 and 16-cluster points are the verify-stage runs.
+TRADEOFF_DATASETS = ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
+TRADEOFF_R = (1, 2, 3, 6, 8)
+TRADEOFF_CLUSTERS = (4, 8, 12)
+
+
+def certified_epsilon(r, delta=VERIFY_PURITY['baselines.fast_lane_delta']):
+    return math.ceil((1 - delta ** (1 / r)) * 1e4) / 1e4
+
+
+def tradeoff_settings(overrides_of):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    out = [(f'er+purity@d5_k16_r{r}', 'experience_replay',
+            er | _lane(5, 16, 'purity', **{'baselines.fast_lane_test_labels': r,
+                                           'baselines.fast_lane_epsilon': certified_epsilon(r)}))
+           for r in TRADEOFF_R]
+    out += [(f'er+representative@d5_k16_c{c}', 'experience_replay',
+             er | _lane(5, 16, 'representative', **{'baselines.fast_lane_clusters': c}))
+            for c in TRADEOFF_CLUSTERS]
+    return out
+
+
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
@@ -356,8 +384,13 @@ def verify_jobs(args):
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
                  for d in datasets for seed in NATURAL_SEEDS[d][:args.seeds_per_dataset]
                  for m in VERIFY_MODEL_SEEDS]
-    settings = verify_settings(overrides_of)
-    return [dict(stage='verify', dataset=d, scenario=s, stream_seed=seed, model_seed=m,
+    stage = 'tradeoff' if args.stage == 'tradeoff' else 'verify'
+    if stage == 'tradeoff':
+        if args.heldout:
+            raise ValueError('the tradeoff stage runs on the development streams only')
+        cells = [c for c in cells if c[0] in TRADEOFF_DATASETS]
+    settings = (tradeoff_settings if stage == 'tradeoff' else verify_settings)(overrides_of)
+    return [dict(stage=stage, dataset=d, scenario=s, stream_seed=seed, model_seed=m,
                  method=method, condition=name, overrides=overrides, stream=stream)
             for d, s, seed, m, stream in cells for name, method, overrides in settings]
 
@@ -516,7 +549,7 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
-    if args.stage == 'verify':
+    if args.stage in ('verify', 'tradeoff'):
         return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()
