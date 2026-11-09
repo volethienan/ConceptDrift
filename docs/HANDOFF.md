@@ -13,7 +13,7 @@
 
 | Thứ | Đường dẫn |
 |---|---|
-| Code DASP-v2 | worktree `.worktrees/dasp-v2`, nhánh `dasp-v2-infra`. **Nhiều thay đổi chưa commit**: LODO, compound, E4/E6/E15. |
+| Code DASP-v2 | worktree `.worktrees/dasp-v2`, nhánh `dasp-v2-infra` (LODO, compound, E4/E6/E15 đã push). Chưa commit: fast lane/xác minh cùng window (`verified_propagation.py`, stage `verify`), builder CIC natural. |
 | Checkout chính | Có sửa đổi chưa commit của người dùng; **không đụng vào**. |
 | Dữ liệu | `prepared_streams_v2/` ở checkout chính (42 GB: controlled, `feature_shift/`, `label_shift/`, `natural/`) |
 | Python | `.venv-revision/Scripts/python.exe` (Py 3.12, torch 2.3.1 CPU). Chạy test với `PYTHONPATH="src;."`. |
@@ -22,8 +22,34 @@
 | Pilot cục bộ E4/E6 | `results_snapshot/pilot_local_20261022/` |
 | Báo cáo đánh giá Q1 + tài liệu | Checkout chính: `reports/NIDS thích ứng trôi dạt.md`, `research_notes/NIDS thích ứng trôi dạt/` |
 | Lệnh E4/E6/E15 | `docs/E4_E6_E15_EVALUATION.md` |
+| Hướng mới: xác minh cùng window | `docs/VERIFY_EVALUATION.md`; held-out niêm phong `prepared_streams_v2/natural/cic-ids2017` (seed 4001–4003, chưa chạy method nào) |
 
-## Kết luận đến nay
+## Hướng mới (2026-10-23): xác minh trong cùng window khi nhãn trễ
+
+Người dùng muốn bài **method mới** (một nguyên lý mới, không ghép module), **không còn làm concept drift** (đã bão hoà). Chủ đề mới: phát hiện xâm nhập khi nhãn đến trễ.
+
+- **Recall của một đợt attack chỉ phụ thuộc vào lúc nhãn đầu tiên của nó đến.** Đợt dài 1–3 window, nên ở d5 ER bỏ sót gần hết.
+- **Cơ chế (`baselines.fast_lane=purity`):** trong 128 nhãn mỗi window, 16 nhãn được xác minh ngay.
+  - Chia flow mô hình đoán benign thành cụm; sàng mỗi cụm bằng 1 nhãn ngẫu nhiên.
+  - Cụm ra attack được rút tiếp đến đủ r = 4 nhãn ngẫu nhiên; nếu cả 4 đều attack và cận dưới Clopper-Pearson ≥ 0,7 thì cảnh báo cả cụm. Cụm lẫn nhãn thì tách đôi.
+  - Không huấn luyện bằng nhãn giả.
+- **Pilot harness (3 seed, cumulative F1 / FPR):**
+  - CSE: d1 0,61 → 0,94; d5 0,55 → 0,95 / 0,5%.
+  - ToN: d1 0,84 → 0,91; d5 0,72 → 0,90 / 5%.
+  - UNSW giữ nguyên.
+  - Seed tệ nhất vẫn hơn fast lane uniform: CSE +0,21, ToN +0,10.
+  - Hierarchical sampling (Dasgupta & Hsu 2008) và uniform+kNN thua: FPR 10–15% trên ToN. Một đại diện mỗi cụm, không kiểm định: F1 tương tự nhưng FPR 9–11%.
+- **Runner thật khớp harness** ở d5, seed đầu: CSE 0,47 → 0,94, ToN 0,74 → 0,91.
+- **BoT không ổn định:** 13 benign mỗi window; runner và harness cho chiều ngược nhau. Chỉ báo cáo như caveat.
+- **Prior art gần:** Dasgupta & Hsu 2008, ILAB (Beaugnon RAID 2017), gom cụm alert (Julisch 2003). Lan truyền trong cùng window phải được trình bày là phân loại theo incident.
+- PU/novelty không phải nguồn gain. Cảnh báo PU thô vỡ FPR khi benign drift.
+- **Việc tiếp:**
+  - chạy stage `verify` trên dev bằng runner (288 run, chạy được cục bộ);
+  - baseline IWMS và ARF;
+  - nhiều held-out natural hơn;
+  - chỉ chạy CIC-IDS2017 held-out một lần khi đã chốt.
+
+## Kết luận đến nay (hướng DASP-v2 cũ)
 
 1. **DASP-v2 không hơn baseline đơn giản.**
    - Trên held-out (NF-CSE, NF-ToN, CIC-IDS2017), Experience Replay (ER) hơn DASP-v2 0,009 Macro-F1 (Holm p 7e-7).
@@ -68,4 +94,4 @@
 
 - Chạy nhiều shard song song trên Windows: các shard cùng ghi `<stage>_plan.json` và có thể lỗi `PermissionError`. Chạy lại shard đó là xong; Linux không bị.
 - Trên máy này mỗi run mất khoảng 30 s/tiến trình; máy có 12 nhân.
-- Chưa commit/push gì. Server cần code đã push lên `dasp-v2-infra` thì mới chạy được stage `sweep`/`shortcut`/`rope`.
+- Commit `a594739c` (LODO, E4/E6/E15) đã push lên `dasp-v2-infra`; phần fast lane/`verify` chưa commit.

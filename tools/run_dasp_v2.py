@@ -36,7 +36,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep')
+STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'verify')
 
 
 def _grid(**axes):
@@ -302,6 +302,46 @@ SHORTCUT_SETS = {
 SHORTCUT_METHODS = ('final', 'experience_replay', 'online_mlp', 'ssf_budget', 'arf_adapted', 'static')
 
 
+# Same-window verification under label delay (verified_propagation). Every
+# condition spends 128 labels per window: fast_label_budget of them on the
+# current window at once, the rest label_delay windows late. Natural
+# streams only. The CIC-IDS2017 natural streams (seeds 4001-4003) are the
+# held-out test of this stage and are planned only with --heldout.
+VERIFY_DELAYS = (1, 5)
+VERIFY_FAST = (8, 16)
+VERIFY_LANES = ('uniform', 'representative', 'purity', 'uniform_knn', 'hierarchical')
+VERIFY_PURITY = {'baselines.fast_lane_test_labels': 4, 'baselines.fast_lane_epsilon': 0.3,
+                 'baselines.fast_lane_delta': 0.25}
+VERIFY_HELDOUT = {'cic-ids2017': (4001, 4002, 4003)}
+
+
+def verify_jobs(args):
+    overrides_of = selected_overrides(args)
+    if args.heldout:
+        cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
+                 for d, seeds in VERIFY_HELDOUT.items() for seed in seeds for m in FINAL_MODEL_SEEDS]
+    else:
+        datasets = args.datasets or list(NATURAL_SEEDS)
+        cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
+                 for d in datasets for seed in NATURAL_SEEDS[d][:args.seeds_per_dataset]
+                 for m in DEV_MODEL_SEEDS]
+    base = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    settings = [(f'er@d{d}', {'training.label_delay': d}) for d in VERIFY_DELAYS]
+    for d in VERIFY_DELAYS:
+        for k in VERIFY_FAST:
+            for lane in VERIFY_LANES:
+                extra = VERIFY_PURITY if lane == 'purity' else {}
+                settings.append((f'er+{lane}@d{d}_k{k}', {
+                    'training.label_delay': d, 'baselines.fast_label_budget': k, 'baselines.fast_lane': lane,
+                    'baselines.fast_lane_clusters': k // 2 if lane == 'purity' else k} | extra))
+        settings.append((f'er+purity_pseudo@d{d}_k16', {
+            'training.label_delay': d, 'baselines.fast_label_budget': 16, 'baselines.fast_lane': 'purity',
+            'baselines.fast_lane_clusters': 8, 'baselines.fast_lane_pseudo_labels': True} | VERIFY_PURITY))
+    return [dict(stage='verify', dataset=d, scenario=s, stream_seed=seed, model_seed=m,
+                 method='experience_replay', condition=name, overrides=base | delta, stream=stream)
+            for d, s, seed, m, stream in cells for name, delta in settings]
+
+
 def setting_name(budget, delay, policy):
     return f'b{budget}_d{delay}_{policy}'
 
@@ -456,6 +496,8 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
+    if args.stage == 'verify':
+        return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()
                  if not args.methods or method in args.methods}
@@ -642,6 +684,8 @@ def parser():
                    help='lodo/sweep/shortcut: stream seeds per dataset (first k of each dataset\'s seeds)')
     p.add_argument('--skip-natural', action='store_true',
                    help='sweep/shortcut: controlled scenarios only, no chronological streams')
+    p.add_argument('--heldout', action='store_true',
+                   help='verify stage: plan the sealed held-out natural streams instead of the development ones')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--resume', action='store_true')
     p.add_argument('--preflight', action='store_true')

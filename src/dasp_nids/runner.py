@@ -45,7 +45,7 @@ from .baselines import (
     train_ssf,
 )
 from .config import ExperimentConfig
-from . import dasp_v2, original_review, sota_adapters
+from . import dasp_v2, original_review, sota_adapters, verified_propagation
 from .feature_groups import semantic_groups
 from .data import (
     PreparedStream,
@@ -2949,6 +2949,10 @@ class StreamingExperiment:
         # Prediction-time attack scores by window index, kept only for
         # score-based query policies until that window's labels arrive.
         self._query_scores: dict[int, tuple[np.ndarray, float]] = {}
+        # Fast-lane (same-window) label queries per window index.
+        self._fast_queries: dict[int, np.ndarray] = {}
+        self._fast_lane_row: dict[str, object] = {}
+        self._last_attack_score = np.empty(0, dtype=np.float64)
         if config.dasp.baseline in REVISION_METHODS:
             required_architecture = REVISION_CONDITIONS[
                 config.dasp.baseline
@@ -3564,7 +3568,9 @@ class StreamingExperiment:
                     window,
                     len(stream.class_names),
                 )
+            metrics = self._fast_lane(model, memory, window, metrics, len(stream.class_names))
             row = self._base_row(window, metrics, warmup=False)
+            row.update(self._fast_lane_row)
             row["drift_scoring_seconds"] = drift_scoring_seconds
             row["prediction_decision_seconds"] = (
                 float(row["preprocessing_seconds"])
@@ -4084,9 +4090,16 @@ class StreamingExperiment:
         seed = cfg.data.random_seed + window.index * 104729 + 17
         policy = cfg.baselines.query_policy
         if policy == "uniform":
-            return _label_blind_uniform_query_indices(
-                len(window.x), cfg.baselines.update_label_budget, seed
+            fast = self._fast_queries.pop(window.index, None)
+            if fast is None:
+                return _label_blind_uniform_query_indices(
+                    len(window.x), cfg.baselines.update_label_budget, seed
+                )
+            rest = torch.from_numpy(np.setdiff1d(np.arange(len(window.x)), fast))
+            bulk = _label_blind_uniform_query_indices(
+                len(rest), cfg.baselines.update_label_budget - len(fast), seed
             )
+            return rest[bulk]
         if window.index not in self._query_scores:
             raise RuntimeError(f"no prediction-time scores for window {window.index}")
         scores, threshold = self._query_scores.pop(window.index)
@@ -4095,6 +4108,90 @@ class StreamingExperiment:
         return _score_query_indices(
             scores, cfg.baselines.update_label_budget, seed, policy, threshold
         )
+
+    def _fast_lane(
+        self,
+        model: OnlineMLP,
+        memory: ReservoirMemory,
+        window: StreamWindow,
+        metrics: dict[str, float | int],
+        n_classes: int,
+    ) -> dict[str, float | int]:
+        """Same-window verification: reveal a few labels of ``window`` now.
+
+        Runs right after ``window`` is predicted. Labels are read only through
+        ``verified_propagation.LabelOracle`` (fast_label_budget queries); the
+        flows it alarms are OR-ed into the window's predictions, and the model
+        trains at once on the fast labels plus the alarms as attack labels.
+        The remaining update labels of the window arrive label_delay windows
+        late, drawn uniformly from the flows the fast lane did not query.
+        """
+        cfg = self.config.baselines
+        self._fast_lane_row = {}
+        budget = int(cfg.fast_label_budget)
+        if budget <= 0:
+            return metrics
+        method = self.config.dasp.baseline
+        if method not in {"online_mlp", "experience_replay"}:
+            raise ValueError(f"fast_label_budget is supported for online_mlp and experience_replay, not {method}")
+        if cfg.query_policy != "uniform" or not 0 < budget < cfg.update_label_budget:
+            raise ValueError("the fast lane needs uniform bulk queries and 0 < fast_label_budget < update_label_budget")
+        started = time.perf_counter()
+        predicted = self._last_predictions.copy()
+        candidates = np.flatnonzero(predicted == 0)
+        x = _tensor_to_numpy(window.x)
+        oracle = verified_propagation.LabelOracle(_tensor_to_numpy(window.y), budget)
+        rng = np.random.default_rng([int(self.config.data.random_seed), int(window.index), 7919])
+        kind = cfg.fast_lane
+        if kind == "uniform":
+            result = verified_propagation.Verification(np.empty(0, np.int64), np.empty(0, np.int64))
+        elif kind == "representative":
+            result = verified_propagation.representative_propagation(
+                x, candidates, oracle, rng, clusters=cfg.fast_lane_clusters)
+        elif kind == "purity":
+            result = verified_propagation.purity_verified_propagation(
+                x, candidates, oracle, rng, initial_clusters=cfg.fast_lane_clusters,
+                labels_per_test=cfg.fast_lane_test_labels, epsilon=cfg.fast_lane_epsilon,
+                delta=cfg.fast_lane_delta)
+        elif kind == "uniform_knn":
+            result = verified_propagation.uniform_knn_propagation(x, candidates, oracle, rng, budget=budget)
+        elif kind == "hierarchical":
+            result = verified_propagation.hierarchical_sampling(x, candidates, oracle, rng, budget=budget)
+        else:
+            raise ValueError(f"unknown fast_lane {kind}")
+        queried = np.asarray(oracle.queried, dtype=np.int64)
+        if len(queried) < budget:  # unused fast labels: uniform over the rest
+            rest = np.setdiff1d(np.arange(len(x)), queried)
+            queried = np.concatenate([queried, rng.choice(rest, budget - len(queried), replace=False)])
+        labels = oracle.query(queried)
+        alarms = np.setdiff1d(result.alarms, queried)
+        fused = predicted.copy()
+        fused[alarms] = 1
+        fused[queried] = labels  # verified flows are known
+        self._fast_queries[window.index] = queried
+        y_true = _tensor_to_numpy(window.y).astype(np.int64)
+        metrics = dict(metrics)
+        score = self._last_attack_score.copy()
+        score[alarms] = 1.0
+        score[queried] = labels
+        metrics.update(classification_metrics(y_true, fused, n_classes, y_score=score))
+        metrics.update(self._subtype_recall_metrics(window, fused))
+        self._last_predictions = fused
+        pseudo = alarms if cfg.fast_lane_pseudo_labels else alarms[:0]
+        train_x = torch.cat([window.x[torch.from_numpy(queried)], window.x[torch.from_numpy(pseudo)]])
+        train_y = torch.cat([torch.from_numpy(labels), torch.ones(len(pseudo), dtype=torch.long)])
+        replay = memory.sample(2 * self.config.dasp.memory_batch_size, self.device)
+        gradients = _train_online(model, train_x, train_y, self.config, self.device, replay=replay)
+        memory.add(window.x[torch.from_numpy(queried)], torch.from_numpy(labels))
+        self._fast_lane_row = {
+            "fast_lane": kind,
+            "fast_labels": int(len(queried)),
+            "fast_alarms_added": int((predicted[alarms] == 0).sum()),
+            "fast_propagated": int(len(result.pseudo_indices)),
+            "fast_gradient_evaluations": int(gradients),
+            "fast_lane_seconds": time.perf_counter() - started,
+        }
+        return metrics
 
     def _update_adapter(
         self, adapter, window: StreamWindow, row: dict[str, object]
@@ -4251,6 +4348,7 @@ class StreamingExperiment:
         metric_started = time.perf_counter()
         predicted = np.asarray(predicted_tensor.tolist(), dtype=np.int64)
         self._last_predictions = predicted.copy()
+        self._last_attack_score = np.asarray(attack_score, dtype=np.float64).copy()
         self._remember_query_scores(window, attack_score)
         result = classification_metrics(
             np.asarray(window.y.tolist(), dtype=np.int64),

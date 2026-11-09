@@ -270,6 +270,20 @@ class BaselineConfig:
     # How budget-matched methods choose their update labels; every policy is
     # label-blind (runner.QUERY_POLICIES). uniform is the historical contract.
     query_policy: str = "uniform"
+    # Same-window verification (verified_propagation): fast_label_budget of
+    # the update_label_budget labels are revealed for the current window right
+    # after it is predicted; the rest arrive label_delay windows late. 0 keeps
+    # the historical contract. fast_lane: uniform | representative | purity |
+    # uniform_knn | hierarchical.
+    fast_label_budget: int = 0
+    fast_lane: str = "purity"
+    fast_lane_clusters: int = 8
+    fast_lane_test_labels: int = 4
+    fast_lane_epsilon: float = 0.3
+    fast_lane_delta: float = 0.25
+    # Also train at once on the fast-lane alarms as attack labels. Off by
+    # default: on the development streams it raised FPR (ToN 5% -> 7%).
+    fast_lane_pseudo_labels: bool = False
     ssf_label_budget: int = 256
     ssf_new_sample_weight: float = 3.0
     ssf_lwf_lambda: float = 0.5
