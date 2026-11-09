@@ -317,7 +317,7 @@ VERIFY_LANES = ('uniform', 'representative', 'purity', 'uniform_knn', 'hierarchi
 VERIFY_K_SWEEP = (4, 8, 32)
 VERIFY_PURITY = {'baselines.fast_lane_test_labels': 4, 'baselines.fast_lane_epsilon': 0.3,
                  'baselines.fast_lane_delta': 0.25}
-VERIFY_HELDOUT = {'cic-ids2017': (4001, 4002, 4003)}
+VERIFY_HELDOUT = {'cic-ids2017': (4001, 4002, 4003), 'cidds-001': (5001, 5002, 5003)}
 
 
 def _lane(d, k, lane, **extra):
@@ -417,7 +417,8 @@ def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
-                 for d, seeds in VERIFY_HELDOUT.items() for seed in seeds for m in VERIFY_MODEL_SEEDS]
+                 for d, seeds in VERIFY_HELDOUT.items() for seed in seeds for m in VERIFY_MODEL_SEEDS
+                 if not args.datasets or d in args.datasets]
     else:
         datasets = args.datasets or list(VERIFY_DATASETS)
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))

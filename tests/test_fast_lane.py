@@ -133,7 +133,7 @@ def test_verify_stage_plan():
     assert len(jobs) == 1215 and {j['dataset'] for j in jobs} == {'nf-unsw-nb15-v3', 'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3'}
     held = jobs_for(parser().parse_args(['--stage', 'verify', '--heldout', '--selection',
                                          'results_snapshot/dev/dev_selection.json']))
-    assert {j['dataset'] for j in held} == {'cic-ids2017'} and len(held) == 405
+    assert {j['dataset'] for j in held} == {'cic-ids2017', 'cidds-001'} and len(held) == 810
     budgets = {j['overrides'].get('baselines.update_label_budget') for j in jobs}
     assert budgets == {128}
 
@@ -243,4 +243,4 @@ def test_verify2_stage_plan():
     args = ['--stage', 'verify2', '--selection', 'results_snapshot/dev/dev_selection.json']
     jobs = jobs_for(parser().parse_args(args))
     assert len(jobs) == 1935 and len({j['condition'] for j in jobs}) == 43
-    assert len(jobs_for(parser().parse_args([*args, '--heldout']))) == 645
+    assert len(jobs_for(parser().parse_args([*args, '--heldout']))) == 1290

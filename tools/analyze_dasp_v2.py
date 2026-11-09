@@ -451,6 +451,154 @@ def analyze_tradeoff(output_root: Path, verify_root: Path, replicates: int = 100
     return result
 
 
+BURST_MIN_SUPPORT = 10
+BURST_DETECTED_RECALL = 0.5
+
+
+def _pooled(windows: pd.DataFrame, prefix: str) -> dict[str, float]:
+    if f'{prefix}attack_tp' not in windows:
+        prefix = ''
+    tp, fn, fp, tn = (float(windows[f'{prefix}attack_{k}'].sum()) for k in ('tp', 'fn', 'fp', 'tn'))
+    attack_f1 = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else np.nan
+    benign_f1 = 2 * tn / (2 * tn + fp + fn) if 2 * tn + fp + fn else np.nan
+    return {'macro_f1': float(np.nanmean([attack_f1, benign_f1])),
+            'benign_fpr': fp / (fp + tn) if fp + tn else np.nan,
+            'attack_recall': tp / (tp + fn) if tp + fn else np.nan,
+            'false_alarms_per_10k': 1e4 * fp / (tp + fn + fp + tn)}
+
+
+def burst_metrics(windows: pd.DataFrame, prefix: str = 'uq_') -> dict[str, float]:
+    """Attack bursts: maximal runs of consecutive scored windows in which a
+    subtype has at least BURST_MIN_SUPPORT flows. A burst is detected in the
+    first window whose subtype recall reaches BURST_DETECTED_RECALL; latency
+    counts windows from the burst's first window (a missed burst counts its
+    length). Scored on unqueried flows when the run logged them."""
+    if not any(c.startswith(f'{prefix}subtype_support_') for c in windows):
+        prefix = ''
+    windows = windows.sort_values('window')
+    bursts = []
+    for column in [c for c in windows if c.startswith(f'{prefix}subtype_support_')]:
+        slug = column[len(f'{prefix}subtype_support_'):]
+        support = windows[column].fillna(0).to_numpy()
+        recall = windows.get(f'{prefix}subtype_recall_{slug}', pd.Series(np.nan, index=windows.index)).to_numpy()
+        index = windows.window.to_numpy()
+        present = support >= BURST_MIN_SUPPORT
+        start = None
+        for i in range(len(present) + 1):
+            inside = i < len(present) and present[i] and (start is None or index[i] == index[i - 1] + 1)
+            if start is not None and not inside:
+                part = recall[start:i]
+                hits = np.flatnonzero(part >= BURST_DETECTED_RECALL)
+                bursts.append({'length': i - start, 'detected': bool(len(hits)),
+                               'latency': int(hits[0]) if len(hits) else i - start,
+                               'onset_recall': float(part[0])})
+                start = None
+            if i < len(present) and present[i] and start is None:
+                start = i
+    if not bursts:
+        return {'bursts': 0, 'burst_detection_rate': np.nan, 'burst_latency_windows': np.nan,
+                'burst_onset_recall': np.nan}
+    table = pd.DataFrame(bursts)
+    return {'bursts': len(table), 'burst_detection_rate': float(table.detected.mean()),
+            'burst_latency_windows': float(table.latency.mean()),
+            'burst_onset_recall': float(table.onset_recall.mean())}
+
+
+def verify2_run_metrics(root: Path, record: dict) -> dict[str, float]:
+    windows = pd.read_csv(run_directory(root, record) / 'windows.csv')
+    windows = windows[~windows.warmup.astype(bool)]
+    out = {}
+    for prefix, name in (('', 'all'), ('uq_', 'uq'), ('model_uq_', 'model')):
+        out |= {f'{name}_{k}': v for k, v in _pooled(windows, prefix).items()}
+    out |= burst_metrics(windows)
+    out['fast_lane_seconds_per_window'] = float(windows['fast_lane_seconds'].mean()) if 'fast_lane_seconds' in windows else 0.0
+    out['fast_groups_per_window'] = float(windows['fast_groups'].mean()) if 'fast_groups' in windows else 0.0
+    return out
+
+
+VERIFY2_BASELINES = ('er@d0', 'er@d1', 'er@d5', 'er_iwms@d1', 'er_iwms@d5', 'er_uncertainty@d1',
+                     'er_uncertainty@d5', 'arf@d1', 'arf@d5')
+VERIFY2_METRICS = ['uq_macro_f1', 'uq_benign_fpr', 'uq_attack_recall', 'uq_false_alarms_per_10k',
+                   'all_macro_f1', 'model_macro_f1', 'burst_detection_rate', 'burst_latency_windows',
+                   'burst_onset_recall', 'fast_lane_seconds_per_window', 'fast_groups_per_window']
+
+
+def verify2_pairs(present: set[str]) -> dict[str, list[tuple[str, str]]]:
+    """Contrast families; pairs are (reference, condition), kept when both ran."""
+    families = {}
+    for d in (1, 5):
+        ref = f'er+purity@d{d}_k16'
+        rivals = [f'er@d{d}', f'er_iwms@d{d}', f'er_uncertainty@d{d}', f'arf@d{d}', f'er+anomaly@d{d}_k16',
+                  *[f'er+{lane}@d{d}_k16' for lane in ('uniform', 'representative', 'uniform_knn', 'hierarchical')]]
+        families[f'd{d}_vs_purity'] = [(ref, c) for c in rivals]
+    families['prospective'] = [('er@d5', 'er+purity@d5_k16_h1'), ('er@d5', 'er+representative@d5_k16_h1'),
+                               ('er@d5', 'er+purity@d5_k16_h2'), ('er@d5', 'er+representative@d5_k16_h2'),
+                               ('er@d1', 'er+purity@d1_k16_h1'), ('er@d1', 'er+representative@d1_k16_h1'),
+                               ('er@d0', 'er+purity@d5_k16_h1'), ('er@d0', 'er+representative@d5_k16_h1'),
+                               ('er+uniform@d5_k16', 'er+purity@d5_k16_h1'),
+                               ('er+uniform@d5_k16', 'er+representative@d5_k16_h1')]
+    families['learner_arf'] = [('arf+uniform@d5_k16', 'arf+purity@d5_k16'),
+                               ('arf+uniform@d5_k16', 'arf+representative@d5_k16'),
+                               ('arf@d5', 'arf+purity@d5_k16'), ('arf@d5', 'arf+purity@d5_k16_h1')]
+    families['ablation'] = [('er+purity@d5_k16', 'er+purity_nosplit@d5_k16'),
+                            ('er+purity@d5_k16', 'er+purity_all@d5_k16'),
+                            ('er+purity@d5_k16', 'er+purity_pseudo@d5_k16'),
+                            ('er+purity@d5_k16', 'er+purity@d5_k16_noise05'),
+                            ('er+purity@d5_k16', 'er+purity@d5_k16_noise10'),
+                            ('er+representative@d5_k16', 'er+representative@d5_k16_noise05'),
+                            ('er+representative@d5_k16', 'er+representative@d5_k16_noise10')]
+    families['budget'] = [(f'er+uniform@d5_k{k}', f'er+purity@d5_k{k}') for k in (4, 8, 16, 32)]
+    families['delay'] = [(f'er@d{d}', f'er+{lane}@d{d}_k16') for d in (1, 2, 5, 10)
+                         for lane in ('purity', 'representative')]
+    return {name: [pair for pair in pairs if set(pair) <= present] for name, pairs in families.items()}
+
+
+def stream_level(frame: pd.DataFrame, pairs: list[tuple[str, str]], column: str) -> list[dict]:
+    """Model seeds averaged within each (dataset, stream): the honest
+    independent unit. Reports how many streams favour the condition."""
+    means = frame.groupby(['dataset', 'stream_seed', 'condition'])[column].mean().unstack('condition')
+    out = []
+    for reference, condition in pairs:
+        diff = (means[condition] - means[reference]).dropna()
+        out.append({'reference': reference, 'condition': condition, 'metric': column, 'streams': int(len(diff)),
+                    'condition_better_streams': int((diff > 0).sum()), 'mean_difference': float(diff.mean()),
+                    'min_difference': float(diff.min()), 'max_difference': float(diff.max()),
+                    'per_dataset_mean': {d: float(part.mean()) for d, part in diff.groupby(level='dataset')}})
+    return out
+
+
+def analyze_verify2(output_root: Path, verify_root: Path, replicates: int = 10000,
+                    allow_incomplete: bool = False) -> dict:
+    """Review-driven evaluation: fast lanes scored on the flows nobody
+    labelled, burst detection latency, the prospective lane, the label-free
+    and ARF lanes and the ablations; learners without a fast lane come from
+    the verify stage (their predictions never use labels of the scored
+    window, so all-flow and unqueried scores coincide)."""
+
+    records = _load_stage(output_root, 'verify2', allow_incomplete)
+    base = [r for r in _load_stage(verify_root, 'verify', allow_incomplete) if r['condition'] in VERIFY2_BASELINES]
+    rows = []
+    for root, group in ((output_root, records), (verify_root, base)):
+        for record in group:
+            rows.append({key: record[key] for key in (*PAIR, 'condition')} | verify2_run_metrics(root, record))
+    frame = pd.DataFrame(rows)
+    frame.to_csv(output_root / 'verify2_runs.csv', index=False)
+    grouped = frame.groupby(['dataset', 'condition'])[VERIFY2_METRICS]
+    summary = grouped.mean().join(grouped.std()[['uq_macro_f1', 'uq_benign_fpr']].add_suffix('_std'))
+    summary = summary.join(grouped.size().rename('runs')).reset_index()
+    summary.to_csv(output_root / 'verify2_summary.csv', index=False)
+    families = {}
+    for name, pairs in verify2_pairs(set(frame.condition)).items():
+        families[name] = {metric: {'run_level': run_level_family(frame, pairs, metric, replicates),
+                                   'stream_level': stream_level(frame, pairs, metric)}
+                          for metric in ('uq_macro_f1', 'uq_benign_fpr', 'burst_latency_windows')}
+    result = {'stage': 'verify2', 'runs': len(frame), 'rope': ROPE,
+              'burst_rule': {'min_support': BURST_MIN_SUPPORT, 'detected_recall': BURST_DETECTED_RECALL},
+              'positive_difference_means': 'condition minus reference', 'contrasts': families}
+    (output_root / 'verify2_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
 def analyze_verify(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
     """Same-window verification under label delay: the purity-verified fast
     lane against every other learner at the same label delay and total
@@ -805,7 +953,7 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify', 'tradeoff'),
+    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify', 'tradeoff', 'verify2'),
                         default='dev')
     parser.add_argument('--output-root', type=Path, required=True,
                         help='stage results; for --stage rope, where rope_analysis.json is written')
@@ -830,6 +978,9 @@ if __name__ == '__main__':
     elif arguments.stage == 'verify':
         analyze_verify(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'verify_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'verify2':
+        analyze_verify2(arguments.output_root, arguments.verify_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'verify2_summary.csv').round(4).to_string(index=False))
     elif arguments.stage == 'tradeoff':
         analyze_tradeoff(arguments.output_root, arguments.verify_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'tradeoff_summary.csv').round(4).to_string(index=False))
