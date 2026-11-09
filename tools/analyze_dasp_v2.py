@@ -321,6 +321,48 @@ def analyze_sweep(output_root: Path, replicates: int = 10000, allow_incomplete: 
     return result
 
 
+def run_level_family(frame: pd.DataFrame, pairs: list[tuple[str, str]], column: str,
+                     replicates: int = 10000, seed: int = 20261109) -> list[dict]:
+    """Paired run-level contrasts (pair = dataset, stream seed, model seed).
+
+    Natural streams give one cell per dataset, so cell-level tests have three
+    values and can never reach significance; here every paired run counts.
+    Wilcoxon signed-rank per dataset and pooled, bootstrap CI of the mean
+    difference, Holm across the family (pooled p values)."""
+
+    rng = np.random.default_rng(seed)
+    out = []
+    for reference, condition in pairs:
+        left = frame[frame.condition == reference][[*PAIR, column]]
+        right = frame[frame.condition == condition][[*PAIR, column]]
+        joined = left.merge(right, on=PAIR, how='outer', suffixes=('_ref', '_cond'), indicator=True)
+        if not joined._merge.eq('both').all() or not len(joined):
+            raise ValueError(f'incomplete pairs for {reference} vs {condition}; no silent pair dropping')
+        joined['difference'] = joined[f'{column}_cond'] - joined[f'{column}_ref']
+
+        def test(values):
+            values = values.to_numpy(float)
+            boot = rng.choice(values, size=(replicates, len(values))).mean(axis=1)
+            p = 1.0 if np.allclose(values, 0) else float(wilcoxon(values).pvalue) if len(values) >= 6 else None
+            return {'runs': int(len(values)), 'mean_difference': float(values.mean()),
+                    'positive_runs': int((values > 0).sum()), 'ci95_low': float(np.quantile(boot, .025)),
+                    'ci95_high': float(np.quantile(boot, .975)), 'p_two_sided': p,
+                    'bayes_signed_rank': bayesian_signed_rank(values)}
+        out.append({'reference': reference, 'condition': condition, 'metric': column,
+                    'positive_difference_means': 'condition better than reference',
+                    'pooled': test(joined.difference),
+                    'per_dataset': {d: test(part.difference) for d, part in joined.groupby('dataset')}})
+    tested = [(i, r['pooled']['p_two_sided']) for i, r in enumerate(out) if r['pooled']['p_two_sided'] is not None]
+    for (index, _), value in zip(tested, holm([p for _, p in tested])):
+        out[index]['pooled']['holm_adjusted_p'] = value
+    for dataset in sorted({d for r in out for d in r['per_dataset']}):
+        tested = [(i, r['per_dataset'][dataset]['p_two_sided']) for i, r in enumerate(out)
+                  if r['per_dataset'].get(dataset, {}).get('p_two_sided') is not None]
+        for (index, _), value in zip(tested, holm([p for _, p in tested])):
+            out[index]['per_dataset'][dataset]['holm_adjusted_p'] = value
+    return out
+
+
 def window_confusion(root: Path, record: dict) -> dict[str, float]:
     windows = pd.read_csv(run_directory(root, record) / 'windows.csv')
     windows = windows[~windows.warmup.astype(bool)]
@@ -362,15 +404,17 @@ def analyze_verify(output_root: Path, replicates: int = 10000, allow_incomplete:
         reported = set(frame.loc[frame.cumulative_benign_fpr.notna(), 'condition'])
         fpr_pairs = [pair for pair in pairs if set(pair) <= reported]
         families[f'd{delay}_vs_purity'] = {
-            'all': paired_family(frame, pairs, 'cumulative_macro_f1', replicates),
-            'fpr': paired_family(frame, fpr_pairs, 'cumulative_benign_fpr', replicates),
-            'fpr_not_reported': sorted({c for _, c in pairs} - reported),
-            'per_dataset': {d: paired_family(part, pairs, 'cumulative_macro_f1', replicates)
-                            for d, part in frame.groupby('dataset')}}
+            'f1': run_level_family(frame, pairs, 'cumulative_macro_f1', replicates),
+            'fpr': run_level_family(frame, fpr_pairs, 'cumulative_benign_fpr', replicates),
+            'fpr_not_reported': sorted({c for _, c in pairs} - reported)}
     sweep = [(f'er+uniform@d5_k{k}', f'er+purity@d5_k{k}') for k in sorted(frame.fast_budget.unique())
              if {f'er+uniform@d5_k{k}', f'er+purity@d5_k{k}'} <= present]
     if sweep:
-        families['purity_vs_uniform_by_fast_budget'] = paired_family(frame, sweep, 'cumulative_macro_f1', replicates)
+        families['purity_vs_uniform_by_fast_budget'] = run_level_family(frame, sweep, 'cumulative_macro_f1', replicates)
+    if 'er@d0' in present:
+        references = sorted(c for c in present if c.startswith('er+purity@') and c.endswith('_k16'))
+        families['purity_vs_immediate_labels'] = run_level_family(
+            frame, [(c, 'er@d0') for c in references], 'cumulative_macro_f1', replicates)
     result = {'stage': 'verify', 'runs': len(records), 'rope': ROPE,
               'positive_difference_means': 'condition better than reference', 'contrasts': families}
     (output_root / 'verify_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')

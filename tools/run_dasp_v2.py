@@ -310,7 +310,7 @@ SHORTCUT_METHODS = ('final', 'experience_replay', 'online_mlp', 'ssf_budget', 'a
 # FPR below 61%. The CIC-IDS2017 natural streams (seeds 4001-4003) are the
 # held-out test and are planned only with --heldout.
 VERIFY_DATASETS = ('nf-unsw-nb15-v3', 'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
-VERIFY_MODEL_SEEDS = (91, 92, 93)
+VERIFY_MODEL_SEEDS = (91, 92, 93, 94, 95)
 VERIFY_DELAYS = (1, 5)
 VERIFY_LANES = ('uniform', 'representative', 'purity', 'uniform_knn', 'hierarchical')
 VERIFY_K_SWEEP = (4, 8, 32)
@@ -330,7 +330,8 @@ def verify_settings(overrides_of):
 
     er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
     arf = overrides_of('arf_adapted') | {'baselines.update_label_budget': 128}
-    out = []
+    # Reference: every label arrives at once (no delay, no fast lane).
+    out = [('er@d0', 'experience_replay', er | {'training.label_delay': 0})]
     for d in VERIFY_DELAYS:
         delay = {'training.label_delay': d}
         out += [(f'er@d{d}', 'experience_replay', er | delay),

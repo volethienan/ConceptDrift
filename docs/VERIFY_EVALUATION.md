@@ -28,11 +28,11 @@ Test: `tests/test_fast_lane.py` lật mọi nhãn nằm ngoài truy vấn fast v
 | `uniform_knn` | Nhãn nhanh uniform; mỗi flow mô hình đoán benign nhận nhãn của flow đã xác minh gần nhất. |
 | `hierarchical` | Dasgupta & Hsu (ICML 2008) trên cây Ward. |
 
-## Điều kiện (26 mỗi cell)
+## Điều kiện (27 mỗi cell)
 
 | Nhóm | Điều kiện | Ghi chú |
 |---|---|---|
-| Không fast lane | `er@d{1,5}` | ER, 128 nhãn trễ d window |
+| Không fast lane | `er@d0`, `er@d{1,5}` | ER, 128 nhãn trễ d window; d0 là mốc nhãn đến ngay |
 | Baseline độ trễ nhãn | `er_iwms@d{1,5}` | IWMS (Csaba et al., NeurIPS 2024): replay mẫu nhớ gần nhất với dữ liệu mới chưa nhãn, `baselines.replay_sampling=iwms` |
 | Baseline active learning | `er_uncertainty@d{1,5}` | Hỏi 128 nhãn gần ngưỡng nhất (kiểu Olímpio et al. 2023) |
 | Baseline stream | `arf@d{1,5}` | ARF, cấu hình đã chọn trên dev |
@@ -40,9 +40,9 @@ Test: `tests/test_fast_lane.py` lật mọi nhãn nằm ngoài truy vấn fast v
 | Ablation nhãn giả | `er+purity_pseudo@d{1,5}_k16` | Huấn luyện thêm bằng flow bị cảnh báo |
 | Ablation ngân sách nhanh | `er+{uniform,purity}@d5_k{4,8,32}` | |
 
-**Dataset dev:** NF-UNSW, NF-CSE, NF-ToN; mỗi dataset 3 stream seed × 3 model seed (91–93), tổng 702 run. NF-BoT bị loại: 64% flow benign có bản trùng y hệt mang nhãn attack, nên không detector flow nào có FPR benign dưới 61% (`label_twins.py`, xem HANDOFF).
+**Dataset dev:** NF-UNSW, NF-CSE, NF-ToN; mỗi dataset 3 stream seed × 5 model seed (91–95), tổng 1.215 run. NF-BoT bị loại: 64% flow benign có bản trùng y hệt mang nhãn attack, nên không detector flow nào có FPR benign dưới 61% (`label_twins.py`, xem HANDOFF).
 
-**Held-out:** CIC-IDS2017 natural, 3 stream seed × 3 model seed, tổng 234 run, chỉ lên kế hoạch khi có `--heldout`.
+**Held-out:** CIC-IDS2017 natural, 3 stream seed × 5 model seed, tổng 405 run, chỉ lên kế hoạch khi có `--heldout`.
 
 ## Lệnh trên server
 
