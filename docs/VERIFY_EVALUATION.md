@@ -53,7 +53,7 @@ cd /workspace/anvlt/ConceptDrift && source .venv/bin/activate && git pull && pyt
 Phải in ra `1.26.4 0.23.0`. Stream CIC-IDS2017 natural không có trong `SHA256SUMS`, nên phải chép thư mục `prepared_streams_v2/natural/cic-ids2017/` lên server, hoặc dựng lại bằng `tools/build_natural_cic_stream.py --stream-seeds 4001,4002,4003`.
 
 ```bash
-export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1; N=27; mkdir -p results/logs
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1; N=23; mkdir -p results/logs
 ```
 
 ```bash
