@@ -321,6 +321,62 @@ def analyze_sweep(output_root: Path, replicates: int = 10000, allow_incomplete: 
     return result
 
 
+def window_confusion(root: Path, record: dict) -> dict[str, float]:
+    windows = pd.read_csv(run_directory(root, record) / 'windows.csv')
+    windows = windows[~windows.warmup.astype(bool)]
+    tp, fn, fp, tn = (float(windows[f'attack_{k}'].sum()) for k in ('tp', 'fn', 'fp', 'tn'))
+    return {'cumulative_benign_fpr': fp / (fp + tn) if fp + tn else np.nan,
+            'cumulative_attack_recall': tp / (tp + fn) if tp + fn else np.nan}
+
+
+def analyze_verify(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
+    """Same-window verification under label delay: the purity-verified fast
+    lane against every other learner at the same label delay and total
+    label budget, and against the uniform fast lane at each fast budget.
+    Natural streams are scored by cumulative Macro-F1."""
+
+    records = _load_stage(output_root, 'verify', allow_incomplete)
+    frame = analysis_frame(records)
+    # Not every learner's summary carries cumulative FPR and recall; recount
+    # them for every run from the post-warm-up confusion counts in windows.csv.
+    counts = [window_confusion(output_root, record) for record in records]
+    keyed = pd.DataFrame([{key: r[key] for key in (*PAIR, 'condition')} | c for r, c in zip(records, counts)])
+    frame = frame.drop(columns=['cumulative_benign_fpr', 'cumulative_attack_recall']).merge(keyed, on=[*PAIR, 'condition'])
+    overrides = frame.overrides.map(json.loads)
+    frame['delay'] = overrides.map(lambda o: o.get('training.label_delay', -1))
+    frame['fast_budget'] = overrides.map(lambda o: o.get('baselines.fast_label_budget', 0))
+    frame.to_csv(output_root / 'verify_runs.csv', index=False)
+    metrics = ['cumulative_macro_f1', 'cumulative_benign_fpr', 'cumulative_attack_recall', 'mean_macro_f1',
+               'total_update_seconds']
+    grouped = frame.groupby(['dataset', 'condition', 'delay', 'fast_budget'])[metrics]
+    summary = grouped.mean().join(grouped.std().add_suffix('_std')).join(grouped.size().rename('runs')).reset_index()
+    summary.to_csv(output_root / 'verify_summary.csv', index=False)
+    present = set(frame.condition)
+    families = {}
+    for delay in sorted(frame.delay.unique()):
+        reference = f'er+purity@d{delay}_k16'
+        if reference not in present:
+            continue
+        rivals = sorted(c for c in present if c.endswith(f'@d{delay}_k16') or c.endswith(f'@d{delay}'))
+        pairs = [(reference, c) for c in rivals if c != reference]
+        reported = set(frame.loc[frame.cumulative_benign_fpr.notna(), 'condition'])
+        fpr_pairs = [pair for pair in pairs if set(pair) <= reported]
+        families[f'd{delay}_vs_purity'] = {
+            'all': paired_family(frame, pairs, 'cumulative_macro_f1', replicates),
+            'fpr': paired_family(frame, fpr_pairs, 'cumulative_benign_fpr', replicates),
+            'fpr_not_reported': sorted({c for _, c in pairs} - reported),
+            'per_dataset': {d: paired_family(part, pairs, 'cumulative_macro_f1', replicates)
+                            for d, part in frame.groupby('dataset')}}
+    sweep = [(f'er+uniform@d5_k{k}', f'er+purity@d5_k{k}') for k in sorted(frame.fast_budget.unique())
+             if {f'er+uniform@d5_k{k}', f'er+purity@d5_k{k}'} <= present]
+    if sweep:
+        families['purity_vs_uniform_by_fast_budget'] = paired_family(frame, sweep, 'cumulative_macro_f1', replicates)
+    result = {'stage': 'verify', 'runs': len(records), 'rope': ROPE,
+              'positive_difference_means': 'condition better than reference', 'contrasts': families}
+    (output_root / 'verify_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
+
 def analyze_shortcut(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False) -> dict:
     """E4: how much each method leans on known shortcut features, and whether
     the method ranking survives their removal."""
@@ -637,7 +693,7 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope'),
+    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify'),
                         default='dev')
     parser.add_argument('--output-root', type=Path, required=True,
                         help='stage results; for --stage rope, where rope_analysis.json is written')
@@ -658,6 +714,9 @@ if __name__ == '__main__':
     elif arguments.stage == 'sweep':
         analyze_sweep(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'sweep_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'verify':
+        analyze_verify(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'verify_summary.csv').round(4).to_string(index=False))
     elif arguments.stage == 'shortcut':
         analyze_shortcut(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'shortcut_summary.csv').round(4).to_string(index=False))

@@ -28,15 +28,40 @@ Test: `tests/test_fast_lane.py` lật mọi nhãn nằm ngoài truy vấn fast v
 | `uniform_knn` | Nhãn nhanh uniform; mỗi flow mô hình đoán benign nhận nhãn của flow đã xác minh gần nhất. |
 | `hierarchical` | Dasgupta & Hsu (ICML 2008) trên cây Ward. |
 
-## Lệnh
+## Điều kiện (26 mỗi cell)
+
+| Nhóm | Điều kiện | Ghi chú |
+|---|---|---|
+| Không fast lane | `er@d{1,5}` | ER, 128 nhãn trễ d window |
+| Baseline độ trễ nhãn | `er_iwms@d{1,5}` | IWMS (Csaba et al., NeurIPS 2024): replay mẫu nhớ gần nhất với dữ liệu mới chưa nhãn, `baselines.replay_sampling=iwms` |
+| Baseline active learning | `er_uncertainty@d{1,5}` | Hỏi 128 nhãn gần ngưỡng nhất (kiểu Olímpio et al. 2023) |
+| Baseline stream | `arf@d{1,5}` | ARF, cấu hình đã chọn trên dev |
+| Fast lane, k = 16 | `er+{uniform,representative,purity,uniform_knn,hierarchical}@d{1,5}_k16` | Method chính là `purity` |
+| Ablation nhãn giả | `er+purity_pseudo@d{1,5}_k16` | Huấn luyện thêm bằng flow bị cảnh báo |
+| Ablation ngân sách nhanh | `er+{uniform,purity}@d5_k{4,8,32}` | |
+
+**Dataset dev:** NF-UNSW, NF-CSE, NF-ToN; mỗi dataset 3 stream seed × 3 model seed (91–93), tổng 702 run. NF-BoT bị loại: 64% flow benign có bản trùng y hệt mang nhãn attack, nên không detector flow nào có FPR benign dưới 61% (`label_twins.py`, xem HANDOFF).
+
+**Held-out:** CIC-IDS2017 natural, 3 stream seed × 3 model seed, tổng 234 run, chỉ lên kế hoạch khi có `--heldout`.
+
+## Lệnh trên server
 
 ```bash
-python tools/run_dasp_v2.py --stage verify --selection results/dev/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/verify --seeds-per-dataset 3 --execute --resume --shard $k/$N
+cd /workspace/anvlt/ConceptDrift && source .venv/bin/activate && git pull && python -c "import numpy, river; print(numpy.__version__, river.__version__)"
 ```
 
-Dev gồm 4 dataset natural × 3 seed × 24 điều kiện, tổng 288 run:
-- ER ở d1 và d5;
-- 5 kiểu fast lane × k ∈ {8, 16} × d ∈ {1, 5};
-- purity có nhãn giả (k = 16) ở d1 và d5.
+Phải in ra `1.26.4 0.23.0`. Stream CIC-IDS2017 natural không có trong `SHA256SUMS`, nên phải chép thư mục `prepared_streams_v2/natural/cic-ids2017/` lên server, hoặc dựng lại bằng `tools/build_natural_cic_stream.py --stream-seeds 4001,4002,4003`.
 
-**Held-out** là stream natural CIC-IDS2017, seed 4001–4003, dựng bằng `tools/build_natural_cic_stream.py`. Chỉ lên kế hoạch khi có `--heldout`, và **chỉ chạy một lần, sau khi thiết kế đã chốt trên dev**.
+```bash
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1; N=27; mkdir -p results/logs
+```
+
+```bash
+for k in $(seq 1 $N); do nohup python tools/run_dasp_v2.py --stage verify --selection results/dev/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/verify --execute --resume --shard $k/$N > results/logs/verify_$k.log 2>&1 & done
+```
+
+```bash
+python tools/analyze_dasp_v2.py --stage verify --output-root results/verify
+```
+
+Gửi lại `results/verify/{verify_summary.csv,verify_analysis.json,verify_runs.csv}`. **Không** chạy `--heldout` cho đến khi thiết kế đã chốt trên dev.

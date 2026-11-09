@@ -303,43 +303,62 @@ SHORTCUT_METHODS = ('final', 'experience_replay', 'online_mlp', 'ssf_budget', 'a
 
 
 # Same-window verification under label delay (verified_propagation). Every
-# condition spends 128 labels per window: fast_label_budget of them on the
-# current window at once, the rest label_delay windows late. Natural
-# streams only. The CIC-IDS2017 natural streams (seeds 4001-4003) are the
-# held-out test of this stage and are planned only with --heldout.
+# learner spends 128 labels per window; a fast lane takes fast_label_budget of
+# them on the current window at once, the rest arrive label_delay windows
+# late. Natural streams only. NF-BoT is left out: 64% of its benign flows have
+# an exact attack-labelled twin, so no flow-level detector gets its benign
+# FPR below 61%. The CIC-IDS2017 natural streams (seeds 4001-4003) are the
+# held-out test and are planned only with --heldout.
+VERIFY_DATASETS = ('nf-unsw-nb15-v3', 'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3')
+VERIFY_MODEL_SEEDS = (91, 92, 93)
 VERIFY_DELAYS = (1, 5)
-VERIFY_FAST = (8, 16)
 VERIFY_LANES = ('uniform', 'representative', 'purity', 'uniform_knn', 'hierarchical')
+VERIFY_K_SWEEP = (4, 8, 32)
 VERIFY_PURITY = {'baselines.fast_lane_test_labels': 4, 'baselines.fast_lane_epsilon': 0.3,
                  'baselines.fast_lane_delta': 0.25}
 VERIFY_HELDOUT = {'cic-ids2017': (4001, 4002, 4003)}
+
+
+def _lane(d, k, lane, **extra):
+    clusters = max(1, k // 2) if lane == 'purity' else k
+    return {'training.label_delay': d, 'baselines.fast_label_budget': k, 'baselines.fast_lane': lane,
+            'baselines.fast_lane_clusters': clusters} | (VERIFY_PURITY if lane == 'purity' else {}) | extra
+
+
+def verify_settings(overrides_of):
+    """(name, method, overrides) of every verify condition."""
+
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    arf = overrides_of('arf_adapted') | {'baselines.update_label_budget': 128}
+    out = []
+    for d in VERIFY_DELAYS:
+        delay = {'training.label_delay': d}
+        out += [(f'er@d{d}', 'experience_replay', er | delay),
+                (f'er_iwms@d{d}', 'experience_replay', er | delay | {'baselines.replay_sampling': 'iwms'}),
+                (f'er_uncertainty@d{d}', 'experience_replay', er | delay | {'baselines.query_policy': 'uncertainty'}),
+                (f'arf@d{d}', 'arf_adapted', arf | delay)]
+        out += [(f'er+{lane}@d{d}_k16', 'experience_replay', er | _lane(d, 16, lane)) for lane in VERIFY_LANES]
+        out.append((f'er+purity_pseudo@d{d}_k16', 'experience_replay',
+                    er | _lane(d, 16, 'purity', **{'baselines.fast_lane_pseudo_labels': True})))
+    out += [(f'er+{lane}@d5_k{k}', 'experience_replay', er | _lane(5, k, lane))
+            for k in VERIFY_K_SWEEP for lane in ('uniform', 'purity')]
+    return out
 
 
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
-                 for d, seeds in VERIFY_HELDOUT.items() for seed in seeds for m in FINAL_MODEL_SEEDS]
+                 for d, seeds in VERIFY_HELDOUT.items() for seed in seeds for m in VERIFY_MODEL_SEEDS]
     else:
-        datasets = args.datasets or list(NATURAL_SEEDS)
+        datasets = args.datasets or list(VERIFY_DATASETS)
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
                  for d in datasets for seed in NATURAL_SEEDS[d][:args.seeds_per_dataset]
-                 for m in DEV_MODEL_SEEDS]
-    base = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
-    settings = [(f'er@d{d}', {'training.label_delay': d}) for d in VERIFY_DELAYS]
-    for d in VERIFY_DELAYS:
-        for k in VERIFY_FAST:
-            for lane in VERIFY_LANES:
-                extra = VERIFY_PURITY if lane == 'purity' else {}
-                settings.append((f'er+{lane}@d{d}_k{k}', {
-                    'training.label_delay': d, 'baselines.fast_label_budget': k, 'baselines.fast_lane': lane,
-                    'baselines.fast_lane_clusters': k // 2 if lane == 'purity' else k} | extra))
-        settings.append((f'er+purity_pseudo@d{d}_k16', {
-            'training.label_delay': d, 'baselines.fast_label_budget': 16, 'baselines.fast_lane': 'purity',
-            'baselines.fast_lane_clusters': 8, 'baselines.fast_lane_pseudo_labels': True} | VERIFY_PURITY))
+                 for m in VERIFY_MODEL_SEEDS]
+    settings = verify_settings(overrides_of)
     return [dict(stage='verify', dataset=d, scenario=s, stream_seed=seed, model_seed=m,
-                 method='experience_replay', condition=name, overrides=base | delta, stream=stream)
-            for d, s, seed, m, stream in cells for name, delta in settings]
+                 method=method, condition=name, overrides=overrides, stream=stream)
+            for d, s, seed, m, stream in cells for name, method, overrides in settings]
 
 
 def setting_name(budget, delay, policy):

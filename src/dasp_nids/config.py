@@ -276,6 +276,11 @@ class BaselineConfig:
     # the historical contract. fast_lane: uniform | representative | purity |
     # uniform_knn | hierarchical.
     fast_label_budget: int = 0
+    # experience_replay replay draw: uniform (historical) or iwms, the
+    # importance-weighted memory sampling of Csaba et al. (NeurIPS 2024): for
+    # each of the newest unlabelled samples, replay the labelled memory sample
+    # nearest to it in the model's last hidden representation.
+    replay_sampling: str = "uniform"
     fast_lane: str = "purity"
     fast_lane_clusters: int = 8
     fast_lane_test_labels: int = 4

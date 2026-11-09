@@ -97,3 +97,42 @@ def test_zero_fast_budget_keeps_the_historical_run(tmp_path):
 def test_fast_lane_is_refused_where_unsupported(tmp_path):
     with pytest.raises(ValueError, match='fast_label_budget'):
         StreamingExperiment(config(tmp_path, 'x', 'purity', method='modular_dasp_v2')).run()
+
+
+def test_iwms_replay_runs_and_is_marked(tmp_path):
+    cfg = config(tmp_path, 'iwms', 'uniform', fast=0)
+    cfg.baselines.replay_sampling = 'iwms'
+    windows = StreamingExperiment(cfg).run().windows
+    updated = windows[~windows.warmup.astype(bool) & windows.get('replay_sampling').notna()]
+    assert len(updated) and set(updated.replay_sampling) == {'iwms'}
+
+
+def test_iwms_picks_the_nearest_memory_sample():
+    from dasp_nids.memory import ReservoirMemory
+    from dasp_nids.model import OnlineMLP
+    from dasp_nids.runner import _iwms_replay
+
+    torch.manual_seed(0)
+    model = OnlineMLP(4, 2, hidden_dims=(8,))
+    memory = ReservoirMemory(10, 0)
+    memory.add(torch.eye(4), torch.tensor([0, 1, 0, 1]))
+    x, y = _iwms_replay(model, memory, torch.eye(4)[[2, 2, 3]], 3, torch.device('cpu'), 1)
+    assert len(x) == 3 and set(y.tolist()) <= {0, 1}
+    _, reps = model(torch.eye(4), return_representations=True)
+    last = reps[list(reps)[-1]]
+    target = torch.nn.functional.normalize(last, dim=1)
+    expected = (target[[2]] @ target.T).argmax().item()
+    assert any(torch.equal(row, torch.eye(4)[expected]) for row in x)
+
+
+def test_verify_stage_plan():
+    from tools.run_dasp_v2 import jobs_for, parser
+
+    args = parser().parse_args(['--stage', 'verify', '--selection', 'results_snapshot/dev/dev_selection.json'])
+    jobs = jobs_for(args)
+    assert len(jobs) == 702 and {j['dataset'] for j in jobs} == {'nf-unsw-nb15-v3', 'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3'}
+    held = jobs_for(parser().parse_args(['--stage', 'verify', '--heldout', '--selection',
+                                         'results_snapshot/dev/dev_selection.json']))
+    assert {j['dataset'] for j in held} == {'cic-ids2017'} and len(held) == 234
+    budgets = {j['overrides'].get('baselines.update_label_budget') for j in jobs}
+    assert budgets == {128}

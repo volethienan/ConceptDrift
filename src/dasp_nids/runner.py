@@ -1528,6 +1528,37 @@ def _train_online(
     return gradient_evaluations
 
 
+def _iwms_replay(
+    model: OnlineMLP,
+    memory: ReservoirMemory,
+    unlabeled_x: torch.Tensor,
+    n: int,
+    device: torch.device,
+    seed: int,
+) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Label-delay replay of Csaba et al. (NeurIPS 2024): nearest labelled
+    memory sample (cosine, last hidden layer) for each of ``n`` newest
+    unlabelled samples. Reads no label of ``unlabeled_x``."""
+
+    stored = memory.tensors(device)
+    if stored is None:
+        return None
+    memory_x, memory_y = stored
+    generator = torch.Generator().manual_seed(int(seed))
+    pick = torch.randperm(len(unlabeled_x), generator=generator)[: min(n, len(unlabeled_x))]
+    was_training = model.training
+    model.eval()
+    with torch.no_grad():
+        _, memory_repr = model(memory_x, return_representations=True)
+        _, new_repr = model(unlabeled_x[pick].to(device), return_representations=True)
+    model.train(was_training)
+    last = list(memory_repr)[-1]
+    a = F.normalize(memory_repr[last], dim=1)
+    b = F.normalize(new_repr[last], dim=1)
+    nearest = (b @ a.T).argmax(dim=1)
+    return memory_x[nearest], memory_y[nearest]
+
+
 def _make_stateful_optimizer(
     model: OnlineMLP, cfg: ExperimentConfig
 ) -> torch.optim.AdamW:
@@ -8428,7 +8459,15 @@ class StreamingExperiment:
             row["selected_candidate"] = "online"
             accepted = "online"
         elif method in {"replay", "experience_replay"}:
-            if memory_probe is None:
+            if cfg.baselines.replay_sampling not in {"uniform", "iwms"}:
+                raise ValueError(f"unknown replay_sampling {cfg.baselines.replay_sampling}")
+            if cfg.baselines.replay_sampling == "iwms" and item.current_unlabeled_x is not None:
+                replay_batch = _iwms_replay(
+                    model, memory, item.current_unlabeled_x, 2 * cfg.dasp.memory_batch_size,
+                    self.device, cfg.data.random_seed + item.window.index * 7919,
+                )
+                row["replay_sampling"] = "iwms"
+            elif memory_probe is None:
                 replay_batch = memory_guard
             elif memory_guard is None:
                 replay_batch = memory_probe
