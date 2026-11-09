@@ -289,6 +289,20 @@ class BaselineConfig:
     # Also train at once on the fast-lane alarms as attack labels. Off by
     # default: on the development streams it raised FPR (ToN 5% -> 7%).
     fast_lane_pseudo_labels: bool = False
+    # 0: alarms go to the verified window itself (incident triage, scored on
+    # the flows the analyst did not label). h >= 1: prospective; the verified
+    # clusters of window t become (centroid, radius) signatures that alarm
+    # model-benign flows of window t + h, and the fast labels train the model
+    # at window t + h - 1 (analyst latency of h windows).
+    fast_lane_horizon: int = 0
+    fast_lane_radius_quantile: float = 0.9
+    # Ablations: split mixed clusters (purity); cluster the model-benign flows
+    # or all flows; analyst error rate on fast labels.
+    fast_lane_split: bool = True
+    fast_lane_candidates: str = "benign"
+    fast_lane_label_noise: float = 0.0
+    # fast_lane=anomaly: label-free Isolation Forest on labelled benign memory
+    fast_lane_anomaly_alpha: float = 0.01
     ssf_label_budget: int = 256
     ssf_new_sample_weight: float = 3.0
     ssf_lwf_lambda: float = 0.5

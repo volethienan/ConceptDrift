@@ -1482,6 +1482,13 @@ def _update_v18_guard_history(
     )
 
 
+def _confusion_counts(prefix: str, y_true: np.ndarray, predicted: np.ndarray) -> dict[str, int]:
+    """Binary attack-vs-benign confusion counts under ``prefix``."""
+    attack, alarm = y_true != 0, predicted != 0
+    return {f"{prefix}attack_tp": int((attack & alarm).sum()), f"{prefix}attack_fn": int((attack & ~alarm).sum()),
+            f"{prefix}attack_fp": int((~attack & alarm).sum()), f"{prefix}attack_tn": int((~attack & ~alarm).sum())}
+
+
 def _split_train_guard(
     window: StreamWindow, guard_ratio: float, seed: int
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -2983,6 +2990,10 @@ class StreamingExperiment:
         # Fast-lane (same-window) label queries per window index.
         self._fast_queries: dict[int, np.ndarray] = {}
         self._fast_lane_row: dict[str, object] = {}
+        # prospective signatures by the window they alarm; pending fast-label training
+        self._fast_signatures: dict[int, list] = {}
+        self._fast_train_queue: list[tuple] = []
+        self._anomaly = None
         self._last_attack_score = np.empty(0, dtype=np.float64)
         if config.dasp.baseline in REVISION_METHODS:
             required_architecture = REVISION_CONDITIONS[
@@ -3919,11 +3930,14 @@ class StreamingExperiment:
             predictions.append(0 if predicted is None else int(predicted))
         self._last_forward_seconds = time.perf_counter() - forward_started
         metric_started = time.perf_counter()
+        self._last_predictions = np.asarray(predictions, dtype=np.int64)
+        self._last_attack_score = self._last_predictions.astype(np.float64)
         result = classification_metrics(
             np.asarray(window.y.tolist(), dtype=np.int64),
             np.asarray(predictions, dtype=np.int64),
             n_classes,
         )
+        result.update(self._subtype_recall_metrics(window, self._last_predictions))
         self._last_metric_seconds = time.perf_counter() - metric_started
         return result
 
@@ -3935,18 +3949,24 @@ class StreamingExperiment:
         row: dict[str, object],
     ) -> None:
         started = time.perf_counter()
-        train_x, train_y, _, _ = _split_train_guard(
-            window, self.config.dasp.guard_ratio, self.config.data.random_seed
-        )
-        budgeted = _balanced_tensor_sample(
-            train_x,
-            train_y,
-            self.config.baselines.update_label_budget,
-            torch.device("cpu"),
-            self.config.data.random_seed + window.index * 104729 + 17,
-        )
-        assert budgeted is not None
-        train_x, train_y = budgeted
+        if int(self.config.baselines.fast_label_budget) > 0:
+            # with a fast lane, the bulk labels are the uniform common query
+            # over the flows the fast lane did not query
+            query = self._query_indices(window)
+            train_x, train_y = window.x[query], window.y[query]
+        else:
+            train_x, train_y, _, _ = _split_train_guard(
+                window, self.config.dasp.guard_ratio, self.config.data.random_seed
+            )
+            budgeted = _balanced_tensor_sample(
+                train_x,
+                train_y,
+                self.config.baselines.update_label_budget,
+                torch.device("cpu"),
+                self.config.data.random_seed + window.index * 104729 + 17,
+            )
+            assert budgeted is not None
+            train_x, train_y = budgeted
         row["ground_truth_update_labels"] = len(train_y)
         records = self._river_records(train_x, feature_names)
         for record, target in zip(records, train_y.tolist()):
@@ -3979,7 +3999,11 @@ class StreamingExperiment:
             metrics = self._evaluate_river(
                 model, window, stream.feature_names, len(stream.class_names)
             )
+            metrics = self._fast_lane_river(
+                model, window, metrics, stream.feature_names, len(stream.class_names)
+            )
             row = self._base_row(window, metrics, warmup=False)
+            row.update(self._fast_lane_row)
             rows.append(row)
             row_lookup[window.index] = row
             pending.append(window)
@@ -4086,6 +4110,7 @@ class StreamingExperiment:
         metric_started = time.perf_counter()
         predicted = np.asarray(predicted, dtype=np.int64)
         self._last_predictions = predicted.copy()
+        self._last_attack_score = np.asarray(attack_score, dtype=np.float64).copy()
         threshold = float(getattr(adapter, "threshold", 0.5))
         self._remember_query_scores(
             window, attack_score, threshold if np.isfinite(threshold) else 0.5
@@ -4148,34 +4173,67 @@ class StreamingExperiment:
         metrics: dict[str, float | int],
         n_classes: int,
     ) -> dict[str, float | int]:
-        """Same-window verification: reveal a few labels of ``window`` now.
-
-        Runs right after ``window`` is predicted. Labels are read only through
-        ``verified_propagation.LabelOracle`` (fast_label_budget queries); the
-        flows it alarms are OR-ed into the window's predictions, and the model
-        trains at once on the fast labels plus the alarms as attack labels.
-        The remaining update labels of the window arrive label_delay windows
-        late, drawn uniformly from the flows the fast lane did not query.
-        """
-        cfg = self.config.baselines
+        """Fast lane for the neural learners (see ``_fast_lane_core``)."""
         self._fast_lane_row = {}
-        budget = int(cfg.fast_label_budget)
-        if budget <= 0:
+        if int(self.config.baselines.fast_label_budget) <= 0:
             return metrics
         method = self.config.dasp.baseline
         if method not in {"online_mlp", "experience_replay"}:
-            raise ValueError(f"fast_label_budget is supported for online_mlp and experience_replay, not {method}")
+            raise ValueError(f"fast_label_budget is supported for online_mlp, experience_replay and arf, not {method}")
+
+        def train(train_x, train_y, memory_x, memory_y) -> int:
+            replay = memory.sample(2 * self.config.dasp.memory_batch_size, self.device)
+            gradients = _train_online(model, train_x, train_y, self.config, self.device, replay=replay)
+            memory.add(memory_x, memory_y)
+            return int(gradients)
+
+        def reference() -> np.ndarray | None:
+            if not len(memory):
+                return None
+            return _tensor_to_numpy(memory.x[memory.y == 0])
+
+        return self._fast_lane_core(window, metrics, n_classes, train, reference)
+
+    def _fast_lane_core(self, window, metrics, n_classes, train, reference) -> dict[str, float | int]:
+        """Verify a few labels of ``window`` right after it is predicted.
+
+        Labels are read only through ``verified_propagation.LabelOracle``
+        (fast_label_budget queries, optionally with analyst noise). With
+        horizon 0 the alarms are OR-ed into the window's own predictions and
+        the queried flows take their verified labels (incident triage); the
+        ``uq_`` counts score only the flows nobody labelled. With horizon h
+        the verified clusters alarm flows of window t + h instead and no
+        label of the scored window is used. The remaining update labels of the
+        window arrive label_delay windows late, drawn uniformly from the flows
+        the fast lane did not query.
+        """
+        cfg = self.config.baselines
+        budget = int(cfg.fast_label_budget)
         if cfg.query_policy != "uniform" or not 0 < budget < cfg.update_label_budget:
             raise ValueError("the fast lane needs uniform bulk queries and 0 < fast_label_budget < update_label_budget")
+        horizon = int(cfg.fast_lane_horizon)
+        if horizon < 0:
+            raise ValueError("fast_lane_horizon must be >= 0")
         started = time.perf_counter()
         predicted = self._last_predictions.copy()
-        candidates = np.flatnonzero(predicted == 0)
         x = _tensor_to_numpy(window.x)
-        oracle = verified_propagation.LabelOracle(_tensor_to_numpy(window.y), budget)
-        rng = np.random.default_rng([int(self.config.data.random_seed), int(window.index), 7919])
+        y_true = _tensor_to_numpy(window.y).astype(np.int64)
+        model_benign = np.flatnonzero(predicted == 0)
+        if cfg.fast_lane_candidates == "benign":
+            candidates = model_benign
+        elif cfg.fast_lane_candidates == "all":
+            candidates = np.arange(len(x))
+        else:
+            raise ValueError(f"unknown fast_lane_candidates {cfg.fast_lane_candidates}")
+        seed = int(self.config.data.random_seed)
+        rng = np.random.default_rng([seed, int(window.index), 7919])
+        oracle = verified_propagation.LabelOracle(
+            y_true, budget, noise=float(cfg.fast_lane_label_noise),
+            rng=np.random.default_rng([seed, int(window.index), 104723]))
+        empty = np.empty(0, np.int64)
         kind = cfg.fast_lane
         if kind == "uniform":
-            result = verified_propagation.Verification(np.empty(0, np.int64), np.empty(0, np.int64))
+            result = verified_propagation.Verification(empty, empty)
         elif kind == "representative":
             result = verified_propagation.representative_propagation(
                 x, candidates, oracle, rng, clusters=cfg.fast_lane_clusters)
@@ -4183,46 +4241,109 @@ class StreamingExperiment:
             result = verified_propagation.purity_verified_propagation(
                 x, candidates, oracle, rng, initial_clusters=cfg.fast_lane_clusters,
                 labels_per_test=cfg.fast_lane_test_labels, epsilon=cfg.fast_lane_epsilon,
-                delta=cfg.fast_lane_delta)
+                delta=cfg.fast_lane_delta, split_mixed=bool(cfg.fast_lane_split))
         elif kind == "uniform_knn":
             result = verified_propagation.uniform_knn_propagation(x, candidates, oracle, rng, budget=budget)
         elif kind == "hierarchical":
             result = verified_propagation.hierarchical_sampling(x, candidates, oracle, rng, budget=budget)
+        elif kind == "anomaly":
+            if self._anomaly is None:
+                ref = reference()
+                if ref is None or len(ref) < 10:
+                    raise RuntimeError("the anomaly lane needs labelled benign flows in memory")
+                self._anomaly = verified_propagation.AnomalyAlarm(
+                    ref, alpha=float(cfg.fast_lane_anomaly_alpha), seed=seed)
+            result = verified_propagation.Verification(empty, self._anomaly.alarms(x, model_benign))
         else:
             raise ValueError(f"unknown fast_lane {kind}")
+        if horizon and kind not in {"representative", "purity"}:
+            raise ValueError("prospective fast lanes (horizon >= 1) need verified clusters")
         queried = np.asarray(oracle.queried, dtype=np.int64)
         if len(queried) < budget:  # unused fast labels: uniform over the rest
             rest = np.setdiff1d(np.arange(len(x)), queried)
             queried = np.concatenate([queried, rng.choice(rest, budget - len(queried), replace=False)])
         labels = oracle.query(queried)
-        alarms = np.setdiff1d(result.alarms, queried)
+        due = self._fast_signatures.pop(window.index, [])
+        if horizon == 0:
+            alarms = np.setdiff1d(result.alarms, queried)
+        else:
+            z = verified_propagation.cluster_space(x)
+            alarms = verified_propagation.match_signatures(z, model_benign, due)
+            if result.groups:
+                self._fast_signatures.setdefault(window.index + horizon, []).extend(
+                    verified_propagation.group_signatures(z, result.groups, float(cfg.fast_lane_radius_quantile)))
         fused = predicted.copy()
         fused[alarms] = 1
-        fused[queried] = labels  # verified flows are known
+        if horizon == 0:
+            fused[queried] = labels  # verified flows are known
         self._fast_queries[window.index] = queried
-        y_true = _tensor_to_numpy(window.y).astype(np.int64)
         metrics = dict(metrics)
         score = self._last_attack_score.copy()
         score[alarms] = 1.0
-        score[queried] = labels
+        if horizon == 0:
+            score[queried] = labels
         metrics.update(classification_metrics(y_true, fused, n_classes, y_score=score))
         metrics.update(self._subtype_recall_metrics(window, fused))
+        unqueried = np.ones(len(x), dtype=bool)
+        unqueried[queried] = False
+        metrics.update(_confusion_counts("uq_", y_true[unqueried], fused[unqueried]))
+        metrics.update(_confusion_counts("model_uq_", y_true[unqueried], predicted[unqueried]))
+        metrics.update(self._subtype_recall_metrics(window, fused, mask=unqueried, prefix="uq_"))
         self._last_predictions = fused
         pseudo = alarms if cfg.fast_lane_pseudo_labels else alarms[:0]
-        train_x = torch.cat([window.x[torch.from_numpy(queried)], window.x[torch.from_numpy(pseudo)]])
-        train_y = torch.cat([torch.from_numpy(labels), torch.ones(len(pseudo), dtype=torch.long)])
-        replay = memory.sample(2 * self.config.dasp.memory_batch_size, self.device)
-        gradients = _train_online(model, train_x, train_y, self.config, self.device, replay=replay)
-        memory.add(window.x[torch.from_numpy(queried)], torch.from_numpy(labels))
+        self._fast_train_queue.append((
+            int(window.index) + max(horizon - 1, 0),
+            torch.cat([window.x[torch.from_numpy(queried)], window.x[torch.from_numpy(pseudo)]]),
+            torch.cat([torch.from_numpy(labels), torch.ones(len(pseudo), dtype=torch.long)]),
+            window.x[torch.from_numpy(queried)], torch.from_numpy(labels)))
+        ready = [item for item in self._fast_train_queue if item[0] <= window.index]
+        self._fast_train_queue = [item for item in self._fast_train_queue if item[0] > window.index]
+        gradients = sum(train(*item[1:]) for item in ready)
+        new_alarms = alarms[predicted[alarms] == 0]
         self._fast_lane_row = {
             "fast_lane": kind,
+            "fast_horizon": horizon,
             "fast_labels": int(len(queried)),
-            "fast_alarms_added": int((predicted[alarms] == 0).sum()),
+            "fast_alarms_added": int(len(new_alarms)),
+            "fast_alarms_benign": int((y_true[new_alarms] == 0).sum()),
+            "fast_groups": int(len(result.groups)),
+            "fast_signatures_applied": int(len(due)),
             "fast_propagated": int(len(result.pseudo_indices)),
             "fast_gradient_evaluations": int(gradients),
             "fast_lane_seconds": time.perf_counter() - started,
         }
         return metrics
+
+    def _fast_lane_adapter(self, adapter, window, metrics, n_classes) -> dict[str, float | int]:
+        """Fast lane for the stream adapters (ARF): fast labels go through adapter.update."""
+        self._fast_lane_row = {}
+        if int(self.config.baselines.fast_label_budget) <= 0:
+            return metrics
+        if self.config.dasp.baseline != "arf_adapted":
+            raise ValueError(f"fast_label_budget is supported for online_mlp, experience_replay and arf, not {self.config.dasp.baseline}")
+        if self.config.baselines.fast_lane == "anomaly":
+            raise ValueError("the anomaly lane needs the neural learner's labelled memory")
+
+        def train(train_x, train_y, memory_x, memory_y) -> int:
+            adapter.update(train_x, torch.arange(len(train_x)), train_y)
+            return 0
+
+        return self._fast_lane_core(window, metrics, n_classes, train, lambda: None)
+
+    def _fast_lane_river(self, model, window, metrics, feature_names, n_classes) -> dict[str, float | int]:
+        """Fast lane for ARF: the same verification, fast labels learned one by one."""
+        self._fast_lane_row = {}
+        if int(self.config.baselines.fast_label_budget) <= 0:
+            return metrics
+        if self.config.baselines.fast_lane == "anomaly":
+            raise ValueError("the anomaly lane needs the neural learner's labelled memory")
+
+        def train(train_x, train_y, memory_x, memory_y) -> int:
+            for record, target in zip(self._river_records(train_x, feature_names), train_y.tolist()):
+                model.learn_one(record, int(target))
+            return 0
+
+        return self._fast_lane_core(window, metrics, n_classes, train, lambda: None)
 
     def _update_adapter(
         self, adapter, window: StreamWindow, row: dict[str, object]
@@ -4277,8 +4398,13 @@ class StreamingExperiment:
         pending: list[StreamWindow] = []
         for window in stream.windows[cfg.data.warmup_windows :]:
             row = self._base_row(
-                window, self._evaluate_adapter(adapter, window, n_classes), warmup=False
+                window,
+                self._fast_lane_adapter(
+                    adapter, window, self._evaluate_adapter(adapter, window, n_classes), n_classes
+                ),
+                warmup=False
             )
+            row.update(self._fast_lane_row)
             rows.append(row)
             row_lookup[window.index] = row
             pending.append(window)
@@ -4438,12 +4564,17 @@ class StreamingExperiment:
     def _subtype_recall_metrics(
         window: StreamWindow,
         predicted: np.ndarray,
+        mask: np.ndarray | None = None,
+        prefix: str = "",
     ) -> dict[str, float]:
-        """Report attack-subtype recall without exposing subtype to the model."""
+        """Report attack-subtype recall without exposing subtype to the model.
+        ``mask`` restricts the flows scored; keys then carry ``prefix``."""
         if window.subtypes is None:
             return {}
         values = np.asarray(window.subtypes).astype(str)
         attack_mask = np.asarray(window.y.tolist(), dtype=np.int64) != 0
+        if mask is not None:
+            attack_mask = attack_mask & mask
         recalls: list[float] = []
         result: dict[str, float] = {}
         for subtype in sorted(set(values[attack_mask].tolist())):
@@ -4455,12 +4586,12 @@ class StreamingExperiment:
                 character if character.isalnum() else "_"
                 for character in subtype.strip().casefold()
             ).strip("_")
-            result[f"subtype_recall_{slug}"] = recall
-            result[f"subtype_support_{slug}"] = float(np.sum(mask))
+            result[f"{prefix}subtype_recall_{slug}"] = recall
+            result[f"{prefix}subtype_support_{slug}"] = float(np.sum(mask))
             recalls.append(recall)
         if recalls:
-            result["minimum_attack_subtype_recall"] = float(min(recalls))
-            result["macro_attack_subtype_recall"] = float(np.mean(recalls))
+            result[f"{prefix}minimum_attack_subtype_recall"] = float(min(recalls))
+            result[f"{prefix}macro_attack_subtype_recall"] = float(np.mean(recalls))
         return result
 
     def _base_row(

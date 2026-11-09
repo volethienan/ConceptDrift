@@ -38,10 +38,19 @@ class LabelBudgetExceeded(RuntimeError):
 
 
 class LabelOracle:
-    """Reveals labels of single flows, records each query, enforces a budget."""
+    """Reveals labels of single flows, records each query, enforces a budget.
 
-    def __init__(self, labels: np.ndarray, budget: int):
-        self._labels = np.asarray(labels)
+    ``noise`` models analyst mistakes: each flow's revealed label is flipped
+    with that probability (fixed per flow, so a repeated query agrees).
+    """
+
+    def __init__(self, labels: np.ndarray, budget: int, noise: float = 0.0,
+                 rng: np.random.Generator | None = None):
+        labels = np.asarray(labels).astype(np.int64)
+        if noise > 0:
+            flips = (rng or np.random.default_rng(0)).random(len(labels)) < noise
+            labels = np.where(flips, 1 - labels, labels)
+        self._labels = labels
         self.budget = int(budget)
         self.queried: list[int] = []
 
@@ -71,6 +80,50 @@ class Verification:
     pseudo_indices: np.ndarray = field(default_factory=lambda: np.empty(0, np.int64))
     pseudo_labels: np.ndarray = field(default_factory=lambda: np.empty(0, np.int64))
     diagnostics: dict = field(default_factory=dict)
+    # groups of flows alarmed as one verified unit (certified clusters)
+    groups: list = field(default_factory=list)
+
+
+def group_signatures(z: np.ndarray, groups: list, quantile: float = 0.9) -> list[tuple[np.ndarray, float]]:
+    """(centroid, radius) of each alarmed group in cluster space; the radius is
+    the ``quantile`` of member distances to the centroid."""
+    out = []
+    for members in groups:
+        if not len(members):
+            continue
+        centroid = z[members].mean(axis=0)
+        radius = float(np.quantile(np.linalg.norm(z[members] - centroid, axis=1), quantile))
+        out.append((centroid, radius))
+    return out
+
+
+def match_signatures(z: np.ndarray, candidates: np.ndarray, signatures: list) -> np.ndarray:
+    """Candidates inside the radius of any signature (verified on an earlier window)."""
+    if not len(candidates) or not signatures:
+        return np.empty(0, np.int64)
+    inside = np.zeros(len(candidates), dtype=bool)
+    for centroid, radius in signatures:
+        inside |= np.linalg.norm(z[candidates] - centroid, axis=1) <= radius
+    return candidates[inside].astype(np.int64)
+
+
+class AnomalyAlarm:
+    """Label-free baseline: Isolation Forest fitted once on reference benign
+    flows (labels already revealed); alarms candidates scoring above the
+    ``1 - alpha`` quantile of the reference scores."""
+
+    def __init__(self, reference: np.ndarray, alpha: float = 0.01, seed: int = 0):
+        from sklearn.ensemble import IsolationForest
+
+        z = cluster_space(reference)
+        self.forest = IsolationForest(n_estimators=100, random_state=seed).fit(z)
+        self.threshold = float(np.quantile(-self.forest.score_samples(z), 1 - alpha))
+
+    def alarms(self, x: np.ndarray, candidates: np.ndarray) -> np.ndarray:
+        if not len(candidates):
+            return np.empty(0, np.int64)
+        score = -self.forest.score_samples(cluster_space(x[candidates]))
+        return candidates[score > self.threshold].astype(np.int64)
 
 
 def cluster_space(x: np.ndarray) -> np.ndarray:
@@ -118,7 +171,8 @@ def _kmeans(z: np.ndarray, k: int, seed: int) -> np.ndarray:
 def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: LabelOracle,
                                 rng: np.random.Generator, *, initial_clusters: int = 8,
                                 labels_per_test: int = 4, epsilon: float = 0.3,
-                                delta: float = 0.25, min_cluster: int = 10) -> Verification:
+                                delta: float = 0.25, min_cluster: int = 10,
+                                split_mixed: bool = True) -> Verification:
     """Screen clusters of ``candidates`` with one random label, confirm attack ones, spread certified attacks.
 
     Each cluster draws members uniformly at random without replacement, one
@@ -157,7 +211,7 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
         elif attacks < n:
             queue[:] = [c for c in queue if c is not cluster]
             rest = np.setdiff1d(cluster["members"], cluster["drawn"])
-            if len(rest) >= 2 * min_cluster:
+            if split_mixed and len(rest) >= 2 * min_cluster:
                 split = _kmeans(z[rest], 2, int(rng.integers(2**31)))
                 queue.extend({"members": rest[split == c], "drawn": [], "labels": []} for c in np.unique(split))
         elif n == labels_per_test:
@@ -172,7 +226,8 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
     return Verification(queried, alarms.astype(np.int64), propagated.astype(np.int64),
                         np.ones(len(propagated), dtype=np.int64),
                         diagnostics={"tests": tests, "certified_clusters": len(certified),
-                                     "propagated": int(sum(map(len, certified)))})
+                                     "propagated": int(sum(map(len, certified)))},
+                        groups=list(certified))
 
 
 def representative_propagation(x: np.ndarray, candidates: np.ndarray, oracle: LabelOracle,
@@ -195,7 +250,8 @@ def representative_propagation(x: np.ndarray, candidates: np.ndarray, oracle: La
     queried = np.asarray(oracle.queried, dtype=np.int64)
     return Verification(queried, np.unique(np.concatenate(alarms)) if alarms else np.empty(0, np.int64),
                         np.concatenate(pseudo_i) if pseudo_i else np.empty(0, np.int64),
-                        np.concatenate(pseudo_y) if pseudo_y else np.empty(0, np.int64))
+                        np.concatenate(pseudo_y) if pseudo_y else np.empty(0, np.int64),
+                        groups=list(alarms))
 
 
 def uniform_knn_propagation(x: np.ndarray, candidates: np.ndarray, oracle: LabelOracle,

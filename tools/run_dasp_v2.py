@@ -37,7 +37,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify')
+STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
 
 
 def _grid(**axes):
@@ -374,6 +374,45 @@ def tradeoff_settings(overrides_of):
     return out
 
 
+# verify2: the review-driven extension of verify. Every fast-lane run is
+# repeated (deterministic) to log the scoring on unqueried flows and burst
+# detection; new conditions add the prospective lane (verified clusters alarm
+# window t + h, so no label of the scored window is used; h is also the
+# analyst latency), a label-free Isolation Forest lane, the fast lane on ARF,
+# and ablations (no cluster splitting, clustering all flows, analyst label
+# noise, label delays 2 and 10). Learners without a fast lane are joined from
+# the verify stage.
+def verify2_settings(overrides_of):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    arf = overrides_of('arf_adapted') | {'baselines.update_label_budget': 128}
+    out = [(f'er+{lane}@d{d}_k16', 'experience_replay', er | _lane(d, 16, lane))
+           for d in (1, 5) for lane in VERIFY_LANES]
+    out.append(('er+purity_pseudo@d5_k16', 'experience_replay',
+                er | _lane(5, 16, 'purity', **{'baselines.fast_lane_pseudo_labels': True})))
+    out += [(f'er+{lane}@d5_k{k}', 'experience_replay', er | _lane(5, k, lane))
+            for k in VERIFY_K_SWEEP for lane in ('uniform', 'purity')]
+    prospective = [(5, 1), (5, 2), (1, 1)]
+    out += [(f'er+{lane}@d{d}_k16_h{h}', 'experience_replay',
+             er | _lane(d, 16, lane, **{'baselines.fast_lane_horizon': h}))
+            for d, h in prospective for lane in ('purity', 'representative')]
+    out += [(f'er+anomaly@d{d}_k16', 'experience_replay', er | _lane(d, 16, 'anomaly')) for d in (1, 5)]
+    out += [(f'arf+{lane}@d5_k16', 'arf_adapted', arf | _lane(5, 16, lane))
+            for lane in ('uniform', 'purity', 'representative')]
+    out.append(('arf+purity@d5_k16_h1', 'arf_adapted', arf | _lane(5, 16, 'purity', **{'baselines.fast_lane_horizon': 1})))
+    out.append(('er+purity_nosplit@d5_k16', 'experience_replay',
+                er | _lane(5, 16, 'purity', **{'baselines.fast_lane_split': False})))
+    out.append(('er+purity_all@d5_k16', 'experience_replay',
+                er | _lane(5, 16, 'purity', **{'baselines.fast_lane_candidates': 'all'})))
+    out += [(f'er+{lane}@d5_k16_noise{int(100 * eta):02d}', 'experience_replay',
+             er | _lane(5, 16, lane, **{'baselines.fast_lane_label_noise': eta}))
+            for eta in (0.05, 0.10) for lane in ('purity', 'representative')]
+    for d in (2, 10):
+        out.append((f'er@d{d}', 'experience_replay', er | {'training.label_delay': d}))
+        out += [(f'er+{lane}@d{d}_k16', 'experience_replay', er | _lane(d, 16, lane))
+                for lane in ('uniform', 'purity', 'representative')]
+    return out
+
+
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
@@ -384,12 +423,13 @@ def verify_jobs(args):
         cells = [(d, NATURAL_SCENARIO, seed, m, stream_path(args.prepared_root, d, NATURAL_SCENARIO, seed))
                  for d in datasets for seed in NATURAL_SEEDS[d][:args.seeds_per_dataset]
                  for m in VERIFY_MODEL_SEEDS]
-    stage = 'tradeoff' if args.stage == 'tradeoff' else 'verify'
+    stage = args.stage
     if stage == 'tradeoff':
         if args.heldout:
             raise ValueError('the tradeoff stage runs on the development streams only')
         cells = [c for c in cells if c[0] in TRADEOFF_DATASETS]
-    settings = (tradeoff_settings if stage == 'tradeoff' else verify_settings)(overrides_of)
+    settings = {'tradeoff': tradeoff_settings, 'verify': verify_settings,
+                'verify2': verify2_settings}[stage](overrides_of)
     return [dict(stage=stage, dataset=d, scenario=s, stream_seed=seed, model_seed=m,
                  method=method, condition=name, overrides=overrides, stream=stream)
             for d, s, seed, m, stream in cells for name, method, overrides in settings]
@@ -549,7 +589,7 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
-    if args.stage in ('verify', 'tradeoff'):
+    if args.stage in ('verify', 'tradeoff', 'verify2'):
         return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()

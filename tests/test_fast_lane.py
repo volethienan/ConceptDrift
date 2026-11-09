@@ -148,3 +148,99 @@ def test_tradeoff_stage_plan():
     assert {j['dataset'] for j in jobs} == {'nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3'}
     for r in (*TRADEOFF_R, 4):
         assert clopper_pearson_lower(r, r, 0.25) >= 1 - certified_epsilon(r)
+
+
+@pytest.mark.parametrize('extra', [
+    {'baselines.fast_lane': 'anomaly'},
+    {'baselines.fast_lane_split': False},
+    {'baselines.fast_lane_candidates': 'all'},
+    {'baselines.fast_lane_label_noise': 0.1},
+    {'baselines.fast_lane_horizon': 1},
+    {'baselines.fast_lane': 'representative', 'baselines.fast_lane_horizon': 2},
+])
+def test_new_fast_lane_variants_read_only_their_queries(tmp_path, extra, monkeypatch):
+    """Same label-flip check as above for the new variants."""
+    fast, bulk, predictions = recorder(monkeypatch)
+
+    def build(name):
+        cfg = config(tmp_path, name, 'purity')
+        for key, value in extra.items():
+            section, field = key.split('.')
+            setattr(getattr(cfg, section), field, value)
+        return cfg
+
+    windows = StreamingExperiment(build('clean')).run().windows
+    evaluated = windows[~windows.warmup.astype(bool)]
+    assert set(evaluated.fast_labels) == {8} and set(evaluated.ground_truth_update_labels) <= {24}
+    assert {'uq_attack_tp', 'model_uq_attack_tp'} <= set(windows.columns)
+    original = StreamingExperiment._load_stream
+
+    def corrupted(self):
+        stream = original(self)
+        out = []
+        for window in stream.windows:
+            keep = torch.zeros(len(window.y), dtype=torch.bool)
+            for source in (fast, bulk):
+                if window.index in source['clean']:
+                    keep[torch.from_numpy(np.asarray(source['clean'][window.index]))] = True
+            if window.index not in fast['clean']:
+                keep[:] = True
+            out.append(dataclasses.replace(window, y=torch.where(keep, window.y, 1 - window.y)))
+        return dataclasses.replace(stream, windows=out)
+
+    monkeypatch.setattr(StreamingExperiment, '_load_stream', corrupted)
+    StreamingExperiment(build('flipped')).run()
+    for index in predictions['clean']:
+        np.testing.assert_array_equal(predictions['clean'][index], predictions['flipped'][index])
+
+
+@pytest.mark.parametrize('lane', ['purity', 'representative'])
+def test_prospective_lane_never_reads_the_scored_window(tmp_path, lane, monkeypatch):
+    """Horizon 1: flipping every label of window T leaves T's predictions unchanged."""
+    _, _, predictions = recorder(monkeypatch)
+    cfg = config(tmp_path, 'clean', lane)
+    cfg.baselines.fast_lane_horizon = 1
+    StreamingExperiment(cfg).run()
+    target = sorted(predictions['clean'])[2]
+    original = StreamingExperiment._load_stream
+
+    def corrupted(self):
+        stream = original(self)
+        out = [dataclasses.replace(w, y=1 - w.y) if w.index == target else w for w in stream.windows]
+        return dataclasses.replace(stream, windows=out)
+
+    monkeypatch.setattr(StreamingExperiment, '_load_stream', corrupted)
+    cfg = config(tmp_path, 'flipped', lane)
+    cfg.baselines.fast_lane_horizon = 1
+    StreamingExperiment(cfg).run()
+    np.testing.assert_array_equal(predictions['clean'][target], predictions['flipped'][target])
+
+
+def test_arf_fast_lane_splits_the_budget(tmp_path):
+    cfg = config(tmp_path, 'arf', 'purity', method='arf_adapted')
+    windows = StreamingExperiment(cfg).run().windows
+    evaluated = windows[~windows.warmup.astype(bool)]
+    assert set(evaluated.fast_labels) == {8}
+    assert set(evaluated.ground_truth_update_labels.dropna()) <= {24}
+
+
+def test_noisy_oracle_and_signatures():
+    from dasp_nids.verified_propagation import LabelOracle, group_signatures, match_signatures
+
+    labels = np.zeros(10000, dtype=np.int64)
+    oracle = LabelOracle(labels, 10000, noise=0.1, rng=np.random.default_rng(1))
+    first = oracle.query(np.arange(5000))
+    assert 0.08 < first.mean() < 0.12
+    np.testing.assert_array_equal(first[:10], oracle.query(np.arange(10)))
+    z = np.r_[np.zeros((20, 2)), np.full((20, 2), 10.0)]
+    signatures = group_signatures(z, [np.arange(20)], quantile=1.0)
+    assert set(match_signatures(z, np.arange(40), signatures)) == set(range(20))
+
+
+def test_verify2_stage_plan():
+    from tools.run_dasp_v2 import jobs_for, parser
+
+    args = ['--stage', 'verify2', '--selection', 'results_snapshot/dev/dev_selection.json']
+    jobs = jobs_for(parser().parse_args(args))
+    assert len(jobs) == 1935 and len({j['condition'] for j in jobs}) == 43
+    assert len(jobs_for(parser().parse_args([*args, '--heldout']))) == 645
