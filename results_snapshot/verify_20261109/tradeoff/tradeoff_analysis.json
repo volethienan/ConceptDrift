@@ -1,0 +1,1248 @@
+{
+  "stage": "tradeoff",
+  "runs": 450,
+  "rope": 0.01,
+  "positive_difference_means": "representative better than purity",
+  "contrasts": {
+    "nf-cse-cic-ids2018-v3": {
+      "matched_purity_at_no_higher_fpr": {
+        "er+representative@d5_k16_c12": "er+purity@d5_k16_r3",
+        "er+representative@d5_k16_c16": "er+purity@d5_k16_r3",
+        "er+representative@d5_k16_c4": "er+purity@d5_k16_r3",
+        "er+representative@d5_k16_c8": "er+purity@d5_k16_r3"
+      },
+      "f1": [
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.003414038438331531,
+            "positive_runs": 6,
+            "ci95_low": -0.008453294409611869,
+            "ci95_high": 0.0012984091544046511,
+            "p_two_sided": 0.30279541015625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.00885,
+              "p_practically_equivalent": 0.99115,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.30279541015625
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.003414038438331531,
+              "positive_runs": 6,
+              "ci95_low": -0.00862475509962847,
+              "ci95_high": 0.0012160660965478175,
+              "p_two_sided": 0.30279541015625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.00885,
+                "p_practically_equivalent": 0.99115,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.30279541015625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.005274384209161235,
+            "positive_runs": 2,
+            "ci95_low": -0.008982889768343244,
+            "ci95_high": -0.0007999506518061261,
+            "p_two_sided": 0.012451171875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0056,
+              "p_practically_equivalent": 0.9944,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0498046875
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.005274384209161235,
+              "positive_runs": 2,
+              "ci95_low": -0.008978638199201316,
+              "ci95_high": -0.0007464998413591919,
+              "p_two_sided": 0.012451171875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0056,
+                "p_practically_equivalent": 0.9944,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0498046875
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.007060843386446436,
+            "positive_runs": 5,
+            "ci95_low": -0.014010803344361451,
+            "ci95_high": -0.0005996252113937942,
+            "p_two_sided": 0.1353759765625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.18245,
+              "p_practically_equivalent": 0.81755,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.270751953125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.007060843386446436,
+              "positive_runs": 5,
+              "ci95_low": -0.01405758606248497,
+              "ci95_high": -0.0005093975670663889,
+              "p_two_sided": 0.1353759765625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.18245,
+                "p_practically_equivalent": 0.81755,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.270751953125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.00892118915727614,
+            "positive_runs": 4,
+            "ci95_low": -0.013786774604076405,
+            "ci95_high": -0.00420605514495652,
+            "p_two_sided": 0.00537109375,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.25585,
+              "p_practically_equivalent": 0.74415,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0322265625
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.00892118915727614,
+              "positive_runs": 4,
+              "ci95_low": -0.0138423575115804,
+              "ci95_high": -0.004025321700349912,
+              "p_two_sided": 0.00537109375,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.25585,
+                "p_practically_equivalent": 0.74415,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0322265625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.048607055891468055,
+            "positive_runs": 0,
+            "ci95_low": -0.056722954465709206,
+            "ci95_high": -0.039510046633439516,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 1.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.048607055891468055,
+              "positive_runs": 0,
+              "ci95_low": -0.05670243274031261,
+              "ci95_high": -0.03943031965104644,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 1.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.05046740166229776,
+            "positive_runs": 0,
+            "ci95_low": -0.05844448199555919,
+            "ci95_high": -0.04225205261916874,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 1.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.05046740166229776,
+              "positive_runs": 0,
+              "ci95_low": -0.058438458142811865,
+              "ci95_high": -0.042339929478208374,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 1.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.0049873350095383994,
+            "positive_runs": 3,
+            "ci95_low": -0.00855967671177886,
+            "ci95_high": -0.0011897339800955248,
+            "p_two_sided": 0.03533935546875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0031,
+              "p_practically_equivalent": 0.9969,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.10601806640625
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.0049873350095383994,
+              "positive_runs": 3,
+              "ci95_low": -0.008622867549145022,
+              "ci95_high": -0.0012063635213373112,
+              "p_two_sided": 0.03533935546875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0031,
+                "p_practically_equivalent": 0.9969,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.10601806640625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.0068476807803681036,
+            "positive_runs": 2,
+            "ci95_low": -0.01072760580445279,
+            "ci95_high": -0.0031461765178268934,
+            "p_two_sided": 0.0067138671875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.03375,
+              "p_practically_equivalent": 0.96625,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0335693359375
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": -0.0068476807803681036,
+              "positive_runs": 2,
+              "ci95_low": -0.010738073734050836,
+              "ci95_high": -0.003145699457696701,
+              "p_two_sided": 0.0067138671875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.03375,
+                "p_practically_equivalent": 0.96625,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0335693359375
+            }
+          }
+        }
+      ],
+      "fpr": [
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.005535140629912737,
+            "positive_runs": 14,
+            "ci95_low": 0.003966747458899106,
+            "ci95_high": 0.007101226407516154,
+            "p_two_sided": 0.0001220703125,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.005535140629912737,
+              "positive_runs": 14,
+              "ci95_low": 0.003989759729742057,
+              "ci95_high": 0.007123417150039532,
+              "p_two_sided": 0.0001220703125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.004872576365717143,
+            "positive_runs": 15,
+            "ci95_low": 0.003747297790209467,
+            "ci95_high": 0.005987673933015942,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.004872576365717143,
+              "positive_runs": 15,
+              "ci95_low": 0.003751661517233322,
+              "ci95_high": 0.006023972137791077,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.007813143112461911,
+            "positive_runs": 15,
+            "ci95_low": 0.005342040419321902,
+            "ci95_high": 0.0106746315636692,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.95465,
+              "p_condition_better": 0.04535
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.007813143112461911,
+              "positive_runs": 15,
+              "ci95_low": 0.005250726115697257,
+              "ci95_high": 0.010633413948319658,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.95465,
+                "p_condition_better": 0.04535
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.007150578848266319,
+            "positive_runs": 15,
+            "ci95_low": 0.005030421154697541,
+            "ci95_high": 0.009351652148980268,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.9935,
+              "p_condition_better": 0.0065
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.007150578848266319,
+              "positive_runs": 15,
+              "ci95_low": 0.004958458335861147,
+              "ci95_high": 0.009404688442202548,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.9935,
+                "p_condition_better": 0.0065
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.006044212951378175,
+            "positive_runs": 15,
+            "ci95_low": 0.003762915513291708,
+            "ci95_high": 0.008460293435398456,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.99745,
+              "p_condition_better": 0.00255
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.006044212951378175,
+              "positive_runs": 15,
+              "ci95_low": 0.0037781556984082085,
+              "ci95_high": 0.008459590364463282,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.99745,
+                "p_condition_better": 0.00255
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.005381648687182582,
+            "positive_runs": 13,
+            "ci95_low": 0.0027653154103194078,
+            "ci95_high": 0.00793448162870404,
+            "p_two_sided": 0.00201416015625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.99815,
+              "p_condition_better": 0.00185
+            },
+            "holm_adjusted_p": 0.0040283203125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.005381648687182582,
+              "positive_runs": 13,
+              "ci95_low": 0.0027444040612716342,
+              "ci95_high": 0.007978375613734953,
+              "p_two_sided": 0.00201416015625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.99815,
+                "p_condition_better": 0.00185
+              },
+              "holm_adjusted_p": 0.0040283203125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.00450714641811688,
+            "positive_runs": 13,
+            "ci95_low": 0.0023642098901293625,
+            "ci95_high": 0.0069133817153160994,
+            "p_two_sided": 0.0008544921875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.9999,
+              "p_condition_better": 0.0001
+            },
+            "holm_adjusted_p": 0.0025634765625
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.00450714641811688,
+              "positive_runs": 13,
+              "ci95_low": 0.00240044855764246,
+              "ci95_high": 0.006926013957971398,
+              "p_two_sided": 0.0008544921875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.9999,
+                "p_condition_better": 0.0001
+              },
+              "holm_adjusted_p": 0.0025634765625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r3",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.0038445821539212885,
+            "positive_runs": 12,
+            "ci95_low": 0.00183389829243455,
+            "ci95_high": 0.0062760783266584555,
+            "p_two_sided": 0.00201416015625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0040283203125
+          },
+          "per_dataset": {
+            "nf-cse-cic-ids2018-v3": {
+              "runs": 15,
+              "mean_difference": 0.0038445821539212885,
+              "positive_runs": 12,
+              "ci95_low": 0.0018629962088321155,
+              "ci95_high": 0.0063179962827385255,
+              "p_two_sided": 0.00201416015625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0040283203125
+            }
+          }
+        }
+      ]
+    },
+    "nf-ton-iot-v3": {
+      "matched_purity_at_no_higher_fpr": {
+        "er+representative@d5_k16_c12": "er+purity@d5_k16_r2",
+        "er+representative@d5_k16_c16": "er+purity@d5_k16_r2",
+        "er+representative@d5_k16_c4": "er+purity@d5_k16_r2",
+        "er+representative@d5_k16_c8": "er+purity@d5_k16_r2"
+      },
+      "f1": [
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.01932012732504514,
+            "positive_runs": 15,
+            "ci95_low": 0.014083679278962948,
+            "ci95_high": 0.024540624429314036,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0014,
+              "p_condition_better": 0.9986
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.01932012732504514,
+              "positive_runs": 15,
+              "ci95_low": 0.014059057174086027,
+              "ci95_high": 0.024537826103807624,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0014,
+                "p_condition_better": 0.9986
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.0094590382062693,
+            "positive_runs": 12,
+            "ci95_low": 0.004132800987569422,
+            "ci95_high": 0.014642632156257145,
+            "p_two_sided": 0.00537109375,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.5438,
+              "p_condition_better": 0.4562
+            },
+            "holm_adjusted_p": 0.021484375
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.0094590382062693,
+              "positive_runs": 12,
+              "ci95_low": 0.003907717435393466,
+              "ci95_high": 0.014695883786366506,
+              "p_two_sided": 0.00537109375,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.5438,
+                "p_condition_better": 0.4562
+              },
+              "holm_adjusted_p": 0.021484375
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.02241138275563054,
+            "positive_runs": 15,
+            "ci95_low": 0.01829359443253156,
+            "ci95_high": 0.026752336816577803,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 5e-05,
+              "p_condition_better": 0.99995
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.02241138275563054,
+              "positive_runs": 15,
+              "ci95_low": 0.018188084091403902,
+              "ci95_high": 0.02677074795132423,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 5e-05,
+                "p_condition_better": 0.99995
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.0125502936368547,
+            "positive_runs": 12,
+            "ci95_low": 0.007421286562040385,
+            "ci95_high": 0.01780974353655934,
+            "p_two_sided": 0.00115966796875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.2362,
+              "p_condition_better": 0.7638
+            },
+            "holm_adjusted_p": 0.0069580078125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.0125502936368547,
+              "positive_runs": 12,
+              "ci95_low": 0.007443611931295838,
+              "ci95_high": 0.017823022232918744,
+              "p_two_sided": 0.00115966796875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.2362,
+                "p_condition_better": 0.7638
+              },
+              "holm_adjusted_p": 0.0069580078125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.000907974231681415,
+            "positive_runs": 8,
+            "ci95_low": -0.003730300275821328,
+            "ci95_high": 0.0015861353671812039,
+            "p_two_sided": 0.803955078125,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 1.0
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": -0.000907974231681415,
+              "positive_runs": 8,
+              "ci95_low": -0.0036953018780079157,
+              "ci95_high": 0.0015859922465026246,
+              "p_two_sided": 0.803955078125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 1.0
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.010769063350457258,
+            "positive_runs": 3,
+            "ci95_low": -0.015106143382036846,
+            "ci95_high": -0.006016009791719412,
+            "p_two_sided": 0.00115966796875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.59005,
+              "p_practically_equivalent": 0.40995,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0069580078125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": -0.010769063350457258,
+              "positive_runs": 3,
+              "ci95_low": -0.01507900843608515,
+              "ci95_high": -0.006133130094020226,
+              "p_two_sided": 0.00115966796875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.59005,
+                "p_practically_equivalent": 0.40995,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0069580078125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.008706246835694542,
+            "positive_runs": 13,
+            "ci95_low": 0.0025538630650345597,
+            "ci95_high": 0.014162091507143915,
+            "p_two_sided": 0.01025390625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.69015,
+              "p_condition_better": 0.30985
+            },
+            "holm_adjusted_p": 0.03076171875
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.008706246835694542,
+              "positive_runs": 13,
+              "ci95_low": 0.0027741322721445347,
+              "ci95_high": 0.014211412821881104,
+              "p_two_sided": 0.01025390625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.69015,
+                "p_condition_better": 0.30985
+              },
+              "holm_adjusted_p": 0.03076171875
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": -0.0011548422830812996,
+            "positive_runs": 8,
+            "ci95_low": -0.0071187523806412285,
+            "ci95_high": 0.0038484229445215276,
+            "p_two_sided": 0.93408203125,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.00555,
+              "p_practically_equivalent": 0.9944,
+              "p_condition_better": 5e-05
+            },
+            "holm_adjusted_p": 1.0
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": -0.0011548422830812996,
+              "positive_runs": 8,
+              "ci95_low": -0.007023678578361141,
+              "ci95_high": 0.003940133563738056,
+              "p_two_sided": 0.93408203125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.00555,
+                "p_practically_equivalent": 0.9944,
+                "p_condition_better": 5e-05
+              },
+              "holm_adjusted_p": 1.0
+            }
+          }
+        }
+      ],
+      "fpr": [
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.030212132385563598,
+            "positive_runs": 15,
+            "ci95_low": 0.02528729231489377,
+            "ci95_high": 0.036229608772829915,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 1.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.030212132385563598,
+              "positive_runs": 15,
+              "ci95_low": 0.025316067939676373,
+              "ci95_high": 0.036335447101751024,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 1.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c12",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.013578615017946109,
+            "positive_runs": 12,
+            "ci95_low": 0.005313894471651155,
+            "ci95_high": 0.021221968858444944,
+            "p_two_sided": 0.012451171875,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.10065,
+              "p_condition_better": 0.89935
+            },
+            "holm_adjusted_p": 0.02490234375
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.013578615017946109,
+              "positive_runs": 12,
+              "ci95_low": 0.005195961723024474,
+              "ci95_high": 0.021378230530711584,
+              "p_two_sided": 0.012451171875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.10065,
+                "p_condition_better": 0.89935
+              },
+              "holm_adjusted_p": 0.02490234375
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.025446316479065714,
+            "positive_runs": 15,
+            "ci95_low": 0.021575041282926723,
+            "ci95_high": 0.029945292592579827,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 1.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.025446316479065714,
+              "positive_runs": 15,
+              "ci95_low": 0.02152550613902281,
+              "ci95_high": 0.029907657104867383,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 1.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c16",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.008812799111448229,
+            "positive_runs": 10,
+            "ci95_low": 0.0017152884297624833,
+            "ci95_high": 0.01591643611704283,
+            "p_two_sided": 0.04791259765625,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.00045,
+              "p_practically_equivalent": 0.5865,
+              "p_condition_better": 0.41305
+            },
+            "holm_adjusted_p": 0.04791259765625
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.008812799111448229,
+              "positive_runs": 10,
+              "ci95_low": 0.0014963355177808576,
+              "ci95_high": 0.015896135017454575,
+              "p_two_sided": 0.04791259765625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.00045,
+                "p_practically_equivalent": 0.5865,
+                "p_condition_better": 0.41305
+              },
+              "holm_adjusted_p": 0.04791259765625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.053021827749963904,
+            "positive_runs": 15,
+            "ci95_low": 0.04496386869853771,
+            "ci95_high": 0.06054275034268754,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 1.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.053021827749963904,
+              "positive_runs": 15,
+              "ci95_low": 0.045007006681628096,
+              "ci95_high": 0.06045408852118761,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 1.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c4",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.03638831038234642,
+            "positive_runs": 14,
+            "ci95_low": 0.025402500574293458,
+            "ci95_high": 0.046650135238102616,
+            "p_two_sided": 0.0001220703125,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 5e-05,
+              "p_condition_better": 0.99995
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.03638831038234642,
+              "positive_runs": 14,
+              "ci95_low": 0.025252125491732176,
+              "ci95_high": 0.04669396398534684,
+              "p_two_sided": 0.0001220703125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 5e-05,
+                "p_condition_better": 0.99995
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r4",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.03938589367931058,
+            "positive_runs": 15,
+            "ci95_low": 0.03186130448016147,
+            "ci95_high": 0.047571313089419365,
+            "p_two_sided": 6.103515625e-05,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0,
+              "p_condition_better": 1.0
+            },
+            "holm_adjusted_p": 0.00048828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.03938589367931058,
+              "positive_runs": 15,
+              "ci95_low": 0.0317469912305537,
+              "ci95_high": 0.04726221060713983,
+              "p_two_sided": 6.103515625e-05,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 1.0
+              },
+              "holm_adjusted_p": 0.00048828125
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16_r2",
+          "condition": "er+representative@d5_k16_c8",
+          "metric": "cumulative_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 15,
+            "mean_difference": 0.022752376311693096,
+            "positive_runs": 14,
+            "ci95_low": 0.013168476561826835,
+            "ci95_high": 0.03293672891263672,
+            "p_two_sided": 0.00042724609375,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 0.0214,
+              "p_condition_better": 0.9786
+            },
+            "holm_adjusted_p": 0.00128173828125
+          },
+          "per_dataset": {
+            "nf-ton-iot-v3": {
+              "runs": 15,
+              "mean_difference": 0.022752376311693096,
+              "positive_runs": 14,
+              "ci95_low": 0.013354731092376556,
+              "ci95_high": 0.03268157680212269,
+              "p_two_sided": 0.00042724609375,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 0.0214,
+                "p_condition_better": 0.9786
+              },
+              "holm_adjusted_p": 0.00128173828125
+            }
+          }
+        }
+      ]
+    }
+  }
+}
