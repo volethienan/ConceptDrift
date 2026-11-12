@@ -65,3 +65,24 @@ python tools/analyze_dasp_v2.py --stage verify --output-root results/verify
 ```
 
 Gửi lại `results/verify/{verify_summary.csv,verify_analysis.json,verify_runs.csv}`. **Không** chạy `--heldout` cho đến khi thiết kế đã chốt trên dev.
+
+## Stage `audit`: kiểm tra chứng chỉ và ablation gom cụm (2026-11-12)
+
+Chạy lại purity ở d5, k16, r=4, kèm log kiểm tra chứng chỉ (`cert_*` trong `windows.csv`). Mỗi cụm đã kiểm được ghi lại với kích thước, số flow benign thật, số nhãn đã rút và kết quả. Runner so với nhãn thật bên ngoài method, nên method không đọc thêm nhãn nào.
+
+Ablation trên dev (13 điều kiện × 45 cell = 585 run):
+- số cụm ban đầu 2/4/16/32;
+- `fast_lane_clusterer` = ward hoặc random;
+- `fast_lane_space` = raw;
+- `fast_lane_min_cluster` = 5/20/40;
+- nhiễu nhãn 5%/10%.
+
+Không sweep δ: khi r cố định, δ chỉ đổi ε chứ không đổi quyết định. Với `--heldout`, chỉ chạy purity với analyst sạch và nhiễu 5%/10% (90 run).
+
+```bash
+python tools/run_dasp_v2.py --stage audit --selection results_snapshot/dev/dev_selection.json --prepared-root prepared_streams_v2 --output-root results/audit --execute --resume --shard $k/$N
+python tools/analyze_dasp_v2.py --stage audit --output-root results/audit
+python paper/jtit/make_audit_tables.py   # cần matplotlib
+```
+
+Snapshot: `results_snapshot/audit_20261112/`.

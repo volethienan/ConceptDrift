@@ -2972,6 +2972,29 @@ def _soft_reset_toward_reference(
     return candidate
 
 
+
+def _certificate_audit(records: list[dict], y_true: np.ndarray, epsilon: float) -> dict[str, object]:
+    """Audit purity certificates against ground truth (diagnostic only; the
+    method never sees these labels). Each record becomes
+    [size, true benign members, draws, attack draws, outcome]."""
+    rows = []
+    for record in records:
+        members = np.asarray(record["members"], dtype=np.int64)
+        labels = record["labels"]
+        rows.append([int(len(members)), int((y_true[members] == 0).sum()) if len(members) else 0,
+                     int(len(labels)), int(sum(labels)), record["outcome"]])
+    passed = [row for row in rows if row[4] == "pass"]
+    impure = [row for row in passed if row[0] and row[1] / row[0] > epsilon]
+    return {
+        "cert_clusters": len(rows),
+        "cert_pass": len(passed),
+        "cert_pass_impure": len(impure),
+        "cert_pass_flows": int(sum(row[0] for row in passed)),
+        "cert_pass_benign": int(sum(row[1] for row in passed)),
+        "cert_max_benign_frac": max((row[1] / row[0] for row in passed if row[0]), default=0.0),
+        "cert_records": json.dumps(rows, separators=(",", ":")),
+    }
+
 class StreamingExperiment:
     def __init__(self, config: ExperimentConfig):
         if config.dasp.baseline not in METHODS:
@@ -4241,7 +4264,9 @@ class StreamingExperiment:
             result = verified_propagation.purity_verified_propagation(
                 x, candidates, oracle, rng, initial_clusters=cfg.fast_lane_clusters,
                 labels_per_test=cfg.fast_lane_test_labels, epsilon=cfg.fast_lane_epsilon,
-                delta=cfg.fast_lane_delta, split_mixed=bool(cfg.fast_lane_split))
+                delta=cfg.fast_lane_delta, split_mixed=bool(cfg.fast_lane_split),
+                min_cluster=int(cfg.fast_lane_min_cluster), clusterer=str(cfg.fast_lane_clusterer),
+                space=str(cfg.fast_lane_space))
         elif kind == "uniform_knn":
             result = verified_propagation.uniform_knn_propagation(x, candidates, oracle, rng, budget=budget)
         elif kind == "hierarchical":
@@ -4312,6 +4337,9 @@ class StreamingExperiment:
             "fast_gradient_evaluations": int(gradients),
             "fast_lane_seconds": time.perf_counter() - started,
         }
+        if kind == "purity":
+            self._fast_lane_row.update(_certificate_audit(
+                result.diagnostics.get("records", []), y_true, float(cfg.fast_lane_epsilon)))
         return metrics
 
     def _fast_lane_adapter(self, adapter, window, metrics, n_classes) -> dict[str, float | int]:

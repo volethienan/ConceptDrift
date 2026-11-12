@@ -1,0 +1,879 @@
+{
+  "stage": "audit",
+  "runs": 90,
+  "rope": 0.01,
+  "reference": "er+purity@d5_k16",
+  "positive_difference_means": "condition minus reference",
+  "certificate": {
+    "er+purity@d5_k16": {
+      "cic-ids2017": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 3733,
+        "censored_open": 463,
+        "passed": 382,
+        "impure_tested": 3282,
+        "impure_passed": 14,
+        "pass_rate_given_impure": 0.0042656916514320535,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.03664921465968586,
+        "benign_share_of_certified_flows": 0.04508532003156515,
+        "max_benign_fraction_passed": 0.453027139874739,
+        "mean_certified_size": 723.1780104712042,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 299,
+            "passed": 281,
+            "pass_rate": 0.939799331103679,
+            "bound_with_replacement": 0.9572732279457637
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 60,
+            "passed": 45,
+            "pass_rate": 0.75,
+            "bound_with_replacement": 0.758618428159346
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 41,
+            "passed": 26,
+            "pass_rate": 0.6341463414634146,
+            "bound_with_replacement": 0.5231569443294486
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 51,
+            "passed": 16,
+            "pass_rate": 0.3137254901960784,
+            "bound_with_replacement": 0.3328420832879931
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 92,
+            "passed": 14,
+            "pass_rate": 0.15217391304347827,
+            "bound_with_replacement": 0.1524264790260294
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 109,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.025997596371704727
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 3081,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 4.8555186570412425e-05
+          }
+        ]
+      },
+      "cidds-001": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 3843,
+        "censored_open": 4,
+        "passed": 3,
+        "impure_tested": 3836,
+        "impure_passed": 1,
+        "pass_rate_given_impure": 0.00026068821689259646,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.3333333333333333,
+        "benign_share_of_certified_flows": 0.5418641390205371,
+        "max_benign_fraction_passed": 0.5707154742096506,
+        "mean_certified_size": 211.0,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 2,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "bound_with_replacement": 1.0
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 2,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.518813659985145
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 3,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.3318953726022227
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 12,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.12358893222948841
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 12,
+            "passed": 1,
+            "pass_rate": 0.08333333333333333,
+            "bound_with_replacement": 0.024741124845935488
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 3812,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 3.372092171626435e-06
+          }
+        ]
+      },
+      "pooled": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 7576,
+        "censored_open": 467,
+        "passed": 385,
+        "impure_tested": 7118,
+        "impure_passed": 15,
+        "pass_rate_given_impure": 0.0021073335206518687,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.03896103896103896,
+        "benign_share_of_certified_flows": 0.046221021571977015,
+        "max_benign_fraction_passed": 0.5707154742096506,
+        "mean_certified_size": 719.187012987013,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 301,
+            "passed": 283,
+            "pass_rate": 0.9401993355481728,
+            "bound_with_replacement": 0.9575571267633999
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 60,
+            "passed": 45,
+            "pass_rate": 0.75,
+            "bound_with_replacement": 0.758618428159346
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 43,
+            "passed": 26,
+            "pass_rate": 0.6046511627906976,
+            "bound_with_replacement": 0.5229549311041322
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 54,
+            "passed": 16,
+            "pass_rate": 0.2962962962962963,
+            "bound_with_replacement": 0.3327894882498948
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 104,
+            "passed": 14,
+            "pass_rate": 0.1346153846153846,
+            "bound_with_replacement": 0.1490990697802747
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 121,
+            "passed": 1,
+            "pass_rate": 0.008264462809917356,
+            "bound_with_replacement": 0.025872987625347448
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 6893,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 2.3567814475798732e-05
+          }
+        ]
+      }
+    },
+    "er+purity@d5_k16_noise05": {
+      "cic-ids2017": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 3944,
+        "censored_open": 656,
+        "passed": 323,
+        "impure_tested": 3464,
+        "impure_passed": 15,
+        "pass_rate_given_impure": 0.0043302540415704385,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.04643962848297214,
+        "benign_share_of_certified_flows": 0.03818012053306171,
+        "max_benign_fraction_passed": 0.5172413793103449,
+        "mean_certified_size": 729.4736842105264,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 326,
+            "passed": 236,
+            "pass_rate": 0.7239263803680982,
+            "bound_with_replacement": 0.9547142974349152
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 57,
+            "passed": 37,
+            "pass_rate": 0.6491228070175439,
+            "bound_with_replacement": 0.7654812143779071
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 46,
+            "passed": 25,
+            "pass_rate": 0.5434782608695652,
+            "bound_with_replacement": 0.5332112638997962
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 51,
+            "passed": 10,
+            "pass_rate": 0.19607843137254902,
+            "bound_with_replacement": 0.31984380246781513
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 85,
+            "passed": 12,
+            "pass_rate": 0.1411764705882353,
+            "bound_with_replacement": 0.14239598704386144
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 109,
+            "passed": 3,
+            "pass_rate": 0.027522935779816515,
+            "bound_with_replacement": 0.026391929053594526
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 3270,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 5.0307681409956304e-05
+          }
+        ]
+      },
+      "cidds-001": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 4227,
+        "censored_open": 25,
+        "passed": 9,
+        "impure_tested": 4216,
+        "impure_passed": 2,
+        "pass_rate_given_impure": 0.0004743833017077799,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.2222222222222222,
+        "benign_share_of_certified_flows": 0.3656716417910448,
+        "max_benign_fraction_passed": 0.5707154742096506,
+        "mean_certified_size": 178.66666666666666,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 3,
+            "passed": 3,
+            "pass_rate": 1.0,
+            "bound_with_replacement": 1.0
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 2,
+            "passed": 2,
+            "pass_rate": 1.0,
+            "bound_with_replacement": 0.5187615403666452
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 6,
+            "passed": 2,
+            "pass_rate": 0.3333333333333333,
+            "bound_with_replacement": 0.31264537249638485
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 13,
+            "passed": 1,
+            "pass_rate": 0.07692307692307693,
+            "bound_with_replacement": 0.14480463237059982
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 12,
+            "passed": 1,
+            "pass_rate": 0.08333333333333333,
+            "bound_with_replacement": 0.026329763569543366
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 4191,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 2.8523702164637628e-06
+          }
+        ]
+      },
+      "pooled": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 8171,
+        "censored_open": 681,
+        "passed": 332,
+        "impure_tested": 7680,
+        "impure_passed": 17,
+        "pass_rate_given_impure": 0.0022135416666666666,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.05120481927710843,
+        "benign_share_of_certified_flows": 0.04039995278803514,
+        "max_benign_fraction_passed": 0.5707154742096506,
+        "mean_certified_size": 714.5421686746988,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 329,
+            "passed": 239,
+            "pass_rate": 0.7264437689969605,
+            "bound_with_replacement": 0.9551272369719829
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 57,
+            "passed": 37,
+            "pass_rate": 0.6491228070175439,
+            "bound_with_replacement": 0.7654812143779071
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 48,
+            "passed": 27,
+            "pass_rate": 0.5625,
+            "bound_with_replacement": 0.532609192085915
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 57,
+            "passed": 12,
+            "pass_rate": 0.21052631578947367,
+            "bound_with_replacement": 0.31908607299713826
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 98,
+            "passed": 13,
+            "pass_rate": 0.1326530612244898,
+            "bound_with_replacement": 0.14271550121985735
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 121,
+            "passed": 4,
+            "pass_rate": 0.03305785123966942,
+            "bound_with_replacement": 0.02638576388162251
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 7461,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 2.365103897436761e-05
+          }
+        ]
+      }
+    },
+    "er+purity@d5_k16_noise10": {
+      "cic-ids2017": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 4275,
+        "censored_open": 746,
+        "passed": 269,
+        "impure_tested": 3787,
+        "impure_passed": 7,
+        "pass_rate_given_impure": 0.0018484288354898336,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.026022304832713755,
+        "benign_share_of_certified_flows": 0.03853046594982079,
+        "max_benign_fraction_passed": 0.6715686274509803,
+        "mean_certified_size": 792.4014869888476,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 350,
+            "passed": 200,
+            "pass_rate": 0.5714285714285714,
+            "bound_with_replacement": 0.9542563682729905
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 47,
+            "passed": 27,
+            "pass_rate": 0.574468085106383,
+            "bound_with_replacement": 0.7732944924977816
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 42,
+            "passed": 21,
+            "pass_rate": 0.5,
+            "bound_with_replacement": 0.5473702611959008
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 49,
+            "passed": 14,
+            "pass_rate": 0.2857142857142857,
+            "bound_with_replacement": 0.3289859377326583
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 74,
+            "passed": 3,
+            "pass_rate": 0.04054054054054054,
+            "bound_with_replacement": 0.13970458660917867
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 117,
+            "passed": 4,
+            "pass_rate": 0.03418803418803419,
+            "bound_with_replacement": 0.024202092423979898
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 3596,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 4.371206689013656e-05
+          }
+        ]
+      },
+      "cidds-001": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 4613,
+        "censored_open": 121,
+        "passed": 3,
+        "impure_tested": 4608,
+        "impure_passed": 3,
+        "pass_rate_given_impure": 0.0006510416666666666,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 1.0,
+        "benign_share_of_certified_flows": 0.4740450538687561,
+        "max_benign_fraction_passed": 0.5707154742096506,
+        "mean_certified_size": 340.3333333333333,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 1,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.9647611898464346
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 1,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.5903279137103149
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 3,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 0.3326798537656889
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 14,
+            "passed": 2,
+            "pass_rate": 0.14285714285714285,
+            "bound_with_replacement": 0.13893001412925696
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 10,
+            "passed": 1,
+            "pass_rate": 0.1,
+            "bound_with_replacement": 0.026232732258861746
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 4584,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 2.398042805372213e-06
+          }
+        ]
+      },
+      "pooled": {
+        "epsilon": 0.3,
+        "delta": 0.25,
+        "r": 4,
+        "tested_clusters": 8888,
+        "censored_open": 867,
+        "passed": 272,
+        "impure_tested": 8395,
+        "impure_passed": 10,
+        "pass_rate_given_impure": 0.0011911852293031567,
+        "promised_bound": 0.24009999999999995,
+        "impure_share_of_passed": 0.03676470588235294,
+        "benign_share_of_certified_flows": 0.04060660108228241,
+        "max_benign_fraction_passed": 0.6715686274509803,
+        "mean_certified_size": 787.4154411764706,
+        "calibration": [
+          {
+            "benign_fraction_bin": "[0.00, 0.05)",
+            "clusters": 351,
+            "passed": 200,
+            "pass_rate": 0.5698005698005698,
+            "bound_with_replacement": 0.9542862965395816
+          },
+          {
+            "benign_fraction_bin": "[0.05, 0.10)",
+            "clusters": 47,
+            "passed": 27,
+            "pass_rate": 0.574468085106383,
+            "bound_with_replacement": 0.7732944924977816
+          },
+          {
+            "benign_fraction_bin": "[0.10, 0.20)",
+            "clusters": 43,
+            "passed": 21,
+            "pass_rate": 0.4883720930232558,
+            "bound_with_replacement": 0.5483692763706546
+          },
+          {
+            "benign_fraction_bin": "[0.20, 0.30)",
+            "clusters": 52,
+            "passed": 14,
+            "pass_rate": 0.2692307692307692,
+            "bound_with_replacement": 0.3291990482730254
+          },
+          {
+            "benign_fraction_bin": "[0.30, 0.50)",
+            "clusters": 88,
+            "passed": 5,
+            "pass_rate": 0.056818181818181816,
+            "bound_with_replacement": 0.13958135916919112
+          },
+          {
+            "benign_fraction_bin": "[0.50, 0.75)",
+            "clusters": 127,
+            "passed": 5,
+            "pass_rate": 0.03937007874015748,
+            "bound_with_replacement": 0.024361985324364295
+          },
+          {
+            "benign_fraction_bin": "[0.75, 1.00)",
+            "clusters": 8180,
+            "passed": 0,
+            "pass_rate": 0.0,
+            "bound_with_replacement": 2.056005143725639e-05
+          }
+        ]
+      }
+    }
+  },
+  "contrasts": {
+    "uq_macro_f1": {
+      "run_level": [
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise05",
+          "metric": "uq_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 30,
+            "mean_difference": -0.012702279118264633,
+            "positive_runs": 13,
+            "ci95_low": -0.02081915782394479,
+            "ci95_high": -0.005552664743392925,
+            "p_two_sided": 0.03841841779649258,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.3263,
+              "p_practically_equivalent": 0.6737,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.03841841779649258
+          },
+          "per_dataset": {
+            "cic-ids2017": {
+              "runs": 15,
+              "mean_difference": -0.025763675775516904,
+              "positive_runs": 2,
+              "ci95_low": -0.03826550279740882,
+              "ci95_high": -0.013848925402084874,
+              "p_two_sided": 0.00201416015625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.98845,
+                "p_practically_equivalent": 0.01155,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.00201416015625
+            },
+            "cidds-001": {
+              "runs": 15,
+              "mean_difference": 0.0003591175389876374,
+              "positive_runs": 11,
+              "ci95_low": 5.078192462154796e-05,
+              "ci95_high": 0.0007386288890010365,
+              "p_two_sided": 0.063720703125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.12744140625
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise10",
+          "metric": "uq_macro_f1",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 30,
+            "mean_difference": -0.024293723414471443,
+            "positive_runs": 8,
+            "ci95_low": -0.03724708758783794,
+            "ci95_high": -0.012799599651772303,
+            "p_two_sided": 0.0012321043759584427,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.9701,
+              "p_practically_equivalent": 0.0299,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.0024642087519168854
+          },
+          "per_dataset": {
+            "cic-ids2017": {
+              "runs": 15,
+              "mean_difference": -0.04863342217937331,
+              "positive_runs": 1,
+              "ci95_low": -0.06763978206382794,
+              "ci95_high": -0.03163307692367315,
+              "p_two_sided": 0.0001220703125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 1.0,
+                "p_practically_equivalent": 0.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.000244140625
+            },
+            "cidds-001": {
+              "runs": 15,
+              "mean_difference": 4.597535043042722e-05,
+              "positive_runs": 7,
+              "ci95_low": -0.0002920834608494381,
+              "ci95_high": 0.0003893188008352867,
+              "p_two_sided": 0.803955078125,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.803955078125
+            }
+          }
+        }
+      ],
+      "stream_level": [
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise05",
+          "metric": "uq_macro_f1",
+          "streams": 6,
+          "condition_better_streams": 3,
+          "mean_difference": -0.012702279118264622,
+          "min_difference": -0.05579097904883901,
+          "max_difference": 0.0009181434656494458,
+          "per_dataset_mean": {
+            "cic-ids2017": -0.02576367577551686,
+            "cidds-001": 0.00035911753898761517
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise10",
+          "metric": "uq_macro_f1",
+          "streams": 6,
+          "condition_better_streams": 2,
+          "mean_difference": -0.02429372341447141,
+          "min_difference": -0.09351634293402689,
+          "max_difference": 0.0004558580151292624,
+          "per_dataset_mean": {
+            "cic-ids2017": -0.048633422179373276,
+            "cidds-001": 4.597535043045683e-05
+          }
+        }
+      ]
+    },
+    "uq_benign_fpr": {
+      "run_level": [
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise05",
+          "metric": "uq_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 30,
+            "mean_difference": -0.0006136969578548111,
+            "positive_runs": 13,
+            "ci95_low": -0.0015852452720720338,
+            "ci95_high": 0.00018504226248583616,
+            "p_two_sided": 0.3284698575735092,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.5976882949471474
+          },
+          "per_dataset": {
+            "cic-ids2017": {
+              "runs": 15,
+              "mean_difference": -0.0015147715668459721,
+              "positive_runs": 4,
+              "ci95_low": -0.0032871788893574947,
+              "ci95_high": -1.4354934588826661e-05,
+              "p_two_sided": 0.10699462890625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.10699462890625
+            },
+            "cidds-001": {
+              "runs": 15,
+              "mean_difference": 0.0002873776511363495,
+              "positive_runs": 9,
+              "ci95_low": 5.202174253283718e-06,
+              "ci95_high": 0.0006462770630682929,
+              "p_two_sided": 0.25238037109375,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.25238037109375
+            }
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise10",
+          "metric": "uq_benign_fpr",
+          "positive_difference_means": "condition better than reference",
+          "pooled": {
+            "runs": 30,
+            "mean_difference": -0.0009262797958301018,
+            "positive_runs": 15,
+            "ci95_low": -0.0018877585700329855,
+            "ci95_high": 1.4320263339938631e-05,
+            "p_two_sided": 0.2988441474735737,
+            "bayes_signed_rank": {
+              "rope": 0.01,
+              "p_condition_worse": 0.0,
+              "p_practically_equivalent": 1.0,
+              "p_condition_better": 0.0
+            },
+            "holm_adjusted_p": 0.5976882949471474
+          },
+          "per_dataset": {
+            "cic-ids2017": {
+              "runs": 15,
+              "mean_difference": -0.002155793430569525,
+              "positive_runs": 3,
+              "ci95_low": -0.00378345673536287,
+              "ci95_high": -0.00032651325028025595,
+              "p_two_sided": 0.0301513671875,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.060302734375
+            },
+            "cidds-001": {
+              "runs": 15,
+              "mean_difference": 0.0003032338389093216,
+              "positive_runs": 12,
+              "ci95_low": 0.00011438220500944966,
+              "ci95_high": 0.0004969762865593721,
+              "p_two_sided": 0.01025390625,
+              "bayes_signed_rank": {
+                "rope": 0.01,
+                "p_condition_worse": 0.0,
+                "p_practically_equivalent": 1.0,
+                "p_condition_better": 0.0
+              },
+              "holm_adjusted_p": 0.0205078125
+            }
+          }
+        }
+      ],
+      "stream_level": [
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise05",
+          "metric": "uq_benign_fpr",
+          "streams": 6,
+          "condition_better_streams": 3,
+          "mean_difference": -0.0006136969578548105,
+          "min_difference": -0.004357132218132175,
+          "max_difference": 0.0006461649926007844,
+          "per_dataset_mean": {
+            "cic-ids2017": -0.0015147715668459704,
+            "cidds-001": 0.00028737765113634955
+          }
+        },
+        {
+          "reference": "er+purity@d5_k16",
+          "condition": "er+purity@d5_k16_noise10",
+          "metric": "uq_benign_fpr",
+          "streams": 6,
+          "condition_better_streams": 3,
+          "mean_difference": -0.0009262797958301015,
+          "min_difference": -0.0039029894270223176,
+          "max_difference": 0.00035172186134951487,
+          "per_dataset_mean": {
+            "cic-ids2017": -0.0021557934305695245,
+            "cidds-001": 0.0003032338389093216
+          }
+        }
+      ]
+    }
+  }
+}

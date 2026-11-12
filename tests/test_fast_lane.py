@@ -155,6 +155,9 @@ def test_tradeoff_stage_plan():
     {'baselines.fast_lane_split': False},
     {'baselines.fast_lane_candidates': 'all'},
     {'baselines.fast_lane_label_noise': 0.1},
+    {'baselines.fast_lane_clusterer': 'ward'},
+    {'baselines.fast_lane_clusterer': 'random'},
+    {'baselines.fast_lane_space': 'raw', 'baselines.fast_lane_min_cluster': 5},
     {'baselines.fast_lane_horizon': 1},
     {'baselines.fast_lane': 'representative', 'baselines.fast_lane_horizon': 2},
 ])
@@ -244,3 +247,17 @@ def test_verify2_stage_plan():
     jobs = jobs_for(parser().parse_args(args))
     assert len(jobs) == 1935 and len({j['condition'] for j in jobs}) == 43
     assert len(jobs_for(parser().parse_args([*args, '--heldout']))) == 1290
+
+
+def test_audit_stage_plan_and_certificate_columns(tmp_path):
+    from tools.run_dasp_v2 import jobs_for, parser
+
+    args = ['--stage', 'audit', '--selection', 'results_snapshot/dev/dev_selection.json']
+    jobs = jobs_for(parser().parse_args(args))
+    assert len(jobs) == 585 and len({j['condition'] for j in jobs}) == 13
+    held = jobs_for(parser().parse_args([*args, '--heldout']))
+    assert len(held) == 90 and {j['dataset'] for j in held} == {'cic-ids2017', 'cidds-001'}
+    windows = StreamingExperiment(config(tmp_path, 'audit', 'purity')).run().windows
+    evaluated = windows[~windows.warmup.astype(bool)]
+    assert {'cert_pass', 'cert_pass_impure', 'cert_pass_benign', 'cert_records'} <= set(windows.columns)
+    assert (evaluated.cert_pass_impure <= evaluated.cert_pass).all()

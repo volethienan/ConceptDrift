@@ -58,3 +58,43 @@ def test_purity_propagation_finds_pure_bursts_and_spares_benign():
 def test_clopper_pearson_all_successes():
     assert vp.clopper_pearson_lower(5, 5, 0.2) == pytest.approx(0.2 ** (1 / 5))
     assert vp.clopper_pearson_lower(0, 5, 0.2) == 0.0
+
+
+@pytest.mark.parametrize("clusterer", vp.CLUSTERERS)
+@pytest.mark.parametrize("space", ["log", "raw"])
+def test_purity_records_every_cluster_once(clusterer, space):
+    x, y = _window()
+    candidates = np.arange(len(x))
+    result = vp.purity_verified_propagation(x, candidates, vp.LabelOracle(y, 32), np.random.default_rng(3),
+                                            labels_per_test=4, epsilon=0.4, delta=0.2,
+                                            clusterer=clusterer, space=space)
+    records = result.diagnostics["records"]
+    assert {r["outcome"] for r in records} <= {"pass", "benign", "mixed", "small", "open"}
+    passed = [r for r in records if r["outcome"] == "pass"]
+    assert len(passed) == result.diagnostics["certified_clusters"]
+    assert all(r["labels"] == [1] * 4 for r in passed)
+    certified = np.concatenate([r["members"] for r in passed]) if passed else np.empty(0, np.int64)
+    np.testing.assert_array_equal(np.sort(certified), np.sort(result.pseudo_indices))
+
+
+def test_partition_methods():
+    z = np.r_[np.zeros((30, 2)), np.full((30, 2), 9.0)]
+    for method in vp.CLUSTERERS:
+        labels = vp._partition(z, 2, 0, method)
+        assert labels.shape == (60,) and set(labels) <= {0, 1}
+    ward = vp._partition(z, 2, 0, "ward")
+    assert len(set(ward[:30])) == 1 and ward[0] != ward[-1]
+    with pytest.raises(ValueError):
+        vp._partition(z, 2, 0, "dbscan")
+
+
+def test_certificate_audit_counts():
+    from dasp_nids.runner import _certificate_audit
+
+    y = np.r_[np.ones(10), np.zeros(10)].astype(np.int64)
+    records = [{"members": np.arange(10), "labels": [1, 1], "outcome": "pass"},
+               {"members": np.arange(5, 15), "labels": [1, 1], "outcome": "pass"},
+               {"members": np.arange(10, 20), "labels": [0], "outcome": "benign"}]
+    out = _certificate_audit(records, y, epsilon=0.3)
+    assert out["cert_pass"] == 2 and out["cert_pass_impure"] == 1
+    assert out["cert_pass_benign"] == 5 and out["cert_max_benign_frac"] == 0.5

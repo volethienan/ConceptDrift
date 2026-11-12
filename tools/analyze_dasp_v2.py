@@ -951,9 +951,97 @@ def analyze_final(output_root: Path, replicates: int = 10000, allow_incomplete: 
     return result
 
 
+
+# audit stage: certificate validity and the remaining purity ablations
+AUDIT_REFERENCE = 'er+purity@d5_k16'
+AUDIT_BINS = (0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0000001)
+
+
+def certificate_rows(root: Path, record: dict) -> pd.DataFrame:
+    """Every verified cluster of a purity run: size, true benign fraction,
+    draws, attack draws and outcome (cert_records in windows.csv)."""
+    windows = pd.read_csv(run_directory(root, record) / 'windows.csv')
+    windows = windows[~windows.warmup.astype(bool)]
+    rows = []
+    for window, cell in zip(windows.window, windows.get('cert_records', pd.Series(dtype=object))):
+        if isinstance(cell, str):
+            rows += [[window, *row] for row in json.loads(cell)]
+    frame = pd.DataFrame(rows, columns=['window', 'size', 'benign', 'draws', 'attack_draws', 'outcome'])
+    frame['benign_fraction'] = frame.benign / frame['size'].clip(lower=1)
+    return frame
+
+
+def certificate_audit(clusters: pd.DataFrame, epsilon: float, delta: float, r: int) -> dict:
+    """Empirical check of the purity certificate. A cluster is tested when at
+    least one of its members was drawn and it closed (pass, benign or mixed);
+    clusters still open when the budget ran out are censored."""
+    tested = clusters[clusters.outcome.isin(['pass', 'benign', 'mixed']) & (clusters.draws > 0)]
+    passed = tested[tested.outcome == 'pass']
+    impure = tested[tested.benign_fraction > epsilon]
+    bins = pd.cut(tested.benign_fraction, AUDIT_BINS, right=False)
+    calibration = []
+    for interval, part in tested.groupby(bins, observed=True):
+        calibration.append({'benign_fraction_bin': f'[{interval.left:.2f}, {min(interval.right, 1):.2f})',
+                            'clusters': int(len(part)), 'passed': int((part.outcome == 'pass').sum()),
+                            'pass_rate': float((part.outcome == 'pass').mean()),
+                            'bound_with_replacement': float(((1 - part.benign_fraction) ** r).mean())})
+    return {
+        'epsilon': epsilon, 'delta': delta, 'r': r,
+        'tested_clusters': int(len(tested)), 'censored_open': int((clusters.outcome == 'open').sum()),
+        'passed': int(len(passed)),
+        'impure_tested': int(len(impure)),
+        'impure_passed': int((impure.outcome == 'pass').sum()),
+        # P(pass | benign fraction > epsilon): the certificate promises <= (1 - epsilon)^r <= delta
+        'pass_rate_given_impure': float((impure.outcome == 'pass').mean()) if len(impure) else np.nan,
+        'promised_bound': float((1 - epsilon) ** r),
+        # share of certificates that are wrong, and the benign share of propagated alarms
+        'impure_share_of_passed': float((passed.benign_fraction > epsilon).mean()) if len(passed) else np.nan,
+        'benign_share_of_certified_flows': float(passed.benign.sum() / max(1, passed['size'].sum())),
+        'max_benign_fraction_passed': float(passed.benign_fraction.max()) if len(passed) else np.nan,
+        'mean_certified_size': float(passed['size'].mean()) if len(passed) else np.nan,
+        'calibration': calibration,
+    }
+
+
+def analyze_audit(output_root: Path, replicates: int = 10000, allow_incomplete: bool = False,
+                  epsilon: float = 0.3, delta: float = 0.25, r: int = 4) -> dict:
+    records = _load_stage(output_root, 'audit', allow_incomplete)
+    rows, clusters = [], []
+    for record in records:
+        metrics = verify2_run_metrics(output_root, record)
+        rows.append({key: record[key] for key in (*PAIR, 'condition')} | metrics)
+        part = certificate_rows(output_root, record)
+        part[['dataset', 'stream_seed', 'model_seed', 'condition']] = (
+            record['dataset'], record['stream_seed'], record['model_seed'], record['condition'])
+        clusters.append(part)
+    frame = pd.DataFrame(rows)
+    clusters = pd.concat(clusters, ignore_index=True)
+    frame.to_csv(output_root / 'audit_runs.csv', index=False)
+    clusters.to_csv(output_root / 'audit_clusters.csv.gz', index=False)
+    grouped = frame.groupby(['dataset', 'condition'])[VERIFY2_METRICS]
+    summary = grouped.mean().join(grouped.std()[['uq_macro_f1', 'uq_benign_fpr']].add_suffix('_std'))
+    summary = summary.join(grouped.size().rename('runs')).reset_index()
+    summary.to_csv(output_root / 'audit_summary.csv', index=False)
+    audits = {}
+    for (dataset, condition), part in clusters.groupby(['dataset', 'condition']):
+        audits.setdefault(condition, {})[dataset] = certificate_audit(part, epsilon, delta, r)
+    for condition, part in clusters.groupby('condition'):
+        audits[condition]['pooled'] = certificate_audit(part, epsilon, delta, r)
+    pairs = [(AUDIT_REFERENCE, c) for c in sorted(set(frame.condition) - {AUDIT_REFERENCE})]
+    contrasts = {}
+    if len(pairs):
+        contrasts = {metric: {'run_level': run_level_family(frame, pairs, metric, replicates),
+                              'stream_level': stream_level(frame, pairs, metric)}
+                     for metric in ('uq_macro_f1', 'uq_benign_fpr')}
+    result = {'stage': 'audit', 'runs': len(frame), 'rope': ROPE, 'reference': AUDIT_REFERENCE,
+              'positive_difference_means': 'condition minus reference',
+              'certificate': audits, 'contrasts': contrasts}
+    (output_root / 'audit_analysis.json').write_text(json.dumps(result, indent=2, default=float), encoding='utf-8')
+    return result
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify', 'tradeoff', 'verify2'),
+    parser.add_argument('--stage', choices=('dev', 'lodo', 'screen', 'final', 'sweep', 'shortcut', 'rope', 'verify', 'tradeoff', 'verify2', 'audit'),
                         default='dev')
     parser.add_argument('--output-root', type=Path, required=True,
                         help='stage results; for --stage rope, where rope_analysis.json is written')
@@ -981,6 +1069,9 @@ if __name__ == '__main__':
     elif arguments.stage == 'verify2':
         analyze_verify2(arguments.output_root, arguments.verify_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'verify2_summary.csv').round(4).to_string(index=False))
+    elif arguments.stage == 'audit':
+        analyze_audit(arguments.output_root, allow_incomplete=arguments.allow_incomplete)
+        print(pd.read_csv(arguments.output_root / 'audit_summary.csv').round(4).to_string(index=False))
     elif arguments.stage == 'tradeoff':
         analyze_tradeoff(arguments.output_root, arguments.verify_root, allow_incomplete=arguments.allow_incomplete)
         print(pd.read_csv(arguments.output_root / 'tradeoff_summary.csv').round(4).to_string(index=False))

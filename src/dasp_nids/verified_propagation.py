@@ -168,11 +168,41 @@ def _kmeans(z: np.ndarray, k: int, seed: int) -> np.ndarray:
     return KMeans(n_clusters=k, n_init=3, random_state=seed).fit_predict(z)
 
 
+CLUSTERERS = ("kmeans", "ward", "random")
+
+
+def _partition(z: np.ndarray, k: int, seed: int, method: str = "kmeans") -> np.ndarray:
+    """Split ``z`` into at most ``k`` groups: k-means (default), Ward
+    agglomeration, or a random partition (ablation: no feature structure)."""
+    if method == "kmeans":
+        return _kmeans(z, k, seed)
+    if method == "ward":
+        k = max(1, min(k, len(np.unique(z, axis=0))))
+        if k == 1:
+            return np.zeros(len(z), dtype=np.int64)
+        from sklearn.cluster import AgglomerativeClustering
+        return AgglomerativeClustering(n_clusters=k, linkage="ward").fit_predict(z).astype(np.int64)
+    if method == "random":
+        k = max(1, min(k, len(z)))
+        return np.random.default_rng(seed).integers(0, k, size=len(z)).astype(np.int64)
+    raise ValueError(f"unknown clusterer {method}; expected one of {CLUSTERERS}")
+
+
+def feature_space(x: np.ndarray, space: str = "log") -> np.ndarray:
+    """Clustering space: signed log (default) or the raw z-scored features."""
+    if space == "log":
+        return cluster_space(x)
+    if space == "raw":
+        return np.asarray(x, dtype=float)
+    raise ValueError(f"unknown cluster space {space}")
+
+
 def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: LabelOracle,
                                 rng: np.random.Generator, *, initial_clusters: int = 8,
                                 labels_per_test: int = 4, epsilon: float = 0.3,
                                 delta: float = 0.25, min_cluster: int = 10,
-                                split_mixed: bool = True) -> Verification:
+                                split_mixed: bool = True, clusterer: str = "kmeans",
+                                space: str = "log") -> Verification:
     """Screen clusters of ``candidates`` with one random label, confirm attack ones, spread certified attacks.
 
     Each cluster draws members uniformly at random without replacement, one
@@ -185,13 +215,25 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
     yet drawn) and the children start afresh. Certification needs all of a
     cluster's draws to be attack, so a cluster whose benign fraction exceeds
     ``epsilon`` passes with probability at most ``(1 - epsilon) ** labels_per_test``.
+
+    ``diagnostics["records"]`` lists every cluster that entered the queue with
+    its members, the labels drawn and its outcome (``pass``; ``benign``: first
+    draw benign; ``mixed``: both labels drawn, split or dropped; ``small``;
+    ``open``: the budget ran out first), so the certificate can be audited
+    against ground truth outside this function.
     """
     if clopper_pearson_lower(labels_per_test, labels_per_test, delta) < 1 - epsilon:
         raise ValueError("labels_per_test all-attack draws cannot reach 1 - epsilon at level delta")
-    z = cluster_space(x)
+    z = feature_space(x, space)
     queue: list[dict] = []
+    records: list[dict] = []
+
+    def close(cluster: dict, outcome: str) -> None:
+        queue[:] = [c for c in queue if c is not cluster]
+        records.append({"members": cluster["members"], "labels": list(cluster["labels"]), "outcome": outcome})
+
     if len(candidates) >= min_cluster:
-        assignment = _kmeans(z[candidates], initial_clusters, int(rng.integers(2**31)))
+        assignment = _partition(z[candidates], initial_clusters, int(rng.integers(2**31)), clusterer)
         queue = [{"members": candidates[assignment == c], "drawn": [], "labels": []}
                  for c in np.unique(assignment)]
     certified, tests = [], []
@@ -200,25 +242,27 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
         cluster = max(confirming or queue, key=lambda c: len(c["members"]))
         undrawn = np.setdiff1d(cluster["members"], cluster["drawn"])
         if len(cluster["members"]) < min_cluster or not len(undrawn):
-            queue[:] = [c for c in queue if c is not cluster]
+            close(cluster, "small")
             continue
         draw = int(rng.choice(undrawn))
         cluster["drawn"].append(draw)
         cluster["labels"].append(int(oracle.query(draw)[0]))
         attacks, n = sum(cluster["labels"]), len(cluster["labels"])
         if attacks == 0:
-            queue[:] = [c for c in queue if c is not cluster]
+            close(cluster, "benign")
         elif attacks < n:
-            queue[:] = [c for c in queue if c is not cluster]
+            close(cluster, "mixed")
             rest = np.setdiff1d(cluster["members"], cluster["drawn"])
             if split_mixed and len(rest) >= 2 * min_cluster:
-                split = _kmeans(z[rest], 2, int(rng.integers(2**31)))
+                split = _partition(z[rest], 2, int(rng.integers(2**31)), clusterer)
                 queue.extend({"members": rest[split == c], "drawn": [], "labels": []} for c in np.unique(split))
         elif n == labels_per_test:
-            queue[:] = [c for c in queue if c is not cluster]
+            close(cluster, "pass")
             lower = clopper_pearson_lower(attacks, n, delta)
             tests.append({"size": int(len(cluster["members"])), "lower": lower})
             certified.append(cluster["members"])
+    for cluster in list(queue):
+        close(cluster, "open")
     queried = np.asarray(oracle.queried, dtype=np.int64)
     queried_attacks = queried[oracle.query(queried) == 1] if len(queried) else queried
     alarms = np.unique(np.concatenate([*certified, queried_attacks])) if certified or len(queried_attacks) else np.empty(0, np.int64)
@@ -226,7 +270,8 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
     return Verification(queried, alarms.astype(np.int64), propagated.astype(np.int64),
                         np.ones(len(propagated), dtype=np.int64),
                         diagnostics={"tests": tests, "certified_clusters": len(certified),
-                                     "propagated": int(sum(map(len, certified)))},
+                                     "propagated": int(sum(map(len, certified))),
+                                     "records": records},
                         groups=list(certified))
 
 

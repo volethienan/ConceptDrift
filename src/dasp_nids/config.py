@@ -301,6 +301,12 @@ class BaselineConfig:
     fast_lane_split: bool = True
     fast_lane_candidates: str = "benign"
     fast_lane_label_noise: float = 0.0
+    # Purity ablations: partition method (kmeans | ward | random), clustering
+    # space (log: signed log of the features | raw) and the smallest cluster
+    # that may be verified.
+    fast_lane_clusterer: str = "kmeans"
+    fast_lane_space: str = "log"
+    fast_lane_min_cluster: int = 10
     # fast_lane=anomaly: label-free Isolation Forest on labelled benign memory
     fast_lane_anomaly_alpha: float = 0.01
     ssf_label_budget: int = 256

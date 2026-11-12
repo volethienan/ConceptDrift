@@ -37,7 +37,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
+STAGES = ('audit', 'dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
 
 
 def _grid(**axes):
@@ -413,6 +413,34 @@ def verify2_settings(overrides_of):
     return out
 
 
+# audit: the purity lane at d5, k16 (r = 4) re-run with certificate logging
+# (ground-truth purity of every verified cluster, checked outside the method)
+# and the remaining sensitivity checks: number of initial clusters, the
+# partition method (Ward; a random partition keeps the budget and the test
+# but drops feature structure), the clustering space and the smallest
+# verifiable cluster. delta is not swept: with r fixed every certificate needs
+# r attack draws out of r, so delta only relabels epsilon. On the held-out
+# streams only the certificate audit (clean and noisy analyst) is planned.
+AUDIT_CLUSTERS = (2, 4, 16, 32)
+AUDIT_MIN_CLUSTER = (5, 20, 40)
+AUDIT_HELDOUT = ('er+purity@d5_k16', 'er+purity@d5_k16_noise05', 'er+purity@d5_k16_noise10')
+
+
+def audit_settings(overrides_of):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+
+    def purity(name, **extra):
+        return (f'er+purity@d5_k16{name}', 'experience_replay', er | _lane(5, 16, 'purity', **extra))
+
+    out = [purity('')]
+    out += [purity(f'_noise{int(100 * eta):02d}', **{'baselines.fast_lane_label_noise': eta}) for eta in (0.05, 0.10)]
+    out += [purity(f'_c{c}', **{'baselines.fast_lane_clusters': c}) for c in AUDIT_CLUSTERS]
+    out += [purity(f'_{m}', **{'baselines.fast_lane_clusterer': m}) for m in ('ward', 'random')]
+    out.append(purity('_rawspace', **{'baselines.fast_lane_space': 'raw'}))
+    out += [purity(f'_min{m}', **{'baselines.fast_lane_min_cluster': m}) for m in AUDIT_MIN_CLUSTER]
+    return out
+
+
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
@@ -429,8 +457,10 @@ def verify_jobs(args):
         if args.heldout:
             raise ValueError('the tradeoff stage runs on the development streams only')
         cells = [c for c in cells if c[0] in TRADEOFF_DATASETS]
-    settings = {'tradeoff': tradeoff_settings, 'verify': verify_settings,
+    settings = {'audit': audit_settings, 'tradeoff': tradeoff_settings, 'verify': verify_settings,
                 'verify2': verify2_settings}[stage](overrides_of)
+    if stage == 'audit' and args.heldout:
+        settings = [item for item in settings if item[0] in AUDIT_HELDOUT]
     return [dict(stage=stage, dataset=d, scenario=s, stream_seed=seed, model_seed=m,
                  method=method, condition=name, overrides=overrides, stream=stream)
             for d, s, seed, m, stream in cells for name, method, overrides in settings]
@@ -590,7 +620,7 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
-    if args.stage in ('verify', 'tradeoff', 'verify2'):
+    if args.stage in ('audit', 'verify', 'tradeoff', 'verify2'):
         return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()
