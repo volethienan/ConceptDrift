@@ -82,6 +82,83 @@ def cost_table():
     (TAB / 'cost.tex').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
+ALL = {**DEV, **HELD}
+
+
+def verify2_summary():
+    frames = [pd.read_csv(VERIFY2 / part / 'verify2_summary.csv')
+              for part in ('verify2', 'verify2_heldout', 'verify2_heldout_cidds')]
+    return pd.concat(frames)
+
+
+def rows_table(summary, rows, datasets, name, fmt=cell):
+    lines = []
+    for condition, label in rows:
+        if condition is None:
+            lines.append(label)
+            continue
+        lines.append(f'{label} & ' + ' & '.join(fmt(summary, d, condition) for d in datasets) + '\\\\')
+    (TAB / name).write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
+def main_table_uq(summary):
+    lanes = [('er@d{d}', 'ER'), ('er_iwms@d{d}', 'ER + IWMS'), ('er_uncertainty@d{d}', 'ER + uncertainty AL'),
+             ('arf@d{d}', 'ARF'), ('er+uniform@d{d}_k16', 'Uniform fast labels'),
+             ('er+uniform_knn@d{d}_k16', 'Uniform + kNN'), ('er+hierarchical@d{d}_k16', 'Hierarchical sampling'),
+             ('er+representative@d{d}_k16', 'Cluster verification, representative'),
+             ('er+purity@d{d}_k16', 'Cluster verification, purity-certified')]
+    rows = [('er@d0', 'ER, labels without delay$^\\dagger$'), (None, '\\midrule')]
+    for d in (1, 5):
+        rows.append((None, f'\\multicolumn{{6}}{{l}}{{\\textit{{Label delay $d={d}$ windows}}}}\\\\'))
+        rows += [(t.format(d=d), n) for t, n in lanes]
+        rows.append((None, '\\midrule'))
+    rows_table(summary, rows[:-1], ALL, 'main_uq.tex')
+
+
+def ablation_k_uq(summary):
+    rows = []
+    for k in (4, 8, 16, 32):
+        rows += [(f'er+uniform@d5_k{k}', f'$k={k}$, uniform'), (f'er+purity@d5_k{k}', f'$k={k}$, purity-certified')]
+    rows += [(None, '\\midrule'),
+             ('er+purity_nosplit@d5_k16', 'No splitting of mixed clusters'),
+             ('er+purity_all@d5_k16', 'Clustering all flows, not only model-benign'),
+             ('er+purity_pseudo@d5_k16', 'Training on alarms as pseudo-labels'),
+             ('arf+uniform@d5_k16', 'ARF learner, uniform fast labels'),
+             ('arf+purity@d5_k16', 'ARF learner, purity-certified')]
+    rows_table(summary, rows, ALL, 'ablation_k_uq.tex')
+
+
+def noise_table(summary):
+    rows = []
+    for lane, name in (('representative', 'Representative'), ('purity', 'Purity-certified')):
+        rows += [(f'er+{lane}@d5_k16', f'{name}, clean'),
+                 (f'er+{lane}@d5_k16_noise05', f'{name}, 5\\% flipped'),
+                 (f'er+{lane}@d5_k16_noise10', f'{name}, 10\\% flipped')]
+        rows.append((None, '\\midrule'))
+    rows_table(summary, rows[:-1], ALL, 'noise.tex')
+
+
+def burst_cell(summary, dataset, condition):
+    row = summary[(summary.dataset == dataset) & (summary.condition == condition)]
+    if not len(row):
+        return '--'
+    r = row.iloc[0]
+    return f'{r.uq_macro_f1:.3f} & {100 * r.burst_detection_rate:.0f} / {r.burst_latency_windows:.1f}'
+
+
+def prospective_table(summary):
+    rows = [('er@d0', 'ER, labels without delay'), ('er@d5', 'ER, $d=5$'),
+            ('er+uniform@d5_k16', 'Uniform fast labels'),
+            ('er+representative@d5_k16', 'Representative, $h=0$'),
+            ('er+representative@d5_k16_h1', 'Representative, $h=1$'),
+            ('er+representative@d5_k16_h2', 'Representative, $h=2$'),
+            ('er+purity@d5_k16', 'Purity-certified, $h=0$'),
+            ('er+purity@d5_k16_h1', 'Purity-certified, $h=1$'),
+            ('er+purity@d5_k16_h2', 'Purity-certified, $h=2$')]
+    rows_table(summary, rows, ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017'), 'prospective.tex',
+               fmt=burst_cell)
+
+
 def calibration_figure(r: int = 4, epsilon: float = 0.3):
     """Observed certification rate vs the true benign fraction of each tested
     cluster, against (1 - b)^r (draws with replacement)."""
@@ -129,4 +206,9 @@ if __name__ == '__main__':
     ablation_table(dev)
     certificate_table(analyses)
     cost_table()
+    v2 = verify2_summary()
+    main_table_uq(v2)
+    ablation_k_uq(v2)
+    noise_table(v2)
+    prospective_table(v2)
     print('wrote', *(p.name for p in TAB.glob('*.tex')))
