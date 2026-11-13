@@ -4298,7 +4298,7 @@ class StreamingExperiment:
                 min_cluster=int(cfg.fast_lane_min_cluster), clusterer=str(cfg.fast_lane_clusterer),
                 space=str(cfg.fast_lane_space), max_certified=int(cfg.fast_lane_max_certified),
                 screen=str(cfg.fast_lane_screen), split_rule=str(cfg.fast_lane_split_rule),
-                attack_score=self._last_attack_score)
+                attack_score=self._last_attack_score, acceptance=str(cfg.fast_lane_acceptance))
         elif kind == "ilab":
             result = verified_propagation.ilab_queries(
                 x, candidates, self._last_attack_score, oracle, rng, budget=budget,

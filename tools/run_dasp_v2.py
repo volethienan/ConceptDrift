@@ -37,7 +37,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
+STAGES = ('acceptance', 'audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
 
 
 def _grid(**axes):
@@ -544,6 +544,21 @@ def memory_settings(overrides_of, heldout=False):
     return clean + noisy if heldout else noisy
 
 
+# acceptance: the acceptance-rule ablation on identical clusters (same partition,
+# screening, splitting and budget as the certified lane): trust one label (r=1),
+# a strict majority of four draws (the majority-label rule of hierarchical
+# sampling), against the certificate (four of four, the er+purity runs), on clean,
+# independently noisy and group-correlated analyst labels.
+def acceptance_settings(overrides_of):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    rules = {'one': {'baselines.fast_lane_test_labels': 1, 'baselines.fast_lane_epsilon': certified_epsilon(1)},
+             'majority': {'baselines.fast_lane_acceptance': 'majority'}}
+    errors = {'': {}, '_noise10': {'baselines.fast_lane_label_noise': REVISION_NOISE},
+              '_group10': {'baselines.fast_lane_noise_model': 'group', 'baselines.fast_lane_label_noise': REVISION_NOISE}}
+    return [(f'er+purity_{rule}@d5_k16{suffix}', 'experience_replay', er | _lane(5, 16, 'purity', **extra, **noise))
+            for rule, extra in rules.items() for suffix, noise in errors.items()]
+
+
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
@@ -565,7 +580,7 @@ def verify_jobs(args):
     elif stage == 'memory':
         settings = memory_settings(overrides_of, heldout=bool(args.heldout))
     else:
-        settings = {'audit': audit_settings, 'dedup': dedup_settings, 'pilot': pilot_settings, 'pilot2': pilot2_settings, 'tradeoff': tradeoff_settings,
+        settings = {'acceptance': acceptance_settings, 'audit': audit_settings, 'dedup': dedup_settings, 'pilot': pilot_settings, 'pilot2': pilot2_settings, 'tradeoff': tradeoff_settings,
                     'verify': verify_settings, 'verify2': verify2_settings}[stage](overrides_of)
     if stage == 'audit' and args.heldout:
         settings = [item for item in settings if item[0] in AUDIT_HELDOUT]
@@ -728,7 +743,7 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
-    if args.stage in ('audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'verify', 'tradeoff', 'verify2'):
+    if args.stage in ('acceptance', 'audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'verify', 'tradeoff', 'verify2'):
         return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()

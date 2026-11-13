@@ -269,7 +269,8 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
                                 split_mixed: bool = True, clusterer: str = "kmeans",
                                 space: str = "log", max_certified: int = 0,
                                 screen: str = "uniform", split_rule: str = "kmeans",
-                                attack_score: np.ndarray | None = None) -> Verification:
+                                attack_score: np.ndarray | None = None,
+                                acceptance: str = "all") -> Verification:
     """Screen clusters of ``candidates`` with one random label, confirm attack ones, spread certified attacks.
 
     Each cluster draws members uniformly at random without replacement, one
@@ -298,7 +299,16 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
     the side (attack or benign) of its nearest drawn member. Children are
     formed before any of their own members is drawn, so the bound still
     holds for each child conditionally on its membership.
+
+    ``acceptance="majority"`` is an ablation of the acceptance rule on the same
+    clusters: after an attack screening draw the cluster always receives all
+    ``labels_per_test`` draws and is raised when a strict majority of them are
+    attack (the symmetric, majority-label rule of hierarchical sampling, without
+    its confidence bound); otherwise it is split like a mixed cluster. It gives
+    no one-sided guarantee.
     """
+    if acceptance not in ("all", "majority"):
+        raise ValueError(f"unknown acceptance rule {acceptance}")
     if clopper_pearson_lower(labels_per_test, labels_per_test, delta) < 1 - epsilon:
         raise ValueError("labels_per_test all-attack draws cannot reach 1 - epsilon at level delta")
     if screen not in ("uniform", "suspicion") or split_rule not in ("kmeans", "guided"):
@@ -349,8 +359,17 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
         cluster["drawn"].append(draw)
         cluster["labels"].append(int(oracle.query(draw)[0]))
         attacks, n = sum(cluster["labels"]), len(cluster["labels"])
-        if attacks == 0:
+        if acceptance == "majority" and attacks and n == need and 2 * attacks <= n:
+            close(cluster, "mixed")  # no strict attack majority after all draws
+            queue.extend({"members": part, "drawn": [], "labels": []} for part in split(cluster))
+        elif acceptance == "majority" and attacks and n == need:
+            close(cluster, "pass")
+            tests.append({"size": int(len(cluster["members"])), "lower": clopper_pearson_lower(attacks, n, delta)})
+            certified.append(cluster["members"])
+        elif attacks == 0:
             close(cluster, "benign")
+        elif acceptance == "majority":
+            continue  # keep drawing until the vote is complete
         elif attacks < n:
             close(cluster, "mixed")
             queue.extend({"members": part, "drawn": [], "labels": []} for part in split(cluster))

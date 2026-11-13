@@ -325,6 +325,9 @@ class BaselineConfig:
     # renewed (one window at a time) only while that draw is attack
     fast_lane_memory: int = 0
     fast_lane_memory_check: bool = False
+    # purity lane acceptance rule: "all" draws attack (the certificate) or a strict
+    # attack majority of the draws (ablation: majority-label rule, no guarantee)
+    fast_lane_acceptance: str = "all"
     # fast_lane=self_train: uniform fast labels plus self-training on the
     # model's confident predictions of the current window (pseudo-labels).
     fast_lane_selftrain_threshold: float = 0.95

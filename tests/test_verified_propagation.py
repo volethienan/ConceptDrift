@@ -23,6 +23,8 @@ METHODS = {
     "purity_suspicion_guided": lambda x, c, o, r: vp.purity_verified_propagation(
         x, c, o, r, labels_per_test=4, epsilon=0.4, delta=0.2, screen="suspicion", split_rule="guided",
         attack_score=np.abs(x[:, 0])),
+    "purity_majority": lambda x, c, o, r: vp.purity_verified_propagation(
+        x, c, o, r, labels_per_test=4, epsilon=0.4, delta=0.2, acceptance="majority"),
 }
 
 
@@ -52,6 +54,16 @@ def test_suspicion_and_guided_split_recover_bursts_hidden_in_one_cluster():
         assert not result.alarms.size or y[result.alarms].mean() >= 0.95  # epsilon allows a little impurity
         found.append(result.alarms.size)
     assert min(found) >= 40
+
+
+def test_majority_acceptance_draws_the_full_vote():
+    x, y = _window()
+    result = vp.purity_verified_propagation(x, np.arange(len(x)), vp.LabelOracle(y, 64), np.random.default_rng(4),
+                                            labels_per_test=4, epsilon=0.4, delta=0.2, acceptance="majority")
+    for record in result.diagnostics["records"]:
+        if record["outcome"] == "pass":
+            assert len(record["labels"]) == 4 and sum(record["labels"]) >= 3
+    assert result.alarms.size >= 80
 
 
 def test_suspicion_screen_needs_scores():

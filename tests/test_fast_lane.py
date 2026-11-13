@@ -165,6 +165,7 @@ def test_tradeoff_stage_plan():
     {'baselines.fast_lane_max_certified': 1},
     {'baselines.fast_lane_screen': 'suspicion', 'baselines.fast_lane_split_rule': 'guided'},
     {'baselines.fast_lane_memory': 2},
+    {'baselines.fast_lane_acceptance': 'majority'},
     {'baselines.fast_lane_memory': 1, 'baselines.fast_lane_memory_check': True},
     {'baselines.fast_lane': 'representative', 'baselines.fast_lane_memory': 1,
      'baselines.fast_lane_memory_check': True},
