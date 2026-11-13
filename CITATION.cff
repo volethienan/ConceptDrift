@@ -9,7 +9,7 @@ authors:
     orcid: "https://orcid.org/0009-0006-7587-8135"
 license: MIT
 doi: "10.5281/zenodo.24203046"
-version: "1.0.1"
+version: "1.0.2"
 date-released: "2026-11-14"
 repository-code: "https://github.com/volethienan/ConceptDrift"
 keywords:
