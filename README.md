@@ -51,6 +51,7 @@ tools/
   analyze_dasp_v2.py           per-run metrics and stage analyses
 paper/jtit/*.py                scripts that build the tables and figures
 results_snapshot/              per-run metrics behind every reported number
+results_raw/                   raw run directories of every stage (per-window metrics)
 tests/                         unit tests, incl. label-leakage checks
 configs/                       learner configuration
 ```
@@ -142,6 +143,23 @@ seed, model seed, condition) and stage summaries used for every reported number:
 | `audit_20261112/` | `audit`, incl. the per-cluster certificate records |
 | `revision_20261113/` | `revision`, `dedup`, `memory`, `acceptance`, operational load |
 | `dev/dev_selection.json` | learner configurations selected on separate development streams |
+
+`results_raw/` holds one archive per stage with the complete run directories:
+for each run its configuration, provenance, summary and per-window metrics
+(`windows.csv`), plus the stage plan and analysis files. Unpacking them
+reproduces the `results/` folder that the stages write, so the tables can be
+rebuilt without re-running the experiments (`operational_load.py` also reads the
+stream manifests that the stream builders write):
+
+```bash
+mkdir -p results
+for f in results_raw/*.tar.gz; do tar -xzf "$f" -C results; done
+python paper/jtit/make_revision_tables.py
+```
+
+Absolute paths of the machine that ran the experiments were rewritten as
+repository-relative paths when the archives were built
+(`tools/package_raw_results.py`).
 
 ## Evaluation protocol
 
