@@ -149,6 +149,7 @@ if __name__ == '__main__':
     parser.add_argument('--results', type=Path, default=ROOT / 'results')
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+    TAB.mkdir(exist_ok=True)
     frame = frames(args.results)
     frame.to_csv(OUT / 'revision_runs.csv', index=False)
     s = summary(frame)

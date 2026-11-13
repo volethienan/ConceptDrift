@@ -191,6 +191,7 @@ def calibration_figure(r: int = 4, epsilon: float = 0.3):
     ax.set_xlim(0, 1); ax.set_ylim(-0.02, 1.02)
     ax.legend(fontsize=6.5, loc='upper right')
     fig.tight_layout()
+    (HERE / 'figures').mkdir(exist_ok=True)
     fig.savefig(HERE / 'figures' / 'certificate.pdf'); fig.savefig(HERE / 'figures' / 'certificate.png', dpi=160)
     plt.close(fig)
 

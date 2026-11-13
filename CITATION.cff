@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Purity-certified same-window verification for NIDS under label delay: code and result snapshots"
+title: "Certified Same-Window Verification for Network Intrusion Detection under Label Delay: Code and Result Snapshots"
 type: software
 authors:
   - family-names: "Vo Le Thien"
@@ -8,7 +8,7 @@ authors:
     affiliation: "The Saigon International University (SIU)"
     orcid: "https://orcid.org/0009-0006-7587-8135"
 license: MIT
-version: "1.0.0"
+version: "1.0.1"
 date-released: "2026-11-14"
 repository-code: "https://github.com/volethienan/ConceptDrift"
 keywords:

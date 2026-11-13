@@ -100,6 +100,7 @@ def fmt(v: float) -> str:
 
 def write_tables(ops: pd.DataFrame, fam: pd.DataFrame) -> None:
     tab = HERE / 'tables'
+    tab.mkdir(exist_ok=True)
     mean = ops.groupby(['dataset', 'condition']).mean(numeric_only=True)
     lines = []
     hours = ' & '.join(f"{mean.loc[(d, 'er+purity@d5_k16'), 'hours_per_window']:.2f}" for d in DATASETS)

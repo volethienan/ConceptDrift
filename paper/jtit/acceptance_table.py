@@ -57,6 +57,7 @@ if __name__ == '__main__':
             first = label if i == 0 else ''
             lines.append(f'{first} & {name} & ' + ' & '.join(cell(s, d, f'er+{rule}@d5_k16{suffix}') for d in DATASETS) + '\\\\')
         lines.append('\\midrule')
+    (HERE / 'tables').mkdir(exist_ok=True)
     (HERE / 'tables' / 'acceptance.tex').write_text('\n'.join(lines[:-1]) + '\n', encoding='utf-8')
     pairs = [(f'er+{rule}@d5_k16{suffix}', f'er+purity@d5_k16{suffix}')
              for suffix, _ in ERRORS for rule in ('purity_one', 'purity_majority')]

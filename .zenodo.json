@@ -1,5 +1,5 @@
 {
-  "title": "Purity-certified same-window verification for NIDS under label delay: code and result snapshots",
+  "title": "Certified Same-Window Verification for Network Intrusion Detection under Label Delay: Code and Result Snapshots",
   "upload_type": "software",
   "description": "<p>Code and result snapshots for experiments on network intrusion detection when analyst labels arrive several windows late. A small part of each window's labelling budget is verified at once and spent on clusters of the flows the model calls benign; a cluster is raised only when r uniformly drawn members are all attacks. The archive contains the stream builders, the experiment runner and stages, the analysis scripts, unit tests and the per-run metrics behind every reported number. The datasets (NetFlow v3 releases, CIC-IDS2017, CIDDS-001) are public and not included.</p>",
   "creators": [
@@ -10,6 +10,12 @@
     }
   ],
   "license": "MIT",
-  "keywords": ["intrusion detection", "label delay", "active learning", "alert triage", "network flows"],
-  "version": "1.0.0"
+  "keywords": [
+    "intrusion detection",
+    "label delay",
+    "active learning",
+    "alert triage",
+    "network flows"
+  ],
+  "version": "1.0.1"
 }

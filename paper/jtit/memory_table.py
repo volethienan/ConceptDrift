@@ -59,6 +59,7 @@ if __name__ == '__main__':
             first = name if i == 0 else ''
             lines.append(f'{first} & {label} & ' + ' & '.join(cell(s, d, condition(lane, suffix)) for d in DATASETS) + '\\\\')
         lines.append('\\midrule')
+    (HERE / 'tables').mkdir(exist_ok=True)
     (HERE / 'tables' / 'memory.tex').write_text('\n'.join(lines[:-1]) + '\n', encoding='utf-8')
     pairs = [(condition(lane, base), condition(lane, var)) for lane in ('purity', 'representative')
              for base, var in (('', '_m2'), ('', '_mc'), ('@noise', '_m2@noise'))]

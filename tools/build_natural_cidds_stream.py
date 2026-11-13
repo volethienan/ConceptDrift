@@ -36,7 +36,7 @@ from tools.build_controlled_nf_streams import _sha256, _write_stream  # noqa: E4
 PROTOCOL_VERSION = 'natural-2.0-cidds'
 DATASET = 'cidds-001'
 FILES = ('CIDDS-001-internal-week1.csv', 'CIDDS-001-internal-week2.csv')
-DEFAULT_SOURCE = Path(r'C:\Users\AnThiwn\Desktop\Q!\data\CIDDS-001\CIDDS-001\traffic\OpenStack')
+DEFAULT_SOURCE = Path('data/CIDDS-001/CIDDS-001/traffic/OpenStack')
 FEATURES = ['duration', 'src_port', 'dst_port', 'packets', 'bytes', 'flows', 'tos', 'bytes_per_packet',
             'proto_tcp', 'proto_udp', 'proto_icmp', 'proto_other',
             'flag_urg', 'flag_ack', 'flag_psh', 'flag_rst', 'flag_syn', 'flag_fin']
