@@ -3,6 +3,7 @@
 Code, tests and result snapshots for the study *Certified Same-Window
 Verification for Network Intrusion Detection under Label Delay*.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24203046.svg)](https://doi.org/10.5281/zenodo.24203046)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 
@@ -153,7 +154,8 @@ seed, model seed, condition) and stage summaries used for every reported number:
 ## Citation
 
 Citation metadata is provided in [`CITATION.cff`](CITATION.cff); GitHub shows a
-*Cite this repository* button for it. Each release is archived on Zenodo with a DOI.
+*Cite this repository* button for it. The code and result snapshots are archived
+on Zenodo: [10.5281/zenodo.24203046](https://doi.org/10.5281/zenodo.24203046).
 
 ## License
 
