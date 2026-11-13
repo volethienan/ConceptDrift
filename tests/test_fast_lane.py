@@ -158,6 +158,16 @@ def test_tradeoff_stage_plan():
     {'baselines.fast_lane_clusterer': 'ward'},
     {'baselines.fast_lane_clusterer': 'random'},
     {'baselines.fast_lane_space': 'raw', 'baselines.fast_lane_min_cluster': 5},
+    {'baselines.fast_lane_noise_model': 'group', 'baselines.fast_lane_label_noise': 0.2},
+    {'baselines.fast_lane_noise_model': 'subtype', 'baselines.fast_lane_label_noise': 0.5},
+    {'baselines.fast_lane': 'ilab'},
+    {'baselines.fast_lane': 'self_train'},
+    {'baselines.fast_lane_max_certified': 1},
+    {'baselines.fast_lane_screen': 'suspicion', 'baselines.fast_lane_split_rule': 'guided'},
+    {'baselines.fast_lane_memory': 2},
+    {'baselines.fast_lane_memory': 1, 'baselines.fast_lane_memory_check': True},
+    {'baselines.fast_lane': 'representative', 'baselines.fast_lane_memory': 1,
+     'baselines.fast_lane_memory_check': True},
     {'baselines.fast_lane_horizon': 1},
     {'baselines.fast_lane': 'representative', 'baselines.fast_lane_horizon': 2},
 ])
@@ -261,3 +271,24 @@ def test_audit_stage_plan_and_certificate_columns(tmp_path):
     evaluated = windows[~windows.warmup.astype(bool)]
     assert {'cert_pass', 'cert_pass_impure', 'cert_pass_benign', 'cert_records'} <= set(windows.columns)
     assert (evaluated.cert_pass_impure <= evaluated.cert_pass).all()
+
+
+def test_revision_stage_plan():
+    from tools.run_dasp_v2 import jobs_for, parser
+
+    args = ['--stage', 'revision', '--selection', 'results_snapshot/dev/dev_selection.json']
+    assert len(jobs_for(parser().parse_args(args))) == 1080
+    held = jobs_for(parser().parse_args([*args, '--heldout', '--datasets', 'cic-ids2017']))
+    assert len(held) == 390 and {j['dataset'] for j in held} == {'cic-ids2017'}
+
+
+def test_dedup_stage_plan():
+    from tools.run_dasp_v2 import jobs_for, parser
+
+    args = ['--stage', 'dedup', '--selection', 'results_snapshot/dev/dev_selection.json',
+            '--datasets', 'nf-ton-iot-v3']
+    jobs = jobs_for(parser().parse_args(args))
+    assert len(jobs) == 105 and {j['dataset'] for j in jobs} == {'nf-ton-iot-v3'}
+    assert {j['condition'] for j in jobs} == {
+        'er@d0', 'er@d5', *(f'er+{lane}@d5_k16' for lane in
+                            ('uniform', 'uniform_knn', 'hierarchical', 'representative', 'purity'))}

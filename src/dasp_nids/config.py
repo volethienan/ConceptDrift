@@ -307,6 +307,28 @@ class BaselineConfig:
     fast_lane_clusterer: str = "kmeans"
     fast_lane_space: str = "log"
     fast_lane_min_cluster: int = 10
+    # Analyst error model for fast labels: independent per-flow flips
+    # (fast_lane_label_noise), or correlated: whole look-alike groups
+    # mislabelled ("group") or whole attack subtypes missed ("subtype"),
+    # each with probability fast_lane_label_noise.
+    fast_lane_noise_model: str = "independent"
+    # Purity: stop after this many certified clusters per window (0 = no cap).
+    fast_lane_max_certified: int = 0
+    # purity lane: first draw of a cluster uniform (part of the certificate) or the
+    # most suspicious member by model score (outside it); mixed clusters split by
+    # k-means or by their drawn labels (nearest drawn member)
+    fast_lane_screen: str = "uniform"
+    fast_lane_split_rule: str = "kmeans"
+    # certificate memory: signatures of clusters raised in window t alarm matching
+    # model-benign flows of the next `fast_lane_memory` windows without new labels;
+    # with memory_check each signature spends one uniform draw per window and is
+    # renewed (one window at a time) only while that draw is attack
+    fast_lane_memory: int = 0
+    fast_lane_memory_check: bool = False
+    # fast_lane=self_train: uniform fast labels plus self-training on the
+    # model's confident predictions of the current window (pseudo-labels).
+    fast_lane_selftrain_threshold: float = 0.95
+    fast_lane_selftrain_cap: int = 256
     # fast_lane=anomaly: label-free Isolation Forest on labelled benign memory
     fast_lane_anomaly_alpha: float = 0.01
     ssf_label_budget: int = 256

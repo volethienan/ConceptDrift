@@ -126,6 +126,71 @@ class AnomalyAlarm:
         return candidates[score > self.threshold].astype(np.int64)
 
 
+NOISE_MODELS = ("independent", "group", "subtype")
+
+
+def correlated_labels(labels: np.ndarray, x: np.ndarray, subtypes: np.ndarray | None, model: str,
+                      eta: float, rng: np.random.Generator, groups: int = 32) -> np.ndarray:
+    """Analyst labels under correlated errors (the oracle then adds no noise).
+
+    ``group``: the window is split into ``groups`` look-alike groups (k-means
+    on the clustering space, seeded by the oracle, not by any fast lane) and
+    every flow of a group is mislabelled when the analyst misjudges that
+    group, with probability ``eta`` per group. ``subtype``: the analyst fails
+    to recognise an attack subtype, with probability ``eta`` per subtype
+    present, and labels all of its flows benign (benign flows stay correct).
+    """
+    labels = np.asarray(labels).astype(np.int64).copy()
+    if model == "group":
+        assignment = _kmeans(cluster_space(x), groups, int(rng.integers(2**31)))
+        for g in np.unique(assignment):
+            if rng.random() < eta:
+                members = assignment == g
+                labels[members] = 1 - labels[members]
+        return labels
+    if model == "subtype":
+        if subtypes is None:
+            raise ValueError("subtype noise needs attack subtypes")
+        names = np.asarray(subtypes).astype(str)
+        # iterate over every subtype name of the window (not only attack ones), so the
+        # draws do not depend on labels of flows nobody queried
+        for name in sorted(set(names.tolist())):
+            if rng.random() < eta:
+                labels[(names == name) & (labels == 1)] = 0
+        return labels
+    raise ValueError(f"unknown correlated noise model {model}")
+
+
+def ilab_queries(x: np.ndarray, candidates: np.ndarray, attack_score: np.ndarray, oracle: LabelOracle,
+                 rng: np.random.Generator, *, budget: int, clusters: int) -> Verification:
+    """ILAB-style query selection (Beaugnon et al. 2017), no propagation.
+
+    Half of the budget goes to the flows closest to the decision threshold
+    (uncertainty sampling); the other half to rare-category detection: the
+    model-benign candidates are clustered and, in each cluster, the member
+    farthest from its centroid (the most atypical one) is queried. Only the
+    queried flows are known; queried attacks are raised as alarms.
+    """
+    uncertain_budget = budget // 2
+    order = np.argsort(np.abs(np.asarray(attack_score, dtype=float) - 0.5), kind="stable")
+    oracle.query(order[:uncertain_budget])
+    rare_budget = budget - len(oracle.queried)
+    if rare_budget > 0 and len(candidates) >= 2:
+        z = cluster_space(x[candidates])
+        assignment = _kmeans(z, min(clusters, rare_budget), int(rng.integers(2**31)))
+        for c in np.unique(assignment):
+            if oracle.remaining <= 0:
+                break
+            inside = np.flatnonzero(assignment == c)
+            centre = z[inside].mean(axis=0)
+            pick = candidates[inside[np.argmax(((z[inside] - centre) ** 2).sum(axis=1))]]
+            if int(pick) not in oracle._seen:
+                oracle.query(pick)
+    queried = np.asarray(oracle.queried, dtype=np.int64)
+    attacks = queried[oracle.query(queried) == 1] if len(queried) else queried
+    return Verification(queried, attacks.astype(np.int64))
+
+
 def cluster_space(x: np.ndarray) -> np.ndarray:
     """Signed log scale: the z-scored flow features are heavy tailed."""
     return np.sign(x) * np.log1p(np.abs(x))
@@ -202,7 +267,9 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
                                 labels_per_test: int = 4, epsilon: float = 0.3,
                                 delta: float = 0.25, min_cluster: int = 10,
                                 split_mixed: bool = True, clusterer: str = "kmeans",
-                                space: str = "log") -> Verification:
+                                space: str = "log", max_certified: int = 0,
+                                screen: str = "uniform", split_rule: str = "kmeans",
+                                attack_score: np.ndarray | None = None) -> Verification:
     """Screen clusters of ``candidates`` with one random label, confirm attack ones, spread certified attacks.
 
     Each cluster draws members uniformly at random without replacement, one
@@ -221,16 +288,45 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
     draw benign; ``mixed``: both labels drawn, split or dropped; ``small``;
     ``open``: the budget ran out first), so the certificate can be audited
     against ground truth outside this function.
+
+    ``screen="suspicion"`` separates detection from certification: the first
+    draw of a cluster is its member with the highest model attack score, and
+    it does not count towards the certificate, which then needs
+    ``labels_per_test`` further uniform draws, all attack. The bound is
+    unchanged because only uniform draws enter it. ``split_rule="guided"``
+    splits a mixed cluster by its drawn labels: every undrawn member joins
+    the side (attack or benign) of its nearest drawn member. Children are
+    formed before any of their own members is drawn, so the bound still
+    holds for each child conditionally on its membership.
     """
     if clopper_pearson_lower(labels_per_test, labels_per_test, delta) < 1 - epsilon:
         raise ValueError("labels_per_test all-attack draws cannot reach 1 - epsilon at level delta")
+    if screen not in ("uniform", "suspicion") or split_rule not in ("kmeans", "guided"):
+        raise ValueError(f"unknown screen {screen} or split rule {split_rule}")
+    if screen == "suspicion" and attack_score is None:
+        raise ValueError("suspicion screening needs the model attack scores")
     z = feature_space(x, space)
     queue: list[dict] = []
     records: list[dict] = []
+    # draws that count towards the certificate (the suspicion screen does not)
+    need = labels_per_test + (1 if screen == "suspicion" else 0)
 
     def close(cluster: dict, outcome: str) -> None:
         queue[:] = [c for c in queue if c is not cluster]
         records.append({"members": cluster["members"], "labels": list(cluster["labels"]), "outcome": outcome})
+
+    def split(cluster: dict) -> list[np.ndarray]:
+        rest = np.setdiff1d(cluster["members"], cluster["drawn"])
+        if not split_mixed or len(rest) < 2 * min_cluster:
+            return []
+        if split_rule == "guided":
+            drawn = np.asarray(cluster["drawn"], dtype=np.int64)
+            labels = np.asarray(cluster["labels"])
+            nearest = np.argmin(((z[rest][:, None, :] - z[drawn][None, :, :]) ** 2).sum(-1), axis=1)
+            side = labels[nearest]
+        else:
+            side = _partition(z[rest], 2, int(rng.integers(2**31)), clusterer)
+        return [rest[side == c] for c in np.unique(side)]
 
     if len(candidates) >= min_cluster:
         assignment = _partition(z[candidates], initial_clusters, int(rng.integers(2**31)), clusterer)
@@ -238,13 +334,18 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
                  for c in np.unique(assignment)]
     certified, tests = [], []
     while queue and oracle.remaining > 0:
+        if max_certified and len(certified) >= max_certified:
+            break  # volume-matched control: stop once max_certified clusters are raised
         confirming = [c for c in queue if c["labels"]]
         cluster = max(confirming or queue, key=lambda c: len(c["members"]))
         undrawn = np.setdiff1d(cluster["members"], cluster["drawn"])
         if len(cluster["members"]) < min_cluster or not len(undrawn):
             close(cluster, "small")
             continue
-        draw = int(rng.choice(undrawn))
+        if screen == "suspicion" and not cluster["labels"]:
+            draw = int(undrawn[np.argmax(np.asarray(attack_score)[undrawn])])
+        else:
+            draw = int(rng.choice(undrawn))
         cluster["drawn"].append(draw)
         cluster["labels"].append(int(oracle.query(draw)[0]))
         attacks, n = sum(cluster["labels"]), len(cluster["labels"])
@@ -252,11 +353,8 @@ def purity_verified_propagation(x: np.ndarray, candidates: np.ndarray, oracle: L
             close(cluster, "benign")
         elif attacks < n:
             close(cluster, "mixed")
-            rest = np.setdiff1d(cluster["members"], cluster["drawn"])
-            if split_mixed and len(rest) >= 2 * min_cluster:
-                split = _partition(z[rest], 2, int(rng.integers(2**31)), clusterer)
-                queue.extend({"members": rest[split == c], "drawn": [], "labels": []} for c in np.unique(split))
-        elif n == labels_per_test:
+            queue.extend({"members": part, "drawn": [], "labels": []} for part in split(cluster))
+        elif n == need:
             close(cluster, "pass")
             lower = clopper_pearson_lower(attacks, n, delta)
             tests.append({"size": int(len(cluster["members"])), "lower": lower})

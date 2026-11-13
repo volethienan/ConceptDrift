@@ -117,13 +117,12 @@ def main_table_uq(summary):
 
 def ablation_k_uq(summary):
     rows = []
-    for k in (4, 8, 16, 32):
+    for k in (4, 16, 32):
         rows += [(f'er+uniform@d5_k{k}', f'$k={k}$, uniform'), (f'er+purity@d5_k{k}', f'$k={k}$, purity-certified')]
     rows += [(None, '\\midrule'),
              ('er+purity_nosplit@d5_k16', 'No splitting of mixed clusters'),
              ('er+purity_all@d5_k16', 'Clustering all flows, not only model-benign'),
              ('er+purity_pseudo@d5_k16', 'Training on alarms as pseudo-labels'),
-             ('arf+uniform@d5_k16', 'ARF learner, uniform fast labels'),
              ('arf+purity@d5_k16', 'ARF learner, purity-certified')]
     rows_table(summary, rows, ALL, 'ablation_k_uq.tex')
 
@@ -151,10 +150,9 @@ def prospective_table(summary):
             ('er+uniform@d5_k16', 'Uniform fast labels'),
             ('er+representative@d5_k16', 'Representative, $h=0$'),
             ('er+representative@d5_k16_h1', 'Representative, $h=1$'),
-            ('er+representative@d5_k16_h2', 'Representative, $h=2$'),
             ('er+purity@d5_k16', 'Purity-certified, $h=0$'),
             ('er+purity@d5_k16_h1', 'Purity-certified, $h=1$'),
-            ('er+purity@d5_k16_h2', 'Purity-certified, $h=2$')]
+            ]
     rows_table(summary, rows, ('nf-cse-cic-ids2018-v3', 'nf-ton-iot-v3', 'cic-ids2017'), 'prospective.tex',
                fmt=burst_cell)
 

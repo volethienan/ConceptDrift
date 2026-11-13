@@ -4250,9 +4250,39 @@ class StreamingExperiment:
             raise ValueError(f"unknown fast_lane_candidates {cfg.fast_lane_candidates}")
         seed = int(self.config.data.random_seed)
         rng = np.random.default_rng([seed, int(window.index), 7919])
-        oracle = verified_propagation.LabelOracle(
-            y_true, budget, noise=float(cfg.fast_lane_label_noise),
-            rng=np.random.default_rng([seed, int(window.index), 104723]))
+        noise_model = str(cfg.fast_lane_noise_model)
+        if noise_model == "independent":
+            oracle = verified_propagation.LabelOracle(
+                y_true, budget, noise=float(cfg.fast_lane_label_noise),
+                rng=np.random.default_rng([seed, int(window.index), 104723]))
+        else:
+            analyst = verified_propagation.correlated_labels(
+                y_true, x, window.subtypes, noise_model, float(cfg.fast_lane_label_noise),
+                np.random.default_rng([seed, int(window.index), 104729]))
+            oracle = verified_propagation.LabelOracle(analyst, budget)
+        # certificate memory (same-window lanes only): clusters raised in earlier
+        # windows left signatures; model-benign flows inside one are alarmed without
+        # new labels and leave the candidate set, so the budget goes to the rest.
+        # With memory_check every due signature first spends one uniform draw on
+        # its matched flows and is dropped when that draw is benign.
+        memory = int(cfg.fast_lane_memory)
+        remembered = np.empty(0, np.int64)
+        kept_signatures: list = []
+        z_window = verified_propagation.cluster_space(x) if memory else None
+        if memory and horizon == 0:
+            for signature in self._fast_signatures.pop(window.index, []):
+                matched = verified_propagation.match_signatures(z_window, candidates, [signature])
+                matched = np.setdiff1d(matched, remembered)
+                if not len(matched):
+                    continue
+                if cfg.fast_lane_memory_check:
+                    if oracle.remaining <= 0:
+                        break
+                    if int(oracle.query(int(rng.choice(matched)))[0]) == 0:
+                        continue
+                kept_signatures.append(signature)
+                remembered = np.union1d(remembered, matched)
+            candidates = np.setdiff1d(candidates, remembered)
         empty = np.empty(0, np.int64)
         kind = cfg.fast_lane
         if kind == "uniform":
@@ -4266,7 +4296,15 @@ class StreamingExperiment:
                 labels_per_test=cfg.fast_lane_test_labels, epsilon=cfg.fast_lane_epsilon,
                 delta=cfg.fast_lane_delta, split_mixed=bool(cfg.fast_lane_split),
                 min_cluster=int(cfg.fast_lane_min_cluster), clusterer=str(cfg.fast_lane_clusterer),
-                space=str(cfg.fast_lane_space))
+                space=str(cfg.fast_lane_space), max_certified=int(cfg.fast_lane_max_certified),
+                screen=str(cfg.fast_lane_screen), split_rule=str(cfg.fast_lane_split_rule),
+                attack_score=self._last_attack_score)
+        elif kind == "ilab":
+            result = verified_propagation.ilab_queries(
+                x, candidates, self._last_attack_score, oracle, rng, budget=budget,
+                clusters=cfg.fast_lane_clusters)
+        elif kind == "self_train":
+            result = verified_propagation.Verification(empty, empty)
         elif kind == "uniform_knn":
             result = verified_propagation.uniform_knn_propagation(x, candidates, oracle, rng, budget=budget)
         elif kind == "hierarchical":
@@ -4290,7 +4328,18 @@ class StreamingExperiment:
         labels = oracle.query(queried)
         due = self._fast_signatures.pop(window.index, [])
         if horizon == 0:
-            alarms = np.setdiff1d(result.alarms, queried)
+            alarms = np.setdiff1d(np.union1d(result.alarms, remembered), queried)
+            if memory:
+                fresh = verified_propagation.group_signatures(
+                    z_window, result.groups, float(cfg.fast_lane_radius_quantile)) if result.groups else []
+                if cfg.fast_lane_memory_check:
+                    # renewed signatures live one window more while their draws stay attack
+                    if fresh or kept_signatures:
+                        self._fast_signatures.setdefault(window.index + 1, []).extend([*kept_signatures, *fresh])
+                else:
+                    for ahead in range(1, memory + 1):
+                        if fresh:
+                            self._fast_signatures.setdefault(window.index + ahead, []).extend(fresh)
         else:
             z = verified_propagation.cluster_space(x)
             alarms = verified_propagation.match_signatures(z, model_benign, due)
@@ -4316,10 +4365,23 @@ class StreamingExperiment:
         metrics.update(self._subtype_recall_metrics(window, fused, mask=unqueried, prefix="uq_"))
         self._last_predictions = fused
         pseudo = alarms if cfg.fast_lane_pseudo_labels else alarms[:0]
+        pseudo_y = np.ones(len(pseudo), dtype=np.int64)
+        if kind == "self_train":
+            # self-training: confident predictions of this window become labels
+            tau, cap = float(cfg.fast_lane_selftrain_threshold), int(cfg.fast_lane_selftrain_cap)
+            free = np.setdiff1d(np.arange(len(x)), queried)
+            picks = []
+            for cls, mask in ((1, score[free] >= tau), (0, score[free] <= 1 - tau)):
+                chosen = free[mask]
+                if len(chosen) > cap:
+                    chosen = rng.choice(chosen, cap, replace=False)
+                picks.append((chosen, np.full(len(chosen), cls, dtype=np.int64)))
+            pseudo = np.concatenate([p for p, _ in picks]).astype(np.int64)
+            pseudo_y = np.concatenate([y for _, y in picks])
         self._fast_train_queue.append((
             int(window.index) + max(horizon - 1, 0),
             torch.cat([window.x[torch.from_numpy(queried)], window.x[torch.from_numpy(pseudo)]]),
-            torch.cat([torch.from_numpy(labels), torch.ones(len(pseudo), dtype=torch.long)]),
+            torch.cat([torch.from_numpy(labels), torch.from_numpy(pseudo_y)]),
             window.x[torch.from_numpy(queried)], torch.from_numpy(labels)))
         ready = [item for item in self._fast_train_queue if item[0] <= window.index]
         self._fast_train_queue = [item for item in self._fast_train_queue if item[0] > window.index]

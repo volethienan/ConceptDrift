@@ -37,8 +37,9 @@ def summaries():
 
 
 def tradeoff_figure(trade, held):
-    others = {'er@d5': 'ER, delay 5', 'er@d0': 'ER, no delay', 'er+uniform@d5_k16': 'Uniform fast labels',
-              'er+uniform_knn@d5_k16': 'Uniform + kNN', 'er+hierarchical@d5_k16': 'Hierarchical (DH08)'}
+    others = {'er@d5': ('ER, delay 5', 'v'), 'er@d0': ('ER, no delay', '^'),
+              'er+uniform@d5_k16': ('Uniform fast labels', 's'), 'er+uniform_knn@d5_k16': ('Uniform + kNN', 'D'),
+              'er+hierarchical@d5_k16': ('Hierarchical (DH08)', 'P')}
     held = held[held.condition.str.contains('@d5_k16$|@d5$|@d0$', regex=True)].copy()
     held['condition'] = held.condition.replace({'er+purity@d5_k16': 'er+purity@d5_k16_r4',
                                                 'er+representative@d5_k16': 'er+representative@d5_k16_c16'})
@@ -53,21 +54,21 @@ def tradeoff_figure(trade, held):
             curve = curve.sort_values('knob')
             ax.plot(100 * curve.cumulative_benign_fpr, curve.cumulative_macro_f1, '-o', color=colour, lw=2,
                     ms=4.5, mec='white', mew=1, label=label, zorder=3)
-            for _, row in curve.iloc[[0, -1]].iterrows():
-                ax.annotate(f"{key}={row.knob}", (100 * row.cumulative_benign_fpr, row.cumulative_macro_f1),
-                            textcoords='offset points', xytext=(4, -9 if key == 'r' else 4), fontsize=6, color=MUTED)
-        for condition, label in others.items():
+            if len(curve) > 1:  # label only the two ends of each curve, on opposite sides
+                for (_, row), offset in zip(curve.iloc[[0, -1]].iterrows(), ((5, -10), (-22, 5)) if key == 'r' else ((5, 4), (5, 4))):
+                    ax.annotate(f"{key}={row.knob}", (100 * row.cumulative_benign_fpr, row.cumulative_macro_f1),
+                                textcoords='offset points', xytext=offset, fontsize=6, color=colour)
+        for condition, (label, marker) in others.items():
             row = part[part.condition == condition]
             if len(row):
-                ax.plot(100 * row.cumulative_benign_fpr, row.cumulative_macro_f1, 's', color=MUTED, ms=4, zorder=2)
-                ax.annotate(label, (100 * row.cumulative_benign_fpr.iloc[0], row.cumulative_macro_f1.iloc[0]),
-                            textcoords='offset points', xytext=(4, 2), fontsize=6, color=MUTED)
+                ax.plot(100 * row.cumulative_benign_fpr, row.cumulative_macro_f1, marker, color=MUTED, ms=4.5,
+                        mec='white', mew=0.6, zorder=2, label=label)
         ax.set_title(title, fontsize=8, color=INK)
         ax.set_xlabel('Benign FPR (%)')
     axes[0].set_ylabel('Cumulative Macro-F1')
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='lower center', ncol=2, fontsize=7)
-    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=6.5)
+    fig.tight_layout(rect=(0, 0.13, 1, 1))
     fig.savefig(FIG / 'tradeoff.pdf'); fig.savefig(FIG / 'tradeoff.png', dpi=160)
     plt.close(fig)
 

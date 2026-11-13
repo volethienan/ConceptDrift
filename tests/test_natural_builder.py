@@ -76,3 +76,13 @@ def test_too_many_seeds_for_a_segment_fails(capture):
     root, _ = capture
     with pytest.raises(ValueError, match='segment'):
         natural.build(arguments(root / 'c', seeds='1,2,3,4,5'))
+
+
+def test_conflicting_rows_marks_every_copy_of_a_mixed_feature_vector(tmp_path):
+    frame = pd.DataFrame({'IN_BYTES': [1.0, 1.0, 2.0, 2.0, 3.0, np.nan, np.nan],
+                          'OUT_PKTS': [5.0, 5.0, 6.0, 6.0, 7.0, 8.0, 8.0],
+                          'Label': [0, 1, 1, 1, 0, 1, 0]})
+    path = tmp_path / 'c.csv'
+    frame.to_csv(path, index=False)
+    mask = natural.conflicting_rows(path, ['IN_BYTES', 'OUT_PKTS'], frame.Label.to_numpy(float), chunksize=2)
+    assert mask.tolist() == [True, True, False, False, False, True, True]

@@ -79,6 +79,25 @@ def select(times: np.ndarray, labels: np.ndarray, n_windows: int, window_size: i
     return {seed: np.stack(parts) for seed, parts in chosen.items()}, summary, int((~valid).sum())
 
 
+def conflicting_rows(path: Path, features: list[str], labels: np.ndarray, chunksize: int) -> np.ndarray:
+    """Rows whose model feature vector also occurs with the opposite label.
+
+    No behaviour-only classifier can separate such flows, so the conflict-free
+    variant (``--drop-conflicts``) removes every copy of them, of both labels.
+    """
+    hashes = []
+    rows = 0
+    for chunk in pd.read_csv(path, usecols=features, chunksize=chunksize, low_memory=False):
+        values = chunk[features].apply(pd.to_numeric, errors='coerce')
+        hashes.append(pd.util.hash_pandas_object(values, index=False).to_numpy(np.uint64))
+        rows += len(chunk)
+        print(f'hash rows={rows}', flush=True)
+    frame = pd.DataFrame({'h': np.concatenate(hashes), 'y': labels})
+    spread = frame.groupby('h')['y'].agg(['min', 'max'])
+    mixed = spread.index[(spread['min'] == 0) & (spread['max'] == 1)]
+    return frame['h'].isin(mixed).to_numpy()
+
+
 def extract(path: Path, features: list[str], wanted: np.ndarray, chunksize: int):
     wanted = np.unique(wanted)
     x = np.empty((len(wanted), len(features)), dtype=np.float32)
@@ -107,6 +126,13 @@ def build(args) -> None:
         times, labels, rows = scan(path, args.chunksize)
         if rows != spec.total_rows:
             raise ValueError(f'{dataset}: expected {spec.total_rows} rows, read {rows}')
+        conflicts = 0
+        if getattr(args, 'drop_conflicts', False):
+            mask = conflicting_rows(path, features, labels, args.chunksize)
+            conflicts = int(mask.sum())
+            print(f'{dataset}: {conflicts} conflicting rows dropped '
+                  f'({int((mask & (labels == 1)).sum())} attack, {int((mask & (labels == 0)).sum())} benign)', flush=True)
+            times = np.where(mask, np.nan, times)
         sample_seed = int.from_bytes(dataset.encode(), 'little') % (2**32) ^ args.sample_salt
         chosen, segments, invalid = select(times, labels, args.n_windows, args.window_size, seeds, sample_seed)
         wanted, raw, subtypes = extract(path, features, np.concatenate([v.reshape(-1) for v in chosen.values()]),
@@ -134,7 +160,8 @@ def build(args) -> None:
             manifest = {
                 'protocol_version': PROTOCOL_VERSION, 'builder': 'tools/build_natural_streams.py',
                 'dataset_key': dataset, 'dataset_name': spec.name, 'source_path': str(path.resolve()),
-                'source_sha256': source_sha256, 'source_rows': rows, 'invalid_rows_excluded': invalid,
+                'source_sha256': source_sha256, 'source_rows': rows, 'invalid_rows_excluded': invalid - conflicts,
+                'conflicting_rows_excluded': conflicts,
                 'scenario': 'Natural-Chronological', 'stream_seed': seed, 'stream_seed_set': seeds,
                 'sample_seed': sample_seed, 'window_size': args.window_size, 'n_windows': args.n_windows,
                 'warmup_windows': args.warmup_windows, 'feature_count': len(features),
@@ -157,6 +184,8 @@ def main() -> None:
     parser.add_argument('--warmup-windows', type=int, default=4)
     parser.add_argument('--sample-salt', type=int, default=20261018)
     parser.add_argument('--chunksize', type=int, default=500_000)
+    parser.add_argument('--drop-conflicts', action='store_true',
+                        help='remove every flow whose feature vector also occurs with the opposite label')
     build(parser.parse_args())
 
 

@@ -20,7 +20,45 @@ METHODS = {
     "representative": lambda x, c, o, r: vp.representative_propagation(x, c, o, r, clusters=8),
     "uniform_knn": lambda x, c, o, r: vp.uniform_knn_propagation(x, c, o, r, budget=16),
     "hierarchical": lambda x, c, o, r: vp.hierarchical_sampling(x, c, o, r, budget=16),
+    "purity_suspicion_guided": lambda x, c, o, r: vp.purity_verified_propagation(
+        x, c, o, r, labels_per_test=4, epsilon=0.4, delta=0.2, screen="suspicion", split_rule="guided",
+        attack_score=np.abs(x[:, 0])),
 }
+
+
+def test_suspicion_screen_is_outside_the_certificate():
+    """With suspicion screening a cluster needs labels_per_test uniform draws after the screen."""
+    x, y = _window()
+    result = vp.purity_verified_propagation(x, np.arange(len(x)), vp.LabelOracle(y, 64), np.random.default_rng(2),
+                                            labels_per_test=4, epsilon=0.4, delta=0.2, screen="suspicion",
+                                            attack_score=np.abs(x[:, 0]))
+    passed = [r for r in result.diagnostics["records"] if r["outcome"] == "pass"]
+    assert passed and all(len(r["labels"]) == 5 for r in passed)
+    assert y[result.alarms].mean() == 1.0
+
+
+def test_suspicion_and_guided_split_recover_bursts_hidden_in_one_cluster():
+    """One cluster holding benign traffic and both bursts: a uniform first draw is
+    usually benign and drops it; the suspicion screen finds the attack, the
+    confirmation draws show the cluster is mixed, and the guided split isolates
+    the bursts."""
+    x, y = _window()
+    found = []
+    for seed in range(5):
+        result = vp.purity_verified_propagation(
+            x, np.arange(len(x)), vp.LabelOracle(y, 64), np.random.default_rng(seed), initial_clusters=1,
+            labels_per_test=4, epsilon=0.4, delta=0.2, screen="suspicion", split_rule="guided",
+            attack_score=np.abs(x[:, 0]))
+        assert not result.alarms.size or y[result.alarms].mean() >= 0.95  # epsilon allows a little impurity
+        found.append(result.alarms.size)
+    assert min(found) >= 40
+
+
+def test_suspicion_screen_needs_scores():
+    x, y = _window()
+    with pytest.raises(ValueError):
+        vp.purity_verified_propagation(x, np.arange(len(x)), vp.LabelOracle(y, 16), np.random.default_rng(0),
+                                       labels_per_test=4, epsilon=0.4, delta=0.2, screen="suspicion")
 
 
 @pytest.mark.parametrize("name", sorted(METHODS))
@@ -98,3 +136,28 @@ def test_certificate_audit_counts():
     out = _certificate_audit(records, y, epsilon=0.3)
     assert out["cert_pass"] == 2 and out["cert_pass_impure"] == 1
     assert out["cert_pass_benign"] == 5 and out["cert_max_benign_frac"] == 0.5
+
+
+def test_correlated_noise_models():
+    x, y = _window()
+    subtypes = np.where(y == 1, np.r_[np.zeros(len(y) - 120, dtype=object).astype(str), ['a'] * 80, ['b'] * 40], 'Benign')
+    rng = np.random.default_rng(0)
+    group = vp.correlated_labels(y, x, None, 'group', 1.0, rng)
+    np.testing.assert_array_equal(group, 1 - y)  # every group misjudged
+    assert (vp.correlated_labels(y, x, None, 'group', 0.0, rng) == y).all()
+    missed = vp.correlated_labels(y, x, subtypes, 'subtype', 1.0, rng)
+    assert missed.sum() == 0  # every attack subtype labelled benign, benign untouched
+    with pytest.raises(ValueError):
+        vp.correlated_labels(y, x, None, 'subtype', 0.1, rng)
+
+
+def test_ilab_queries_and_max_certified():
+    x, y = _window()
+    score = np.linspace(0, 1, len(y))
+    oracle = vp.LabelOracle(y, 16)
+    result = vp.ilab_queries(x, np.arange(len(x)), score, oracle, np.random.default_rng(1), budget=16, clusters=8)
+    assert len(oracle.queried) <= 16 and set(result.alarms) <= set(result.queried)
+    assert (y[result.alarms] == 1).all()
+    capped = vp.purity_verified_propagation(x, np.arange(len(x)), vp.LabelOracle(y, 32), np.random.default_rng(1),
+                                            labels_per_test=4, epsilon=0.4, delta=0.2, max_certified=1)
+    assert capped.diagnostics['certified_clusters'] <= 1

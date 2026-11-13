@@ -1,0 +1,9 @@
+{
+ "features": 49,
+ "flows": 16933808,
+ "benign": 51989,
+ "macro_f1": 0.993853287218276,
+ "benign_fpr": 0.014060666679489893,
+ "benign_with_attack_twin": 0.02448594895073958,
+ "conflicting_flows": 4652
+}

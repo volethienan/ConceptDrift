@@ -37,7 +37,7 @@ VERSION = 'dasp-v2-dev-runner-20261018-r0'
 DEV_DATASETS = ('nf-bot-iot-v3', 'nf-unsw-nb15-v3')
 DEV_STREAM_SEEDS = (2001, 2002, 2003)
 DEV_MODEL_SEEDS = (91,)
-STAGES = ('audit', 'dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
+STAGES = ('audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'dev', 'final', 'lodo', 'screen', 'shortcut', 'smoke', 'sweep', 'tradeoff', 'verify', 'verify2')
 
 
 def _grid(**axes):
@@ -441,6 +441,109 @@ def audit_settings(overrides_of):
     return out
 
 
+# revision: conditions requested by the round-1 review. Correlated analyst
+# errors (whole look-alike groups mislabelled; whole attack subtypes missed)
+# for every propagating lane, independent noise for the lanes not yet run
+# with it, certified r=2 under noise, a self-training (pseudo-label)
+# baseline, an ILAB-style query lane (uncertainty + rare category, no
+# propagation), the fast lanes on top of immediate labels (d=0), a
+# volume-matched control for the confirmation draws (at most one certified
+# cluster per window for r=1 and r=4), and the fast-label budget with K held
+# at 8. Held-out runs add the K sensitivity of the fixed method (K=4, 16).
+REVISION_NOISE = 0.10
+
+
+def revision_settings(overrides_of, heldout=False):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    r2 = {'baselines.fast_lane_test_labels': 2, 'baselines.fast_lane_epsilon': certified_epsilon(2)}
+    lanes = {'purity': {}, 'purity_r2': r2, 'representative': {}, 'uniform_knn': {}, 'hierarchical': {}}
+
+    def lane(name, d=5, k=16, **extra):
+        base = 'purity' if name.startswith('purity') else name
+        return er | _lane(d, k, base, **(lanes.get(name, {}) | extra))
+
+    out = []
+    for model in ('group', 'subtype'):
+        for name in lanes:
+            out.append((f'er+{name}@d5_k16_{model}10', 'experience_replay',
+                        lane(name, **{'baselines.fast_lane_noise_model': model,
+                                      'baselines.fast_lane_label_noise': REVISION_NOISE})))
+    for name in ('purity_r2', 'uniform_knn', 'hierarchical'):
+        out.append((f'er+{name}@d5_k16_noise10', 'experience_replay',
+                    lane(name, **{'baselines.fast_lane_label_noise': REVISION_NOISE})))
+    out.append(('er+purity_r2@d5_k16', 'experience_replay', lane('purity_r2')))
+    for d in (1, 5):
+        out.append((f'er+self_train@d{d}_k16', 'experience_replay', er | _lane(d, 16, 'self_train')))
+        out.append((f'er+ilab@d{d}_k16', 'experience_replay', er | _lane(d, 16, 'ilab')))
+    for name in ('purity', 'representative'):
+        out.append((f'er+{name}@d0_k16', 'experience_replay', lane(name, d=0)))
+    out.append(('er+purity_r1cap1@d5_k16', 'experience_replay',
+                lane('purity', **{'baselines.fast_lane_test_labels': 1, 'baselines.fast_lane_epsilon': certified_epsilon(1),
+                                  'baselines.fast_lane_max_certified': 1})))
+    out.append(('er+purity_cap1@d5_k16', 'experience_replay',
+                lane('purity', **{'baselines.fast_lane_max_certified': 1})))
+    for k in (4, 32):
+        out.append((f'er+purity@d5_k{k}_K8', 'experience_replay',
+                    er | _lane(5, k, 'purity', **{'baselines.fast_lane_clusters': 8})))
+    if heldout:
+        out += [(f'er+purity@d5_k16_c{c}', 'experience_replay', lane('purity', **{'baselines.fast_lane_clusters': c}))
+                for c in (4, 16)]
+    return out
+
+
+# dedup: NF-ToN-IoT rebuilt without contradictory duplicates (every flow whose
+# feature vector also occurs with the opposite label is removed, see
+# tools/build_natural_streams.py --drop-conflicts); the main comparison at d5.
+DEDUP_LANES = ('uniform', 'uniform_knn', 'hierarchical', 'representative', 'purity')
+
+
+def dedup_settings(overrides_of):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    out = [('er@d0', 'experience_replay', er | {'training.label_delay': 0}),
+           ('er@d5', 'experience_replay', er | {'training.label_delay': 5})]
+    return out + [(f'er+{lane}@d5_k16', 'experience_replay', er | _lane(5, 16, lane)) for lane in DEDUP_LANES]
+
+
+# pilot: development-only screening of two changes to the purity lane that keep
+# its certificate: the first draw of a cluster is its most suspicious member by
+# model score and lies outside the certificate (s), and mixed clusters are split
+# by their drawn labels (g). Held-out streams are not touched by this stage.
+# Second round: certificate memory (signatures of clusters raised in window t alarm
+# matching model-benign flows of later windows without new labels; m<H>: H windows;
+# mc: renewed one window at a time by one uniform draw), also for the uncertified
+# representative lane, so the ablation shows whether memory needs the certificate.
+PILOT_VARIANTS = {('purity', 's'): {'baselines.fast_lane_screen': 'suspicion'},
+                  ('purity', 'g'): {'baselines.fast_lane_split_rule': 'guided'},
+                  ('purity', 'sg'): {'baselines.fast_lane_screen': 'suspicion',
+                                     'baselines.fast_lane_split_rule': 'guided'},
+                  ('purity', 'm1'): {'baselines.fast_lane_memory': 1},
+                  ('purity', 'm2'): {'baselines.fast_lane_memory': 2},
+                  ('purity', 'mc'): {'baselines.fast_lane_memory': 1, 'baselines.fast_lane_memory_check': True},
+                  ('representative', 'm2'): {'baselines.fast_lane_memory': 2},
+                  ('representative', 'mc'): {'baselines.fast_lane_memory': 1,
+                                             'baselines.fast_lane_memory_check': True}}
+
+
+def pilot_settings(overrides_of, names=('s', 'g', 'sg')):
+    er = overrides_of('experience_replay') | {'baselines.update_label_budget': 128}
+    return [(f'er+{lane}_{name}@d5_k16', 'experience_replay', er | _lane(5, 16, lane, **extra))
+            for (lane, name), extra in PILOT_VARIANTS.items() if name in names]
+
+
+def pilot2_settings(overrides_of):
+    return pilot_settings(overrides_of, names=('m1', 'm2', 'mc'))
+
+
+# memory: the certificate-memory ablation for the paper. Development streams add
+# the noisy-analyst runs (the clean ones are the pilot2 runs, same conditions);
+# held-out CIC-IDS2017 runs every condition once, after the design was fixed.
+def memory_settings(overrides_of, heldout=False):
+    clean = [item for item in pilot_settings(overrides_of, names=('m2', 'mc'))]
+    noisy = [(f'{name}_noise10', method, overrides | {'baselines.fast_lane_label_noise': REVISION_NOISE})
+             for name, method, overrides in pilot_settings(overrides_of, names=('m2',))]
+    return clean + noisy if heldout else noisy
+
+
 def verify_jobs(args):
     overrides_of = selected_overrides(args)
     if args.heldout:
@@ -457,8 +560,13 @@ def verify_jobs(args):
         if args.heldout:
             raise ValueError('the tradeoff stage runs on the development streams only')
         cells = [c for c in cells if c[0] in TRADEOFF_DATASETS]
-    settings = {'audit': audit_settings, 'tradeoff': tradeoff_settings, 'verify': verify_settings,
-                'verify2': verify2_settings}[stage](overrides_of)
+    if stage == 'revision':
+        settings = revision_settings(overrides_of, heldout=bool(args.heldout))
+    elif stage == 'memory':
+        settings = memory_settings(overrides_of, heldout=bool(args.heldout))
+    else:
+        settings = {'audit': audit_settings, 'dedup': dedup_settings, 'pilot': pilot_settings, 'pilot2': pilot2_settings, 'tradeoff': tradeoff_settings,
+                    'verify': verify_settings, 'verify2': verify2_settings}[stage](overrides_of)
     if stage == 'audit' and args.heldout:
         settings = [item for item in settings if item[0] in AUDIT_HELDOUT]
     return [dict(stage=stage, dataset=d, scenario=s, stream_seed=seed, model_seed=m,
@@ -620,7 +728,7 @@ def final_conditions(selection_paths):
 def jobs_for(args):
     if args.stage in ('sweep', 'shortcut'):
         return analysis_jobs(args)
-    if args.stage in ('audit', 'verify', 'tradeoff', 'verify2'):
+    if args.stage in ('audit', 'dedup', 'memory', 'pilot', 'pilot2', 'revision', 'verify', 'tradeoff', 'verify2'):
         return verify_jobs(args)
     if args.stage == 'lodo':
         grids = {method: grid for method, grid in SUITES[args.suite].items()
