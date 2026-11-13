@@ -1,73 +1,58 @@
-# DASP-NIDS
+# Purity-certified same-window verification for NIDS under label delay
 
-**Current review branch:** the improved original DASP and separate reviewer
-experiments are documented in [docs/DASP_ORIGINAL_REVIEW.md](docs/DASP_ORIGINAL_REVIEW.md).
-The primary five-dataset/ten-scenario/eight-method design is unchanged.
-Historical results below are not validation of the revised implementation.
+Code and result snapshots for experiments on network intrusion detection when
+analyst labels arrive several windows late. A small part of each window's
+labelling budget is verified at once (the *fast lane*); the fast labels are
+spent on clusters of the flows the model calls benign, and a cluster is raised
+as one alert group only when `r` uniformly drawn members are all attacks, which
+bounds the chance of raising a cluster whose benign share exceeds a tolerance.
 
-Reproducible prequential experiments for binary network intrusion detection under concept drift.
+## Contents
 
-## Current Research Task
-
-- Main method: `modular_dasp` — Drift-Attributed Subspace Plasticity.
-- Core idea: localize drift at module/subspace level, then repair only affected modules.
-- Architecture: `ModularOnlineMLP` with disjoint feature-group modules.
-- Evaluation: test-then-train with one-window label delay.
-- Main comparator: `ssf` on the same streams and seeds. The original matrix retains method-specific supervision semantics; the revision matrix adds a common total-label-access contract.
-
-## Kept Experiment Scenarios
-
-| Path | Purpose |
+| Path | What it holds |
 |---|---|
-| `configs/modular_dasp_main.yaml` | Main controlled partial-drift pilot against SSF |
-| `configs/modular_dasp_smoke.yaml` | Small auxiliary smoke run/test config |
-| `configs/smoke.yaml` | Legacy lightweight unit-test fixture |
-| `src/dasp_nids/` | Algorithm, baselines, stream runner, metrics |
-| `tests/` | Unit and regression tests |
-| `data/` | Optional raw/prepared IDS data inputs |
+| `src/dasp_nids/` | stream runner, learners, label oracle, fast lanes (`verified_propagation.py`) |
+| `tools/build_natural_streams.py`, `tools/build_natural_cic_stream.py`, `tools/build_natural_cidds_stream.py` | chronological stream construction (`--drop-conflicts` for the conflict-free NF-ToN-IoT rebuild) |
+| `tools/run_dasp_v2.py` | experiment stages: `verify`, `verify2`, `tradeoff`, `audit`, `revision`, `dedup`, `memory`, `acceptance`, `pilot`, `pilot2` |
+| `tools/analyze_dasp_v2.py` | per-run metrics and stage analyses |
+| `paper/jtit/*.py` | scripts that turn the result snapshots into the tables and figures |
+| `results_snapshot/` | per-run metrics and summaries used for every reported number (`verify_20261109`, `verify2_20261110`, `audit_20261112`, `revision_20261113`); `dev/dev_selection.json` holds the selected learner configurations |
+| `tests/` | unit tests, including label-leakage checks that flip every unqueried label |
 
-## Run Smoke Test
+## Data
 
-```powershell
-$env:PYTHONPATH='src'
-python -m dasp_nids.cli run --config configs\modular_dasp_smoke.yaml
+All datasets are public and are not redistributed here: the NetFlow v3 releases
+of UNSW-NB15, CSE-CIC-IDS2018, ToN-IoT and BoT-IoT (Luay et al., 2025),
+CIC-IDS2017 (MachineLearningCVE feature files) and CIDDS-001 (OpenStack weeks
+1-2). Place them under `data/` as expected by `tools/build_controlled_nf_streams.py`
+and the natural-stream builders.
+
+## Reproducing
+
+```bash
+python -m venv .venv-revision
+.venv-revision/Scripts/pip install -r requirements-revision-lock.txt   # Windows; use bin/ on Linux
+.venv-revision/Scripts/pip install -e .
+
+# build chronological streams (example: NF-ToN-IoT)
+python tools/build_natural_streams.py --datasets nf-ton-iot-v3 --stream-seeds 3001,3002,3003 \
+    --output-dir prepared_streams_v2/natural
+
+# plan, then run one stage (shards are independent processes)
+python tools/run_dasp_v2.py --stage revision --selection results_snapshot/dev/dev_selection.json \
+    --prepared-root prepared_streams_v2 --output-root results/revision
+python tools/run_dasp_v2.py --stage revision --selection results_snapshot/dev/dev_selection.json \
+    --prepared-root prepared_streams_v2 --output-root results/revision --execute --resume --shard 1/4
+
+# tables from the snapshots (or from fresh results with --results results)
+python paper/jtit/make_revision_tables.py
+python -m pytest tests
 ```
 
-## Compare Against SSF
+Held-out streams (CIC-IDS2017, CIDDS-001) are planned with `--heldout`.
+Every stream is ordered in time, preprocessing is fitted on warm-up windows
+only, and each window is scored only on the flows the fast lane did not query.
 
-```powershell
-$env:PYTHONPATH='src'
-python -m dasp_nids.cli compare `
-  --config configs\modular_dasp_main.yaml `
-  --methods modular_dasp ssf `
-  --seeds 9501
-```
+## License
 
-## Key Evidence Columns
-
-Each run writes `windows.csv` with:
-
-- `requirement_module_*`: localized drift attribution by module.
-- `plasticity_module_*`: routed update intensity by module.
-- `localized_repair_modules`: modules selected for repair.
-- `localized_repair_module_count`: number of repaired subspaces.
-- `global_update`: should remain false for `modular_dasp`.
-
-
-## Small Pilot
-
-```powershell
-$env:PYTHONPATH='src'
-python toolsun_modular_dasp_small_pilot.py
-```
-
-This runs 5 datasets × 3 scenarios × 1 stream seed × 1 model seed × 8 methods and writes `outputs_pilot_small/pilot_summary.csv` plus `outputs_pilot_small/PILOT_SMALL_REPORT.md`.
-
-## Verification
-
-```powershell
-$env:PYTHONPATH='src'
-pytest tests/test_core.py::test_modular_dasp_strict_freeze_updates_only_routed_module -q
-```
-
-For the current global Python install, PyTorch emits a NumPy 2.x compatibility warning, but the smoke run and focused unit test complete successfully.
+MIT, see `LICENSE`. Citation metadata is in `CITATION.cff`.
